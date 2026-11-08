@@ -37,7 +37,7 @@ jobs:
             libdrm-dev libgbm-dev libegl-dev libgles-dev \
             libx11-dev libxext-dev libxcursor-dev libxi-dev libxfixes-dev libxrandr-dev \
             libxss-dev libxtst-dev libwayland-dev libxkbcommon-dev wayland-protocols \
-            libdecor-0-dev
+            libdecor-0-dev libcurl4-openssl-dev
 
       - name: Install macOS packages
         if: runner.os == 'macOS'
