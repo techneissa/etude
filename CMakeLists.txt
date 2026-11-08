@@ -49,6 +49,11 @@ if(MSVC)
   target_compile_options(etude_warnings INTERFACE /W4)
 else()
   target_compile_options(etude_warnings INTERFACE -Wall -Wextra -Wpedantic -Wshadow -Wconversion)
+  # GCC's maybe-uninitialized fires on moves of a std::optional at -O2 (GCC 13, x86-64) where
+  # nothing is uninitialized, and under -Werror that fails the build. Clang still checks it.
+  if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    target_compile_options(etude_warnings INTERFACE -Wno-maybe-uninitialized)
+  endif()
 endif()
 
 include(cmake/Dependencies.cmake)
