@@ -1,5 +1,7 @@
 # Every third-party library is a release tarball pinned by SHA-256, so a fresh clone builds the same
 # everywhere. To upgrade one, change the URL and replace the hash with `shasum -a 256` of the new file.
+# A GitHub source archive is fetched from codeload.github.com first, which serves the same bytes
+# when github.com's archive and release links fail; DOWNLOAD_NAME keeps the cached file's name.
 include(FetchContent)
 set(CMAKE_POLICY_DEFAULT_CMP0135 NEW) # extracted files get the extraction time, so rebuilds work
 
@@ -53,7 +55,9 @@ if(ETUDE_BUILD_APP)
   set(SDL_TEST_LIBRARY OFF CACHE BOOL "" FORCE)
   set(SDL_EXAMPLES OFF CACHE BOOL "" FORCE)
   etude_declare(SDL3
-    URL https://github.com/libsdl-org/SDL/archive/refs/tags/release-3.4.16.tar.gz
+    URL https://codeload.github.com/libsdl-org/SDL/tar.gz/refs/tags/release-3.4.16
+        https://github.com/libsdl-org/SDL/archive/refs/tags/release-3.4.16.tar.gz
+    DOWNLOAD_NAME release-3.4.16.tar.gz
     URL_HASH SHA256=c2ee715e42ec520c4d11fd8d249ef1d2b2baf4ad31148b72b3b000276c0b3633
     SYSTEM)
   FetchContent_MakeAvailable(SDL3)
@@ -65,7 +69,8 @@ if(ETUDE_BUILD_APP)
   # SOURCE_SUBDIR points at a missing folder so MakeAvailable only downloads, and the
   # add_subdirectory below runs once FreeType is in place.
   etude_declare(SDL3_ttf
-    URL https://github.com/libsdl-org/SDL_ttf/releases/download/release-3.2.2/SDL3_ttf-3.2.2.tar.gz
+    URL https://www.libsdl.org/projects/SDL_ttf/release/SDL3_ttf-3.2.2.tar.gz
+        https://github.com/libsdl-org/SDL_ttf/releases/download/release-3.2.2/SDL3_ttf-3.2.2.tar.gz
     URL_HASH SHA256=63547d58d0185c833213885b635a2c0548201cc8f301e6587c0be1a67e1e045d
     SOURCE_SUBDIR no-add-subdirectory
     SYSTEM)
@@ -122,21 +127,24 @@ if(ETUDE_BUILD_APP)
   set(ETUDE_FONT_MUSIC_FILE ${font_noto_music_SOURCE_DIR}/NotoMusic-Regular.ttf)
 
   # Icons for the touch UI: the Lucide icon font (ISC; the icons derived from Feather are MIT), from
-  # the lucide-font release archive. Merged into the ImGui font atlas, so a control can draw an icon
+  # the lucide-static package on npm (the same lucide.ttf as the GitHub release, whose downloads
+  # are less reliable). Merged into the ImGui font atlas, so a control can draw an icon
   # by its codepoint (app/ui/icons.hpp lists the ones used). A binary release must ship
   # Lucide's ISC licence text with it.
   etude_declare(font_lucide
-    URL https://github.com/lucide-icons/lucide/releases/download/1.55.0/lucide-font-1.55.0.zip
-    URL_HASH SHA256=f5f44ae0e910259ed1b832e370b3bb96405bb88abef6658b1166fc7053b108c9
+    URL https://registry.npmjs.org/lucide-static/-/lucide-static-1.55.0.tgz
+    URL_HASH SHA256=809e2e759aeecd05ef3abc231395a0ccb6a58169823cbd26a425960b4d282797
     SOURCE_SUBDIR no-add-subdirectory)
   FetchContent_MakeAvailable(font_lucide)
-  set(ETUDE_ICON_FONT_FILE ${font_lucide_SOURCE_DIR}/lucide.ttf)
+  set(ETUDE_ICON_FONT_FILE ${font_lucide_SOURCE_DIR}/font/lucide.ttf)
 
   # Dear ImGui (MIT), the settings and menu screens. The release tarball has no CMake project, so
   # it is only downloaded here and app/CMakeLists.txt builds its core files plus the SDL3 platform
   # and SDLRenderer3 renderer backends into a static library.
   etude_declare(imgui
-    URL https://github.com/ocornut/imgui/archive/refs/tags/v1.92.9b.tar.gz
+    URL https://codeload.github.com/ocornut/imgui/tar.gz/refs/tags/v1.92.9b
+        https://github.com/ocornut/imgui/archive/refs/tags/v1.92.9b.tar.gz
+    DOWNLOAD_NAME v1.92.9b.tar.gz
     URL_HASH SHA256=21d8a0a565e85dce943e375db00812c2f3f0ab21f3f0f7964e364a63422d7f99
     SOURCE_SUBDIR no-add-subdirectory
     SYSTEM)
@@ -151,13 +159,17 @@ if(ETUDE_BUILD_APP)
   # a shared library, so both are only downloaded and built here as static libraries private to
   # app/, with every warning off (not ours to fix).
   etude_declare(verovio
-    URL https://github.com/rism-digital/verovio/archive/refs/tags/version-6.3.0.tar.gz
+    URL https://codeload.github.com/rism-digital/verovio/tar.gz/refs/tags/version-6.3.0
+        https://github.com/rism-digital/verovio/archive/refs/tags/version-6.3.0.tar.gz
+    DOWNLOAD_NAME version-6.3.0.tar.gz
     URL_HASH SHA256=095a561e9bd26c97787ad49e01009576d1ca234feae3995948c5aede97a40598
     SOURCE_SUBDIR no-add-subdirectory
     SYSTEM)
   FetchContent_MakeAvailable(verovio)
   etude_declare(lunasvg
-    URL https://github.com/sammycage/lunasvg/archive/refs/tags/v3.5.0.tar.gz
+    URL https://codeload.github.com/sammycage/lunasvg/tar.gz/refs/tags/v3.5.0
+        https://github.com/sammycage/lunasvg/archive/refs/tags/v3.5.0.tar.gz
+    DOWNLOAD_NAME v3.5.0.tar.gz
     URL_HASH SHA256=1abf1472ee6c4d19797916e8cc3c2e4b628e0d81178ffac60bdb0d457e32c690
     SOURCE_SUBDIR no-add-subdirectory
     SYSTEM)
@@ -229,7 +241,9 @@ if(ETUDE_BUILD_APP OR ETUDE_BUILD_TOOLS)
   set(LIBREMIDI_NO_JACK ON CACHE BOOL "" FORCE)
   set(LIBREMIDI_NO_NETWORK ON CACHE BOOL "" FORCE)
   etude_declare(libremidi
-    URL https://github.com/celtera/libremidi/archive/refs/tags/v5.4.3.tar.gz
+    URL https://codeload.github.com/celtera/libremidi/tar.gz/refs/tags/v5.4.3
+        https://github.com/celtera/libremidi/archive/refs/tags/v5.4.3.tar.gz
+    DOWNLOAD_NAME v5.4.3.tar.gz
     URL_HASH SHA256=a1c369c6aab01c80f1506345d1c099a167b330d1d59159aa7583f7b0b9f966b9
     SYSTEM)
   FetchContent_MakeAvailable(libremidi)
@@ -240,7 +254,9 @@ endif()
 # downloaded here; cmake/Synth.cmake compiles the implementation into etude_tsf.
 if(ETUDE_BUILD_APP OR ETUDE_BUILD_TESTS)
   etude_declare(tinysoundfont
-    URL https://github.com/schellingb/TinySoundFont/archive/853a0a171759f1ddba0de1442133a75912bbeffa.tar.gz
+    URL https://codeload.github.com/schellingb/TinySoundFont/tar.gz/853a0a171759f1ddba0de1442133a75912bbeffa
+        https://github.com/schellingb/TinySoundFont/archive/853a0a171759f1ddba0de1442133a75912bbeffa.tar.gz
+    DOWNLOAD_NAME 853a0a171759f1ddba0de1442133a75912bbeffa.tar.gz
     URL_HASH SHA256=76c356df524f71f2a34f67fa0cb2cb946036fe7a65d2930a849569c5e742fa57
     SOURCE_SUBDIR no-add-subdirectory
     SYSTEM)
@@ -254,8 +270,10 @@ endif()
 # private to core. Their warnings are not ours to fix: the include folders are SYSTEM and the
 # compile flags drop all warnings.
 etude_declare(pugixml
-  URL https://github.com/zeux/pugixml/releases/download/v1.16/pugixml-1.16.tar.gz
-  URL_HASH SHA256=4cee1ca4aad395170f4c7a07824f3bdd41f28316c6e1e1090a1425b278ec0b4b
+  URL https://codeload.github.com/zeux/pugixml/tar.gz/refs/tags/v1.16
+      https://github.com/zeux/pugixml/archive/refs/tags/v1.16.tar.gz
+  DOWNLOAD_NAME v1.16.tar.gz
+  URL_HASH SHA256=357bcab8877dc9943f355d3a72daba1b053238ba955f50fa81586afb65090219
   SOURCE_SUBDIR no-add-subdirectory
   SYSTEM)
 FetchContent_MakeAvailable(pugixml)
@@ -266,7 +284,9 @@ target_compile_definitions(etude_pugixml PUBLIC
   PUGIXML_NO_EXCEPTIONS PUGIXML_NO_XPATH PUGIXML_NO_STL)
 
 etude_declare(miniz
-  URL https://github.com/richgel999/miniz/archive/refs/tags/3.1.2.tar.gz
+  URL https://codeload.github.com/richgel999/miniz/tar.gz/refs/tags/3.1.2
+      https://github.com/richgel999/miniz/archive/refs/tags/3.1.2.tar.gz
+  DOWNLOAD_NAME 3.1.2.tar.gz
   URL_HASH SHA256=98468f8924934b723276680f85238b6c78bf1f8b49b4459cc9b7214a20e2e9fb
   SOURCE_SUBDIR no-add-subdirectory
   SYSTEM)
@@ -296,7 +316,9 @@ set_target_properties(etude_miniz etude_pugixml PROPERTIES COMPILE_WARNING_AS_ER
 # power-of-two sizes and out-of-place real transforms, where KISS FFT never allocates after
 # kiss_fftr_alloc, so a transform is safe on the real-time analysis thread.
 etude_declare(kissfft
-  URL https://github.com/mborgerding/kissfft/archive/refs/tags/131.2.0.tar.gz
+  URL https://codeload.github.com/mborgerding/kissfft/tar.gz/refs/tags/131.2.0
+      https://github.com/mborgerding/kissfft/archive/refs/tags/131.2.0.tar.gz
+  DOWNLOAD_NAME 131.2.0.tar.gz
   URL_HASH SHA256=205a8f6a448ef12b091f8ac6a514b5091bb5f6b0b543431ed75f673116cf5cbf
   SOURCE_SUBDIR no-add-subdirectory
   SYSTEM)
@@ -371,7 +393,9 @@ endif()
 # hash the new file; the upload tests (tests/upload_http_test.cpp) must pass.
 if(ETUDE_BUILD_APP OR ETUDE_BUILD_TESTS)
   etude_declare(httplib
-    URL https://github.com/yhirose/cpp-httplib/archive/refs/tags/v0.61.0.tar.gz
+    URL https://codeload.github.com/yhirose/cpp-httplib/tar.gz/refs/tags/v0.61.0
+        https://github.com/yhirose/cpp-httplib/archive/refs/tags/v0.61.0.tar.gz
+    DOWNLOAD_NAME v0.61.0.tar.gz
     URL_HASH SHA256=f03bdb0bee4911d6db0335bc103f0f441ae70c527e993c1f4b3f177586b042d3
     SOURCE_SUBDIR no-add-subdirectory
     SYSTEM)
@@ -388,7 +412,9 @@ endif()
 # app/qr_code.* alone. Version 1.8.0, pinned by the SHA-256 of the GitHub tag archive.
 if(ETUDE_BUILD_APP OR ETUDE_BUILD_TESTS)
   etude_declare(qrcodegen
-    URL https://github.com/nayuki/QR-Code-generator/archive/refs/tags/v1.8.0.tar.gz
+    URL https://codeload.github.com/nayuki/QR-Code-generator/tar.gz/refs/tags/v1.8.0
+        https://github.com/nayuki/QR-Code-generator/archive/refs/tags/v1.8.0.tar.gz
+    DOWNLOAD_NAME v1.8.0.tar.gz
     URL_HASH SHA256=2ec0a4d33d6f521c942eeaf473d42d5fe139abcfa57d2beffe10c5cf7d34ae60
     SOURCE_SUBDIR no-add-subdirectory
     SYSTEM)
@@ -406,7 +432,9 @@ endif()
 
 if(ETUDE_BUILD_TESTS)
   etude_declare(doctest
-    URL https://github.com/doctest/doctest/archive/refs/tags/v2.5.3.tar.gz
+    URL https://codeload.github.com/doctest/doctest/tar.gz/refs/tags/v2.5.3
+        https://github.com/doctest/doctest/archive/refs/tags/v2.5.3.tar.gz
+    DOWNLOAD_NAME v2.5.3.tar.gz
     URL_HASH SHA256=174ebc4e769928959614789c5b4e9c3d0a0f81a62bb608756b127bfebfb21331
     SYSTEM)
   FetchContent_MakeAvailable(doctest)

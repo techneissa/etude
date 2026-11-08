@@ -43,6 +43,13 @@ jobs:
         if: runner.os == 'macOS'
         run: brew install ninja
 
+      - name: Cache dependency downloads
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/etude/downloads
+          key: deps-${{ hashFiles('cmake/Dependencies.cmake') }}
+          restore-keys: deps-
+
       - name: Configure
         run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_COMPILE_WARNING_AS_ERROR=ON -DETUDE_PIANO_FROM_SOURCE=OFF
 
