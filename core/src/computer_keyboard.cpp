@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/computer_keyboard.hpp"
+#include "etude/computer_keyboard.hpp"
 
 #include <algorithm>
 
-namespace toonval {
+namespace etude {
 namespace {
 
 struct KeyDef {
@@ -209,4 +209,4 @@ void ComputerKeyboard::release_all(std::int64_t time_ns, std::vector<MidiEvent>&
     }
 }
 
-} // namespace toonval
+} // namespace etude

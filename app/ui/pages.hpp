@@ -1,58 +1,63 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // The settings pages, built from the kit and editing the UiModel: the sheet (sheet.cpp) shows the
-// top-level ones in its rail, Quick first. Each page lays itself out for the width it gets, in one
-// column or two.
+// ones in `kRail` in its rail, Notes first. Each page lays itself out for the width it gets, in one
+// column or two. Each setting is drawn on one page only (settings_catalogue.hpp).
 #pragma once
 
 #include "kit.hpp"
+#include "page_ids.hpp"
+#include "settings_catalogue.hpp"
+#include "sheet_layout.hpp"
 
 #include <array>
 #include <cstdint>
 #include <string>
 
-namespace toonval::app::ui {
+namespace etude::app::ui {
 
-enum class Page : std::uint8_t {
-    Quick,
-    Look,
-    Colours, // under Look
-    Names,
-    Effects,
-    View,
-    Keyboard, // under View
-    Presets,
-    Practice,
-};
+// Draws the body of `p` at the cursor, as wide as the content region (`body`, the page area the
+// sheet gives it). Returns the page to open when a row drills further, else `p`.
+Page draw_page(Kit& k, Page p, UiModel& model, int columns, ImVec2 body);
+// What a page adds to the sheet's header row, drawn after the title (the Effects page's
+// Colours | Hit effects switch).
+void draw_page_header(Kit& k, Page p, ImVec2 body, int columns);
 
-// The pages in the sheet's rail, in order.
-inline constexpr std::array<Page, 7> kRail{Page::Quick, Page::Look,    Page::Names,   Page::Effects,
-                                           Page::View,  Page::Presets, Page::Practice};
-
-const char* page_title(Page p);
 const char* page_icon(Page p);
-// The page a sub-page's back button returns to (Colours to Look, Keyboard to View); a rail page
-// returns itself.
-Page parent_of(Page p);
-inline bool is_subpage(Page p) { return parent_of(p) != p; }
 
-// Draws the body of `p` at the cursor, as wide as the content region. Returns the page to open
-// when a row drills further (Colours, Keyboard), else `p`.
-Page draw_page(Kit& k, Page p, UiModel& model, int columns);
+// The MIDI input and output rows of Settings > Input (pages_midi_ports.cpp).
+void midi_port_rows(Kit& k, AppSettings& app);
 
-// Switches note names off, or back on to what they were.
-void toggle_names(UiModel& model);
-const char* style_label(NoteStyle s);
-// Style tiles and the built-in look chips, shared with the strip bar's cards.
+// The Input page (pages_input.cpp).
+void page_input(Kit& k, UiModel& model, int columns);
+
+// The Configs page (pages_configs.cpp).
+void page_configs(Kit& k, UiModel& model, int columns);
+// Developer (--panel configs-copy): the page opens with its question asked for the last of the
+// other profiles, once they are known.
+void configs_page_ask_last();
+// The icon audit leaves out what the Configs page's open question covers (from here on, in
+// this frame), the sheet's header included: the sheet calls it before drawing that.
+void configs_page_cover_audit();
+
+// The Add songs page (pages_add_songs.cpp).
+void page_add_songs(Kit& k, UiModel& model, int columns);
+
+// The About page (pages_about.cpp) and the sheet that replaces its body for a link
+// (pages_about_link.cpp): Back, the address's name, its QR code and the address in text.
+void page_about(Kit& k, UiModel& model, int columns);
+void draw_link_sheet(Kit& k, AboutPort& port, ImVec2 origin, float w, float body_h);
+// The row of icon colours under the About page's Updates (pages_about_icons.cpp).
+void about_icon_picker(Kit& k, UiModel& model);
+
+// The View page's Learn colours (pages_learn_colours.cpp): the four sections' shades and a reset.
+void learn_colour_rows(Kit& k, UiModel& model);
+// The settings sheet was opened: Learn colours shows its first tab again.
+void learn_colours_sheet_opened();
+
+// The note style tiles (Notes page).
 bool style_picker(Kit& k, LookSettings& look);
-bool builtin_looks(Kit& k, UiModel& model, int columns_hint = 0);
-
-// The name of the built-in or user look `model.look` is ("Custom" for none). The player's own
-// preferences (octave numbering, key size, typing letters) do not count: built-in looks keep them.
-std::string current_preset_name(const UiModel& model);
-// Applies the next look in the cycle (built-ins, then the used user slots).
-void cycle_preset(UiModel& model);
-// Quick names for the naming dialog: a touch-only device has no keyboard to type on.
+// Quick names for the look-naming dialog: one tap each, before the keyboard is wanted.
 inline constexpr std::array<const char*, 6> kQuickNames{"My look", "Practice", "Bright",
                                                         "Night",   "Big keys", "Soft"};
 
-} // namespace toonval::app::ui
+} // namespace etude::app::ui

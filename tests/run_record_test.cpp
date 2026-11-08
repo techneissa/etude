@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/run_record.hpp"
+#include "etude/run_record.hpp"
 
-#include "toonval/midi_event.hpp"
-#include "toonval/transport.hpp"
+#include "etude/midi_event.hpp"
+#include "etude/transport.hpp"
 
 #include <doctest/doctest.h>
 
@@ -12,7 +12,7 @@
 #include <string>
 #include <vector>
 
-using namespace toonval;
+using namespace etude;
 
 namespace {
 
@@ -153,7 +153,7 @@ TEST_CASE("a real Flow run becomes a record") {
     CHECK(r.right.graded == 4);
     CHECK(r.left.graded == 0);
     CHECK(r.longest_combo == 3);
-    CHECK(r.accuracy(HandFilter::Both) == doctest::Approx(0.75));
+    CHECK(r.accuracy(HandFilter::Both).value() == doctest::Approx(0.75));
     REQUIRE(r.measures.size() == 2);
     CHECK(r.measures[0] == RunBar{1, 3, 0, 0});
     CHECK(r.measures[1] == RunBar{2, 1, 1, 0});
@@ -164,12 +164,12 @@ TEST_CASE("a real Flow run becomes a record") {
 
 TEST_CASE("accuracy per hand comes from the hit and graded counts") {
     RunRecord r = sample_record();
-    CHECK(r.left.accuracy() == doctest::Approx(18.0 / 20.0));
-    CHECK(r.right.accuracy() == doctest::Approx(25.0 / 28.0));
-    CHECK(r.all.accuracy() == doctest::Approx(43.0 / 48.0));
-    CHECK(r.accuracy(HandFilter::Left) == doctest::Approx(18.0 / 20.0));
-    CHECK(r.accuracy(HandFilter::Right) == doctest::Approx(25.0 / 28.0));
-    CHECK(r.accuracy(HandFilter::Both) == doctest::Approx(43.0 / 48.0));
+    CHECK(r.left.accuracy().value() == doctest::Approx(18.0 / 20.0));
+    CHECK(r.right.accuracy().value() == doctest::Approx(25.0 / 28.0));
+    CHECK(r.all.accuracy().value() == doctest::Approx(43.0 / 48.0));
+    CHECK(r.accuracy(HandFilter::Left).value() == doctest::Approx(18.0 / 20.0));
+    CHECK(r.accuracy(HandFilter::Right).value() == doctest::Approx(25.0 / 28.0));
+    CHECK(r.accuracy(HandFilter::Both).value() == doctest::Approx(43.0 / 48.0));
     CHECK(r.graded_notes() == 48);
 }
 
@@ -208,7 +208,7 @@ TEST_CASE("sanitized forces every field into its documented range") {
     r.all.graded = -1;
     r.counts.perfect = 2'000'000'000;
     RunRecord s = sanitized(r);
-    CHECK(s.speed_percent == 150);
+    CHECK(s.speed_percent == 200);
     CHECK(s.transpose_semitones == -12);
     CHECK(s.duration_ms == 0);
     CHECK(s.local_day == kMaxRunDay);
@@ -220,7 +220,11 @@ TEST_CASE("sanitized forces every field into its documented range") {
 
     r = sample_record();
     r.speed_percent = 83;
-    CHECK(sanitized(r).speed_percent == 85); // steps of 5, as the Transport
+    CHECK(sanitized(r).speed_percent == 83); // a whole percent, as the Transport keeps it
+    r.speed_percent = 5000;
+    CHECK(sanitized(r).speed_percent == 200);
+    r.speed_percent = 3;
+    CHECK(sanitized(r).speed_percent == 25);
     r.duration_ms = kMaxRunDurationMs + 1;
     CHECK(sanitized(r).duration_ms == kMaxRunDurationMs);
 }
@@ -525,4 +529,26 @@ TEST_CASE("fuzz: random bytes never crash, and anything accepted is valid and st
         }
     }
     CHECK(accepted > 0); // the flipped-byte cases keep some valid, so the check above ran
+}
+
+TEST_CASE("is_attempt: nothing pressed is no attempt, any hit or wrong press is") {
+    EvaluationSummary s;
+    CHECK_FALSE(is_attempt(s)); // nothing graded
+    // Watching the song: every note graded Missed, nothing pressed.
+    s.counts.missed = 12;
+    s.all = {.graded = 12, .hit = 0};
+    CHECK_FALSE(is_attempt(s));
+    // Only wrong presses: still a run the player played.
+    s.wrong = 1;
+    CHECK(is_attempt(s));
+    // A single hit.
+    s.wrong = 0;
+    s.counts.perfect = 1;
+    s.counts.missed = 11;
+    s.all = {.graded = 12, .hit = 1};
+    CHECK(is_attempt(s));
+    // Wrong presses with no note to grade: nothing to score.
+    EvaluationSummary ungraded;
+    ungraded.wrong = 3;
+    CHECK_FALSE(is_attempt(ungraded));
 }

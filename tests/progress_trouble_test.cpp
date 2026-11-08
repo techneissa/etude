@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/progress.hpp"
+#include "etude/progress.hpp"
 
-#include "toonval/transport.hpp"
+#include "timing_factor.hpp"
+
+#include "etude/transport.hpp"
 
 #include "progress_fixtures.hpp"
 
@@ -13,10 +15,10 @@
 #include <random>
 #include <vector>
 
-using namespace toonval;
-using toonval::testing::make;
-using toonval::testing::make_bars;
-using toonval::testing::RunSpec;
+using namespace etude;
+using etude::testing::make;
+using etude::testing::make_bars;
+using etude::testing::RunSpec;
 
 namespace {
 
@@ -426,11 +428,49 @@ TEST_CASE("trouble: 100,000 runs of other songs and of one song") {
     auto ms =
         std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - t0)
             .count();
-    CHECK(ms < 10'000);
+    CHECK(ms < 10'000 * etude::test::kTimingFactor);
     REQUIRE(rare.spots.size() == 1);
     CHECK(rare.spots[0].first_measure == 12);
     CHECK(rare.runs_read == 30);
     CHECK(common.spots.empty());
     CHECK(common.runs_read == 30); // only the latest are read
     CHECK(none.runs_read == 0);
+}
+
+TEST_CASE("trouble: bars far apart are read like bars side by side") {
+    // Runs of a song whose bars run 1..40 with 10 and 11 bad. A second set has one run that also
+    // graded a bar far out (a damaged file): the bars it shares with the others are read the same.
+    std::vector<RunRecord> near_runs;
+    std::vector<RunRecord> far_runs;
+    for (int i = 0; i < 6; ++i) {
+        near_runs.push_back(make_bars(7, 40, {10, 11}, 3, 100 + i));
+        far_runs.push_back(make_bars(7, 40, {10, 11}, 3, 100 + i));
+    }
+    RunSpec far;
+    far.song = 7;
+    far.day = 200;
+    far.bars.push_back({90'000, 4, 4, 0});
+    far_runs.push_back(make(far));
+
+    const TroublePlan dense = trouble_plan(near_runs, 7);
+    const TroublePlan sparse = trouble_plan(far_runs, 7);
+    REQUIRE_FALSE(dense.spots.empty());
+    CHECK(dense.bars.size() == 40);
+    CHECK(sparse.bars.size() == 41);
+    for (const BarHeat& b : dense.bars) {
+        const BarHeat* other = bar(sparse, b.measure);
+        REQUIRE(other != nullptr);
+        CHECK(other->attempts == b.attempts);
+        CHECK(other->reliable == b.reliable);
+        // The far run is the newest, so it ages the others by a run: the heat of a bar both read
+        // is the same only where the age does not show (the rate is 0 everywhere but 10 and 11).
+        if (b.measure != 10 && b.measure != 11) {
+            CHECK(other->heat == b.heat);
+        }
+    }
+    CHECK(bar(sparse, 90'000) != nullptr);
+    // Bars in a gap are not made up, and the order is by measure.
+    for (std::size_t i = 1; i < sparse.bars.size(); ++i) {
+        CHECK(sparse.bars[i - 1].measure < sparse.bars[i].measure);
+    }
 }

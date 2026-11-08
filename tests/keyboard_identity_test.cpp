@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/keyboard_identity.hpp"
+#include "etude/keyboard_identity.hpp"
 
 #include <array>
 #include <map>
@@ -8,7 +8,7 @@
 
 #include <doctest/doctest.h>
 
-using namespace toonval;
+using namespace etude;
 
 namespace {
 // A table with USB ids, for the rules the built-in table does not exercise yet.

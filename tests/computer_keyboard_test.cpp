@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/computer_keyboard.hpp"
+#include "etude/computer_keyboard.hpp"
 
-#include "toonval/key_state.hpp"
-#include "toonval/pitch.hpp"
+#include "etude/key_state.hpp"
+#include "etude/pitch.hpp"
 
 #include <utility>
 #include <vector>
 
 #include <doctest/doctest.h>
 
-using namespace toonval;
+using namespace etude;
 
 namespace {
 

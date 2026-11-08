@@ -1,18 +1,24 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/content_hash.hpp"
+#include "etude/content_hash.hpp"
 
-namespace toonval {
+namespace etude {
 
-std::uint64_t content_hash(const void* data, std::size_t size) {
-    constexpr std::uint64_t kOffsetBasis = 0xcbf29ce484222325ULL;
-    constexpr std::uint64_t kPrime = 0x100000001b3ULL;
+namespace {
+constexpr std::uint64_t kOffsetBasis = 0xcbf29ce484222325ULL;
+constexpr std::uint64_t kPrime = 0x100000001b3ULL;
+} // namespace
+
+std::uint64_t content_hash_extend(std::uint64_t hash, const void* data, std::size_t size) {
     const auto* bytes = static_cast<const std::uint8_t*>(data);
-    std::uint64_t hash = kOffsetBasis;
     for (std::size_t i = 0; i < size; ++i) {
         hash ^= bytes[i];
         hash *= kPrime;
     }
     return hash;
+}
+
+std::uint64_t content_hash(const void* data, std::size_t size) {
+    return content_hash_extend(kOffsetBasis, data, size);
 }
 
 std::string content_hash_hex(std::uint64_t hash) {
@@ -47,4 +53,4 @@ bool parse_content_hash_hex(std::string_view text, std::uint64_t& out) {
     return true;
 }
 
-} // namespace toonval
+} // namespace etude

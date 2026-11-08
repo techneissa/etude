@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/screen_layout.hpp"
+#include "etude/screen_layout.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -8,7 +8,7 @@
 
 #include <doctest/doctest.h>
 
-using namespace toonval;
+using namespace etude;
 
 namespace {
 

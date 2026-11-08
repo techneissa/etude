@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/session_restore.hpp"
+#include "etude/session_restore.hpp"
 
 #include <doctest/doctest.h>
 
 #include <limits>
 #include <string>
 
-using namespace toonval;
+using namespace etude;
 using Outcome = RestoreOutcome;
 
 namespace {
@@ -33,8 +33,7 @@ SessionState saved_in(double position_s = 30.0) {
     s.loop_enabled = true;
     s.auto_speed_enabled = true;
     s.auto_speed_start_percent = 50;
-    s.count_in_beats = 4;
-    s.metronome = true;
+    s.count_in_bars = 2;
     s.mode = PracticeMode::Flow;
     s.keyboard = KeyboardChoice::Manual;
     s.keyboard_lowest = 28;
@@ -45,8 +44,6 @@ SessionState saved_in(double position_s = 30.0) {
 // The part of the state that belongs to the player and the device, not the song.
 void check_preferences_kept(const SessionState& state, const SessionState& saved) {
     CHECK(state.mode == saved.mode);
-    CHECK(state.count_in_beats == saved.count_in_beats);
-    CHECK(state.metronome == saved.metronome);
     CHECK(state.auto_speed_enabled == saved.auto_speed_enabled);
     CHECK(state.auto_speed_start_percent == saved.auto_speed_start_percent);
     CHECK(state.auto_speed_step_percent == saved.auto_speed_step_percent);
@@ -59,6 +56,7 @@ void check_preferences_kept(const SessionState& state, const SessionState& saved
 void check_song_state_reset(const SessionState& state) {
     CHECK(state.position_s == 0.0);
     CHECK(state.speed_percent == 100);
+    CHECK(state.count_in_bars == 1);
     CHECK(state.practice_hands == HandFilter::Both);
     CHECK(state.piano_plays == PianoPlays::Nothing);
     CHECK(state.transpose_semitones == 0);
@@ -274,4 +272,103 @@ TEST_CASE("a damaged saved state still produces a valid plan in every outcome") 
             }
         }
     }
+}
+
+TEST_CASE("the library path is tried first, then the absolute one, each by content hash") {
+    SessionState saved = saved_in();
+    saved.song_abs_path = "/elsewhere/a.mid";
+    const SongProbe good{true, true, true};
+    const SongProbe changed{true, false, true};
+    const SongProbe missing{};
+    const SongProbe unreadable{true, true, false};
+
+    // Both are good: the library wins.
+    CHECK(choose_song_source(saved, good, good) == SongSource::Library);
+    // The library file is gone, moved or changed: the absolute path takes over.
+    CHECK(choose_song_source(saved, missing, good) == SongSource::Absolute);
+    CHECK(choose_song_source(saved, changed, good) == SongSource::Absolute);
+    CHECK(choose_song_source(saved, unreadable, good) == SongSource::Absolute);
+    // Neither is good: the library answers when it found a file, else the absolute path does.
+    CHECK(choose_song_source(saved, changed, changed) == SongSource::Library);
+    CHECK(choose_song_source(saved, missing, changed) == SongSource::Absolute);
+    CHECK(choose_song_source(saved, missing, missing) == SongSource::Library);
+    // A path that was not saved is not tried, whatever its probe says.
+    SessionState only_lib = saved;
+    only_lib.song_abs_path.clear();
+    CHECK(choose_song_source(only_lib, missing, good) == SongSource::Library);
+    SessionState only_abs = saved;
+    only_abs.song_path.clear();
+    CHECK(choose_song_source(only_abs, good, good) == SongSource::Absolute);
+    CHECK(choose_song_source(only_abs, good, missing) == SongSource::Absolute);
+}
+
+TEST_CASE("a session with only an absolute path restores from it and forgets it when gone") {
+    SessionState saved = saved_in();
+    saved.song_path.clear();
+    saved.song_abs_path = "/elsewhere/a.mid";
+    Song song = song_of(120.0);
+    RestorePlan ok = plan_restore(saved, true, true, &song);
+    CHECK(ok.outcome == Outcome::Restored);
+    CHECK(ok.load_song);
+    CHECK(ok.state.song_abs_path == saved.song_abs_path);
+    CHECK(ok.state.position_s == doctest::Approx(30.0));
+
+    RestorePlan gone = plan_restore(saved, false, false, nullptr);
+    CHECK(gone.outcome == Outcome::SongMissing);
+    CHECK(gone.state.song_abs_path.empty());
+    CHECK(gone.state.song_path.empty());
+    CHECK_FALSE(gone.state.has_song());
+}
+
+TEST_CASE("what the player changed while the song was read wins over the saved session") {
+    SessionState saved = saved_in(12.0);
+    saved.mode = PracticeMode::Wait;
+    saved.practice_hands = HandFilter::Right;
+    saved.piano_plays = PianoPlays::Right;
+    saved.speed_percent = 80;
+    saved.count_in_bars = 2;
+    saved.transpose_semitones = 3;
+    const SessionState at_start = saved; // the controller had taken the saved choices in
+
+    // Nothing changed: the planned state stands, song-bound parts included.
+    CHECK(keep_player_changes(saved, at_start, at_start) == saved);
+
+    SessionState now = at_start;
+    now.practice_hands = HandFilter::Left;
+    now.transpose_semitones = -2;
+    const SessionState kept = keep_player_changes(saved, at_start, now);
+    CHECK(kept.practice_hands == HandFilter::Left);
+    CHECK(kept.transpose_semitones == -2);
+    // The rest of the saved session is untouched.
+    CHECK(kept.mode == PracticeMode::Wait);
+    CHECK(kept.speed_percent == 80);
+    CHECK(kept.count_in_bars == 2);
+    CHECK(kept.piano_plays == PianoPlays::Right);
+    CHECK(kept.position_s == saved.position_s);
+    CHECK(kept.song_hash == saved.song_hash);
+
+    // A plan that reset the song-bound choices (the song changed) still gives way to the player's
+    // own change, and only to that.
+    SessionState reset = saved;
+    reset.speed_percent = 100;
+    reset.practice_hands = HandFilter::Both;
+    reset.transpose_semitones = 0;
+    SessionState tweaked = at_start;
+    tweaked.speed_percent = 120;
+    const SessionState over = keep_player_changes(reset, at_start, tweaked);
+    CHECK(over.speed_percent == 120);
+    CHECK(over.practice_hands == HandFilter::Both);
+    CHECK(over.transpose_semitones == 0);
+
+    // Every field the function looks at is one the controller can change without a song.
+    SessionState flipped = at_start;
+    flipped.mode = PracticeMode::Flow;
+    flipped.piano_plays = PianoPlays::Nothing;
+    flipped.count_in_bars = 0;
+    flipped.speed_percent = 50;
+    const SessionState all = keep_player_changes(saved, at_start, flipped);
+    CHECK(all.mode == PracticeMode::Flow);
+    CHECK(all.piano_plays == PianoPlays::Nothing);
+    CHECK(all.count_in_bars == 0);
+    CHECK(all.speed_percent == 50);
 }

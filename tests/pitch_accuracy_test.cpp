@@ -5,11 +5,11 @@
 // tools/pitch-eval runs the full set. Under AddressSanitizer every fourth key is used: the run is
 // about five times slower there, and the sanitizer is after memory errors, not accuracy (the
 // other builds gate every key).
-#include "toonval/pitch_eval.hpp"
+#include "etude/pitch_eval.hpp"
 
 #include <doctest/doctest.h>
 
-using namespace toonval;
+using namespace etude;
 
 namespace {
 

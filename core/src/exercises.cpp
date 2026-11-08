@@ -1,14 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/exercises.hpp"
+#include "etude/exercises.hpp"
 
-#include "toonval/pitch.hpp"
-#include "toonval/song_builder.hpp"
+#include "etude/accidental_text.hpp"
+#include "etude/pitch.hpp"
+#include "etude/song_builder.hpp"
 
 #include <algorithm>
 #include <array>
 #include <cmath>
 
-namespace toonval {
+namespace etude {
 namespace {
 
 // ----- Fingering tables -----
@@ -21,6 +22,7 @@ struct Pattern {
     int first;
     std::array<int, 7> cycle;
     int top;
+    int second = 0; // finger of degree 2 in the first octave when it differs from the cycle's
 };
 
 // Right hand.
@@ -39,6 +41,13 @@ constexpr Pattern kLhFlat{3, {3, 2, 1, 4, 3, 2, 1}, 3}; // Db Eb Ab Bb, C# minor
 constexpr Pattern kLhGb{4, {4, 3, 2, 1, 3, 2, 1}, 4};   // F#/Gb, F# minor
 constexpr Pattern kLhBbMinor{2, {2, 1, 3, 2, 1, 4, 3}, 2};
 constexpr Pattern kLhEbMinor{2, {2, 1, 4, 3, 2, 1, 3}, 2};
+// G# natural minor: its seventh (F#) is black, so the thumb moves from the harmonic's F## to E.
+constexpr Pattern kLhGsNatural{3, {3, 2, 1, 3, 2, 1, 4}, 3};
+// Melodic minor going up in F# and C#: the raised sixth (D#, A#) is black where the harmonic's
+// thumb note sits, so the 4th finger takes the sixth and the thumb the raised seventh. C# starts
+// 3 4 and then repeats 2 3 1 2 3 4 1 (the `second` field is the 4).
+constexpr Pattern kRhFsMelodic{2, {2, 3, 1, 2, 3, 4, 1}, 2};
+constexpr Pattern kRhCsMelodic{3, {2, 3, 1, 2, 3, 4, 1}, 2, 4};
 
 // Indexed by the tonic's pitch class, C = 0.
 constexpr std::array<const Pattern*, 12> kMajorRh{&kRhC,  &kRhDb, &kRhC,  &kRhEb, &kRhC,  &kRhF,
@@ -46,24 +55,60 @@ constexpr std::array<const Pattern*, 12> kMajorRh{&kRhC,  &kRhDb, &kRhC,  &kRhEb
 constexpr std::array<const Pattern*, 12> kMajorLh{&kLhC,    &kLhFlat, &kLhC,    &kLhFlat,
                                                   &kLhC,    &kLhC,    &kLhGb,   &kLhC,
                                                   &kLhFlat, &kLhC,    &kLhFlat, &kLhB};
-// Natural and harmonic minor share these.
+// Natural, harmonic and melodic minor share these, bar the exceptions in find_pattern.
 constexpr std::array<const Pattern*, 12> kMinorRh{&kRhC,  &kRhAb, &kRhC,  &kRhEb, &kRhC,  &kRhF,
                                                   &kRhAb, &kRhC,  &kRhAb, &kRhC,  &kRhBb, &kRhC};
 constexpr std::array<const Pattern*, 12> kMinorLh{&kLhC,    &kLhFlat, &kLhC,       &kLhEbMinor,
                                                   &kLhC,    &kLhC,    &kLhGb,      &kLhC,
                                                   &kLhFlat, &kLhC,    &kLhBbMinor, &kLhB};
 
-const Pattern* find_pattern(int root_pc, ScaleType type, Hand hand) {
+// Melodic minor goes up with its own table where it differs (the right hand in F# and C#) and
+// comes down as the natural minor, finger for finger.
+const Pattern* find_pattern(int root_pc, ScaleType type, Hand hand, bool descending) {
+    if (type == ScaleType::MelodicMinor && descending) {
+        type = ScaleType::NaturalMinor;
+    }
     const bool major = type == ScaleType::Major;
-    const bool minor = type == ScaleType::NaturalMinor || type == ScaleType::HarmonicMinor;
+    const bool minor = type == ScaleType::NaturalMinor || type == ScaleType::HarmonicMinor ||
+                       type == ScaleType::MelodicMinor;
     if ((!major && !minor) || (hand != Hand::Right && hand != Hand::Left)) {
         return nullptr;
     }
-    const auto pc = static_cast<std::size_t>(pitch_class(root_pc));
+    const int pc = pitch_class(root_pc);
+    const auto idx = static_cast<std::size_t>(pc);
     if (hand == Hand::Right) {
-        return major ? kMajorRh[pc] : kMinorRh[pc];
+        if (type == ScaleType::MelodicMinor && pc == 6) {
+            return &kRhFsMelodic;
+        }
+        if (type == ScaleType::MelodicMinor && pc == 1) {
+            return &kRhCsMelodic;
+        }
+        return major ? kMajorRh[idx] : kMinorRh[idx];
     }
-    return major ? kMajorLh[pc] : kMinorLh[pc];
+    if (type == ScaleType::NaturalMinor && pc == 8) {
+        return &kLhGsNatural;
+    }
+    return major ? kMajorLh[idx] : kMinorLh[idx];
+}
+
+std::vector<int> fingers_of(const Pattern* p, int octaves) {
+    if (p == nullptr || octaves < 1 || octaves > 2) {
+        return {};
+    }
+    std::vector<int> out;
+    const int count = 7 * octaves + 1;
+    for (int i = 0; i < count; ++i) {
+        if (i == 0) {
+            out.push_back(p->first);
+        } else if (i == 1 && p->second != 0) {
+            out.push_back(p->second);
+        } else if (i == count - 1) {
+            out.push_back(p->top);
+        } else {
+            out.push_back(p->cycle[static_cast<std::size_t>(i % 7)]);
+        }
+    }
+    return out;
 }
 
 // ----- Chord shapes -----
@@ -87,6 +132,10 @@ constexpr std::array<int, 5> kDom9{0, 4, 7, 10, 14};
 constexpr std::array<int, 5> kMaj9{0, 4, 7, 11, 14};
 constexpr std::array<int, 5> kMin9{0, 3, 7, 10, 14};
 constexpr std::array<int, 2> kPower{0, 7};
+constexpr std::array<int, 4> kDom7Sus4{0, 5, 7, 10};
+constexpr std::array<int, 5> kDom7Flat9{0, 4, 7, 10, 13};
+constexpr std::array<int, 5> kMaj69{0, 4, 7, 9, 14};
+constexpr std::array<int, 6> kDom13{0, 4, 7, 10, 14, 21};
 
 const char* quality_words(ChordQuality q) {
     switch (q) {
@@ -128,6 +177,14 @@ const char* quality_words(ChordQuality q) {
         return "minor 9th";
     case ChordQuality::Power:
         return "power chord";
+    case ChordQuality::Dominant7Sus4:
+        return "dominant 7th sus4";
+    case ChordQuality::Dominant7Flat9:
+        return "dominant 7th flat 9";
+    case ChordQuality::Major69:
+        return "6/9";
+    case ChordQuality::Dominant13:
+        return "dominant 13th";
     case ChordQuality::None:
         break;
     }
@@ -261,9 +318,11 @@ struct Line {
 };
 
 // Orders `up` (ascending positions) and `down` (the same positions seen coming down, from the top)
-// by direction. `down_pitches` may differ from the ascending ones (melodic minor).
+// by direction. `down_pitches` and `down_fingers` may differ from the ascending ones (melodic
+// minor).
 void arrange(Direction dir, const std::vector<int>& up_pitches, const std::vector<int>& up_fingers,
-             const std::vector<int>& down_pitches, Line& line) {
+             const std::vector<int>& down_pitches, const std::vector<int>& down_fingers,
+             Line& line) {
     const std::size_t n = up_pitches.size();
     auto push_up = [&] {
         for (std::size_t i = 0; i < n; ++i) {
@@ -274,7 +333,7 @@ void arrange(Direction dir, const std::vector<int>& up_pitches, const std::vecto
     auto push_down = [&](std::size_t stop) { // positions n-1 .. stop
         for (std::size_t i = n; i-- > stop;) {
             line.pitches.push_back(down_pitches[i]);
-            line.fingers.push_back(up_fingers[i]);
+            line.fingers.push_back(down_fingers[i]);
         }
     };
     switch (dir) {
@@ -286,10 +345,12 @@ void arrange(Direction dir, const std::vector<int>& up_pitches, const std::vecto
         break;
     case Direction::UpDown:
         push_up();
-        // The top is already played; the way down starts below it.
+        // The top is played once, with the finger the way down needs.
+        line.fingers.back() = down_fingers[n - 1];
+        // The way down starts below the top.
         for (std::size_t i = n - 1; i-- > 0;) {
             line.pitches.push_back(down_pitches[i]);
-            line.fingers.push_back(up_fingers[i]);
+            line.fingers.push_back(down_fingers[i]);
         }
         break;
     }
@@ -340,22 +401,11 @@ int default_base(int pc, Hand hand) {
 } // namespace
 
 std::vector<int> scale_fingers(int root_pc, ScaleType type, Hand hand, int octaves) {
-    const Pattern* p = find_pattern(root_pc, type, hand);
-    if (p == nullptr || octaves < 1 || octaves > 2) {
-        return {};
-    }
-    std::vector<int> out;
-    const int count = 7 * octaves + 1;
-    for (int i = 0; i < count; ++i) {
-        if (i == 0) {
-            out.push_back(p->first);
-        } else if (i == count - 1) {
-            out.push_back(p->top);
-        } else {
-            out.push_back(p->cycle[static_cast<std::size_t>(i % 7)]);
-        }
-    }
-    return out;
+    return fingers_of(find_pattern(root_pc, type, hand, false), octaves);
+}
+
+std::vector<int> scale_fingers_descending(int root_pc, ScaleType type, Hand hand, int octaves) {
+    return fingers_of(find_pattern(root_pc, type, hand, true), octaves);
 }
 
 // ----- Scales -----
@@ -398,16 +448,20 @@ ExerciseResult make_scale_exercise(const ScaleSpec& spec, const ExerciseSettings
                                        ? scale_fingers(spec.root_pc, spec.type, hand, spec.octaves)
                                        : std::vector<int>{};
         fingers.resize(up.size(), 0);
+        std::vector<int> fingers_down =
+            asc.size() == 7 ? scale_fingers_descending(spec.root_pc, spec.type, hand, spec.octaves)
+                            : std::vector<int>{};
+        fingers_down.resize(up.size(), 0);
         Line line;
         line.hand = hand;
-        arrange(spec.direction, up, fingers, down, line);
+        arrange(spec.direction, up, fingers, down, fingers_down, line);
         lines.push_back(std::move(line));
     }
     const Tonic tonic = default_tonic(spec.root_pc, spec.type);
-    std::string title =
-        spelled_name(SpelledNote{tonic.letter, tonic.accidental, tonic.pitch_class()}) + " " +
-        lower_first(scale_type_name(spec.type)) + " scale, " + hands_text(spec.hands) + ", " +
-        octaves_text(spec.octaves);
+    std::string title = accidental_display(spelled_name(
+                            SpelledNote{tonic.letter, tonic.accidental, tonic.pitch_class()})) +
+                        " " + lower_first(scale_type_name(spec.type)) + " scale, " +
+                        hands_text(spec.hands) + ", " + octaves_text(spec.octaves);
     return build_lines(lines, spec.hands, settings, std::move(title));
 }
 
@@ -453,6 +507,14 @@ std::span<const int> chord_intervals(ChordQuality quality) {
         return kMin9;
     case ChordQuality::Power:
         return kPower;
+    case ChordQuality::Dominant7Sus4:
+        return kDom7Sus4;
+    case ChordQuality::Dominant7Flat9:
+        return kDom7Flat9;
+    case ChordQuality::Major69:
+        return kMaj69;
+    case ChordQuality::Dominant13:
+        return kDom13;
     case ChordQuality::None:
         break;
     }
@@ -475,7 +537,7 @@ std::vector<int> inverted_tones(ChordQuality q, int inversion) {
 std::string root_name(int root_pc, ChordQuality q) {
     const Tonic t =
         default_tonic(root_pc, minor_flavoured(q) ? ScaleType::NaturalMinor : ScaleType::Major);
-    return spelled_name(SpelledNote{t.letter, t.accidental, t.pitch_class()});
+    return accidental_display(spelled_name(SpelledNote{t.letter, t.accidental, t.pitch_class()}));
 }
 
 } // namespace
@@ -520,7 +582,8 @@ ExerciseResult make_arpeggio_exercise(const ArpeggioSpec& spec, const ExerciseSe
         up.push_back(base + 12 * spec.octaves);
         Line line;
         line.hand = hand;
-        arrange(spec.direction, up, std::vector<int>(up.size(), 0), up, line);
+        const std::vector<int> no_fingers(up.size(), 0);
+        arrange(spec.direction, up, no_fingers, up, no_fingers, line);
         lines.push_back(std::move(line));
     }
     std::string title =
@@ -560,7 +623,7 @@ ExerciseResult make_chord_drill(const ChordDrillSpec& spec, const ExerciseSettin
         return fail(why);
     }
     if (spec.items.empty()) {
-        return fail("a chord drill needs at least one chord");
+        return fail("a chord exercise needs at least one chord");
     }
     if (!(spec.step_beats > 0.0) || !(spec.hold_beats > 0.0) || spec.hold_beats > spec.step_beats ||
         !std::isfinite(spec.step_beats)) {
@@ -619,8 +682,8 @@ ExerciseResult make_chord_drill(const ChordDrillSpec& spec, const ExerciseSettin
             return fail(asked + " is not recognised as a chord when played");
         }
         if (seen.root_pc != pitch_class(item.root_pc) || seen.quality != item.quality) {
-            return fail(asked + " reads as " + chord_name(seen, spec.prefer_flats) +
-                        " when played");
+            return fail(asked + " reads as " +
+                        accidental_display(chord_name(seen, spec.prefer_flats)) + " when played");
         }
 
         const std::int64_t start = static_cast<std::int64_t>(i) * step;
@@ -639,7 +702,7 @@ ExerciseResult make_chord_drill(const ChordDrillSpec& spec, const ExerciseSettin
             }
         }
         ExerciseStep s;
-        s.label = chord_name(seen, spec.prefer_flats);
+        s.label = accidental_display(chord_name(seen, spec.prefer_flats));
         s.notes = all;
         s.start_tick = start;
         r.steps.push_back(std::move(s));
@@ -668,4 +731,4 @@ std::vector<ChordDrillItem> inversion_drill(int root_pc, ChordQuality quality) {
     return items;
 }
 
-} // namespace toonval
+} // namespace etude

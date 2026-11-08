@@ -1,14 +1,17 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/look.hpp"
+#include "etude/look.hpp"
 
 #include <algorithm>
 #include <vector>
 
 #include <doctest/doctest.h>
 
-#include "toonval/pitch.hpp"
+#include "sample_looks.hpp"
 
-using namespace toonval;
+#include "etude/pitch.hpp"
+
+using namespace etude;
+using namespace etude::test;
 
 namespace {
 
@@ -30,8 +33,8 @@ std::vector<LookSettings> sweep() {
             out.push_back(s);
         }
     }
-    for (PresetId id : kAllPresets) {
-        out.push_back(preset(id));
+    for (Sample id : kAllSamples) {
+        out.push_back(sample_look(id));
     }
     return out;
 }

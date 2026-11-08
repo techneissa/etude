@@ -7,7 +7,7 @@
 #include <cstdio>
 #include <initializer_list>
 
-namespace toonval::app {
+namespace etude::app {
 namespace {
 
 std::int64_t steady_ns() {
@@ -70,4 +70,4 @@ int run_synth_test(const AudioOptions& options) {
     return 0;
 }
 
-} // namespace toonval::app
+} // namespace etude::app

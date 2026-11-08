@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/screen_layout.hpp"
+#include "etude/screen_layout.hpp"
 
 #include <algorithm>
 #include <cmath>
 
-namespace toonval {
+namespace etude {
 namespace {
 
 constexpr float kMaxWindowPx = 100000.0f;
@@ -14,8 +14,9 @@ constexpr float kMaxPxPerMm = 40.0f;
 // display still gets readable text.
 constexpr float kChordFontMm = 8.0f;
 constexpr float kChordFontHeightShare = 0.09f; // of the window height, at size 1.0
-constexpr float kStatusFontMm = 3.0f;
-constexpr float kStatusFontHeightShare = 0.024f; // of the window height, like the first renderer
+// The chord label's names are a share of that: small and calm (the setting's 1.0 is this size, not
+// the old banner's).
+constexpr float kChordLabelShare = 0.46f;
 // The key bed (fallboard strip above the keys): its height, the felt line on its lower edge and
 // the shadow it casts on the keys, as shares of the keyboard height with floors in pixels.
 constexpr float kKeyBedShare = 0.07f;
@@ -103,29 +104,89 @@ float min_name_font_px(float px_per_mm) {
     return std::round(kMinNameFontPx * std::min(px_per_mm, kMaxPxPerMm) / kDefaultPxPerMm);
 }
 
-NamePlacement place_block_name(const RectF& block, const RectF& clip, float max_font_px,
-                               int full_chars, int letter_chars, float min_font_px) {
-    const float floor_px =
-        std::isfinite(min_font_px) ? std::max(min_font_px, 1.0f) : kMinNameFontPx;
-    NamePlacement out;
-    out.label = place_label(block, clip, max_font_px, full_chars, floor_px);
-    if (out.label.visible) {
-        out.form = NameForm::Full;
-        return out;
+float min_small_name_font_px(float px_per_mm) {
+    if (!std::isfinite(px_per_mm) || px_per_mm <= 0.0f) {
+        return kMinSmallNameFontPx;
     }
-    if (letter_chars > 0 && letter_chars < full_chars) {
-        out.label = place_label(block, clip, max_font_px, letter_chars, floor_px);
-        if (out.label.visible) {
-            out.form = NameForm::Letter;
-            return out;
-        }
-    }
-    out.label = {};
-    return out;
+    return std::round(kMinSmallNameFontPx * std::min(px_per_mm, kMaxPxPerMm) / kDefaultPxPerMm);
 }
 
+float ui_window_grow(float width_px, float height_px, float px_per_mm) {
+    const float density = std::isfinite(px_per_mm) && px_per_mm > 0.0f
+                              ? std::min(px_per_mm, kMaxPxPerMm) / kDefaultPxPerMm
+                              : 1.0f;
+    const float w = std::isfinite(width_px) && width_px > 0.0f ? width_px / density : 0.0f;
+    const float h = std::isfinite(height_px) && height_px > 0.0f ? height_px / density : 0.0f;
+    const float grow = std::min(w / kUiDesignWidthPt, h / kUiDesignHeightPt);
+    return std::clamp(std::isfinite(grow) ? grow : 1.0f, 1.0f, kUiMaxGrow);
+}
+
+namespace {
+// The scale floor in pixels: `kUiMinScale` points at `pixel_density` pixels a point.
+float min_scale_px(float pixel_density) {
+    return kUiMinScale * (std::isfinite(pixel_density) && pixel_density > 0.0f ? pixel_density : 1.0f);
+}
+} // namespace
+
+namespace {
+// `grow` when the caller gave one, else the window's own.
+float growth(float width_px, float height_px, float px_per_mm, float grow) {
+    return std::isfinite(grow) && grow > 0.0f ? std::clamp(grow, 1.0f, kUiMaxGrow)
+                                              : ui_window_grow(width_px, height_px, px_per_mm);
+}
+} // namespace
+
+float ui_scale(float width_px, float height_px, float px_per_mm, float pixel_density, float grow) {
+    const float density = std::isfinite(px_per_mm) && px_per_mm > 0.0f
+                              ? std::min(px_per_mm, kMaxPxPerMm) / kDefaultPxPerMm
+                              : 1.0f;
+    return std::max(min_scale_px(pixel_density),
+                    density * growth(width_px, height_px, px_per_mm, grow));
+}
+
+float bar_under_row_pt(bool has_song, bool slim) {
+    if (!has_song) {
+        return 0.0f;
+    }
+    return slim ? kSlimSectionBandPt : kSectionBandPt;
+}
+
+namespace {
+
+// The top row's parts: the gear, the library's and Learn's buttons (one menu button on a narrow
+// row), and the status text (with its font).
+void place_top_row_parts(ScreenLayout& out, float top_h, float W, float unit) {
+    // The gear: a square as tall as the row at its right end, the library's at its left end and
+    // Learn's beside it.
+    // The status text runs from a margin on the left to a gap before the gear.
+    const float side = std::min(top_h, W);
+    out.gear = RectF{W - side, 0.0f, side, top_h};
+    const bool menu_row = W < kMenuBelowRowPt * unit;
+    if (out.gear.x >= side) {
+        (menu_row ? out.menu : out.library) = RectF{0.0f, 0.0f, side, top_h};
+    }
+    if (!menu_row && out.gear.x >= 2.0f * side) {
+        out.learn = RectF{side, 0.0f, side, top_h};
+    }
+    const float margin = std::round(top_h * kTopRowMarginShare);
+    const float text_w = out.gear.x - 2.0f * margin;
+    if (text_w > 0.0f) {
+        out.status_text = RectF{margin, 0.0f, text_w, top_h};
+    }
+    // The UI's body size, on the same scale as every control.
+    const float font = std::min(std::max(kStatusFontPt * unit, kMinLabelFontPx),
+                                std::floor(top_h / kTopRowMinHeightEm));
+    if (font >= kMinLabelFontPx && !out.status_text.empty()) {
+        out.status_visible = true;
+        out.status_font_px = font;
+    }
+}
+
+} // namespace
+
 ScreenLayout compute_layout(float width_px, float height_px, float px_per_mm,
-                            const LookSettings& look_in) {
+                            const LookSettings& look_in, const PinnedBar& bar,
+                            float pixel_density, float grow_in) {
     const LookSettings look = look_in.clamped();
     const float W = whole_pixels(width_px);
     const float H = whole_pixels(height_px);
@@ -140,20 +201,66 @@ ScreenLayout compute_layout(float width_px, float height_px, float px_per_mm,
 
     // The notes always keep their share; everything else shares the rest, most important first.
     float budget = std::floor(H * (1.0f - kMinNoteAreaShare));
+    // The UI's scale: design points to pixels, and how much the window grows the UI.
+    const float unit = ui_scale(W, H, ppmm, pixel_density, grow_in);
+    const float grow = growth(W, H, ppmm, grow_in);
 
-    const float top_h =
-        std::min({std::ceil(kMinTouchTargetMm * ppmm), std::floor(H * kMaxTopRowShare), budget});
+    // 15 mm grown with the window, but never less than 15 mm at the scale floor, so the row keeps
+    // the controls the kit draws at that floor.
+    const float top_mm_px = std::max(kMinTouchTargetMm * ppmm * grow,
+                                     kMinTouchTargetMm * min_scale_px(pixel_density) * kDefaultPxPerMm);
+    const float top_h = std::min({std::ceil(top_mm_px), std::floor(H * kMaxTopRowShare), budget});
     budget -= top_h;
+
+    float under_h = 0.0f;
+    float lane_h = 0.0f;
+    if (bar.pinned) {
+        out.bar_fit = BarFit::Full;
+    }
+    if (bar.has_song && (bar.pinned || bar.lane)) {
+        const auto band = [&](bool slim) { return std::ceil(bar_under_row_pt(true, slim) * unit); };
+        // The keyboard it would have without the band; it may shrink to this share, no more.
+        const float keyboard_now = std::min(std::floor(H * look.keyboard_height), budget);
+        const float keyboard_min = std::floor(kMinPinnedKeyboardShare * keyboard_now);
+        if (bar.lane) {
+            const float lane_full = std::ceil(kLanePt * unit);
+            const float lane_min = std::ceil(kLaneMinPt * unit);
+            const float left = budget - band(false) - keyboard_min;
+            if (lane_full <= left) {
+                lane_h = lane_full;
+                out.lane_fit = LaneFit::Full;
+            } else if (lane_min <= left) {
+                lane_h = std::floor(left);
+                out.lane_fit = LaneFit::Short;
+            } else {
+                out.lane_fit = LaneFit::NoRoom;
+            }
+        }
+        if (lane_h > 0.0f) {
+            under_h = band(false); // the lane always has the full band over it
+        } else if (bar.pinned) {
+            if (band(false) + keyboard_min <= budget) {
+                under_h = band(false);
+            } else if (band(true) + keyboard_min <= budget) {
+                under_h = band(true);
+                out.bar_fit = BarFit::Slim;
+            } else {
+                out.bar_fit = BarFit::Fallback;
+            }
+        }
+        budget -= under_h + lane_h;
+    }
 
     const float keyboard_h = std::min(std::floor(H * look.keyboard_height), budget);
     budget -= keyboard_h;
 
     float chord_h = 0.0f;
     if (look.chord_label) {
-        // Big enough to read from the piano bench: the larger of the physical size and a share of
-        // the window height (what the first renderer drew), scaled by the setting.
+        // Readable from the piano bench without being a banner: the larger of the physical size
+        // and a share of the window height, a share of that (kChordLabelShare), scaled by the
+        // setting.
         const float preferred = std::max(std::max(kChordFontMm * ppmm, kChordFontHeightShare * H) *
-                                             look.chord_label_size,
+                                             kChordLabelShare * look.chord_label_size,
                                          kMinChordFontPx);
         const float strip_max = std::min(std::floor(H * kMaxChordLabelShare), budget);
         const float widest = W / (static_cast<float>(kChordLabelMaxChars) * kLabelCharWidthEm);
@@ -165,10 +272,14 @@ ScreenLayout compute_layout(float width_px, float height_px, float px_per_mm,
         }
     }
 
-    const float note_h = H - top_h - chord_h - keyboard_h;
+    const float note_h = H - top_h - under_h - lane_h - chord_h - keyboard_h;
     float y = 0.0f;
     out.top_row = row(y, top_h, W);
     y += top_h;
+    out.bar_under = row(y, under_h, W);
+    y += under_h;
+    out.lane = row(y, lane_h, W);
+    y += lane_h;
     out.chord_label = row(y, chord_h, W);
     y += chord_h;
     out.note_area = row(y, note_h, W);
@@ -176,23 +287,7 @@ ScreenLayout compute_layout(float width_px, float height_px, float px_per_mm,
     out.keyboard = row(y, keyboard_h, W);
 
     if (top_h > 0.0f) {
-        // The gear: a square as tall as the row at its right end. The status text runs from a
-        // margin on the left to a gap before it.
-        const float side = std::min(top_h, W);
-        out.gear = RectF{W - side, 0.0f, side, top_h};
-        const float margin = std::round(top_h * kTopRowMarginShare);
-        const float text_w = out.gear.x - 2.0f * margin;
-        if (text_w > 0.0f) {
-            out.status_text = RectF{margin, 0.0f, text_w, top_h};
-        }
-        const float preferred =
-            std::round(std::max(kStatusFontMm * ppmm, kStatusFontHeightShare * H));
-        const float font =
-            std::floor(std::min(std::max(preferred, kMinLabelFontPx), top_h / kTopRowMinHeightEm));
-        if (font >= kMinLabelFontPx && !out.status_text.empty()) {
-            out.status_visible = true;
-            out.status_font_px = font;
-        }
+        place_top_row_parts(out, top_h, W, unit);
     }
 
     if (keyboard_h > 0.0f) {
@@ -252,4 +347,76 @@ TopRowSplit split_top_row(const ScreenLayout& layout, float bar_w, float keep_st
     return out;
 }
 
-} // namespace toonval
+float bar_room(const ScreenLayout& layout, float keep_status_w) {
+    const RectF& area = layout.status_text;
+    if (area.empty()) {
+        return 0.0f;
+    }
+    const float keep = std::isfinite(keep_status_w) ? std::max(0.0f, keep_status_w) : 0.0f;
+    if (keep <= 0.0f) {
+        return area.w;
+    }
+    const float gap = std::round(layout.top_row.h * kTopRowMarginShare);
+    return std::max(0.0f, area.w - keep - gap);
+}
+
+HitBand scrubber_hit_band(float track_cy, float height, float row_bottom, float limit_bottom) {
+    if (!std::isfinite(track_cy) || !std::isfinite(height) || !std::isfinite(row_bottom) ||
+        !std::isfinite(limit_bottom) || !(height > 0.0f)) {
+        return {std::isfinite(row_bottom) ? row_bottom : 0.0f,
+                std::isfinite(row_bottom) ? row_bottom : 0.0f};
+    }
+    const float limit = std::max(limit_bottom, row_bottom);
+    float top = track_cy - height * 0.5f;
+    top = std::min(top, limit - height); // room below is short: move up first
+    top = std::max(top, row_bottom);     // but never into the row
+    return {top, std::min(top + height, limit)};
+}
+
+BarForm fit_bar_form(float comfy_room_w, float room_w, const BarFormWidths& widths) {
+    if (!std::isfinite(room_w) || room_w < 0.0f) {
+        return BarForm::Minimal;
+    }
+    const auto fits = [](float w, float room) {
+        return std::isfinite(w) && w > 0.0f && std::isfinite(room) && w <= room;
+    };
+    const auto offered = [](float w) { return std::isfinite(w) && w > 0.0f; };
+    if (fits(widths.full, comfy_room_w)) {
+        return BarForm::Full;
+    }
+    if (fits(widths.compact, room_w)) {
+        return BarForm::Compact;
+    }
+    if (fits(widths.tight, room_w)) {
+        return BarForm::Tight;
+    }
+    if (fits(widths.minimal, room_w) || fits(widths.minimal_no_pin, room_w) ||
+        !offered(widths.lean)) {
+        return BarForm::Minimal;
+    }
+    if (fits(widths.lean, room_w) || !offered(widths.bare)) {
+        return BarForm::Lean;
+    }
+    if (fits(widths.bare, room_w) || !offered(widths.least)) {
+        return BarForm::Bare;
+    }
+    return BarForm::Least;
+}
+
+bool bar_keeps_pin(BarForm form, const BarFormWidths& widths, float room_w) {
+    switch (form) {
+    case BarForm::Full:
+    case BarForm::Compact:
+    case BarForm::Tight:
+        return true;
+    case BarForm::Minimal:
+        break;
+    case BarForm::Lean:
+    case BarForm::Bare:
+    case BarForm::Least:
+        return false;
+    }
+    return std::isfinite(room_w) && std::isfinite(widths.minimal) && widths.minimal <= room_w;
+}
+
+} // namespace etude

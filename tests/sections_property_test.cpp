@@ -3,7 +3,7 @@
 // their invariants, a refused edit changed nothing, and ids are never reused. The invariants are
 // checked here by hand, not through valid(), and valid() has to agree. A fixed seed makes a failure
 // repeat; the iteration and step are printed.
-#include "toonval/sections.hpp"
+#include "etude/sections.hpp"
 
 #include "section_fixtures.hpp"
 
@@ -17,8 +17,8 @@
 #include <string>
 #include <vector>
 
-using namespace toonval;
-using namespace toonval::testing;
+using namespace etude;
+using namespace etude::testing;
 
 namespace {
 

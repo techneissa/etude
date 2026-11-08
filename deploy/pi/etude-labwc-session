@@ -1,0 +1,70 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Runs the app (or the crash screen) inside a labwc session and ends with the app's own exit status.
+# Installed to /usr/local/lib/etude/etude-labwc-session by deploy/pi/setup.sh; the labwc units' ExecStart.
+#
+# Why it exists: `labwc -S COMMAND` stops labwc when COMMAND ends, but labwc itself always ends 0 (its
+# main returns 0 once the display has stopped, whatever the session client did; neither its manual nor
+# its source has an option that passes the status on). systemd would see a unit that ended well after
+# a crash: OnFailure= never starts the crash screen, the helper's watch of a version on trial sees no
+# failed unit, and the crash screen's own unit would be taken for a Restart (OnSuccess=) after it
+# crashed. So labwc is given this script again as the command (--child): it runs the app, writes the
+# status to a file in the unit's runtime folder (RuntimeDirectory=) and ends with it; the first
+# instance, which is the unit's main process, waits for labwc, reads the file and ends with that status:
+# 0 only when the app ended 0 (a normal close; for the crash screen, Restart or Try again).
+#
+# usage: etude-labwc-session APP [ARGS...]
+#        ETUDE_LABWC=PATH names another compositor (the container test's stand-in).
+
+if [ "${1:-}" = --child ]; then
+    file=$2
+    shift 2
+    "$@"
+    status=$?
+    # A signal that ended the app reads as 128 + the signal, as a shell reports it: a crash all the same.
+    printf '%s\n' "$status" >"$file.new" && mv -f "$file.new" "$file"
+    exit "$status"
+fi
+
+dir="${RUNTIME_DIRECTORY:-}"
+dir="${dir%%:*}"
+if [ -z "$dir" ] || [ ! -d "$dir" ]; then
+    echo "etude-labwc-session: no runtime folder (RuntimeDirectory= of the unit)" >&2
+    exit 70
+fi
+file="$dir/session-status"
+rm -f "$file" "$file.new"
+
+# The command labwc runs, quoted for its shell-style parser: this script, --child, the status file and
+# the app with its arguments.
+command=
+for argument in "$0" --child "$file" "$@"; do
+    case "$argument" in
+    *"'"*)
+        echo "etude-labwc-session: an argument with a quote in it: $argument" >&2
+        exit 64
+        ;;
+    esac
+    command="$command '$argument'"
+done
+
+"${ETUDE_LABWC:-/usr/bin/labwc}" -S "$command"
+labwc_status=$?
+
+if [ -r "$file" ]; then
+    code=
+    read -r code <"$file" || true
+    case "$code" in
+    '' | *[!0-9]*) exit 1 ;;
+    esac
+    if [ "$code" -gt 255 ]; then
+        exit 1
+    fi
+    exit "$code"
+fi
+# No status: the app never ran to its end (labwc could not start it, or died first). Never a good end.
+if [ "$labwc_status" -ne 0 ]; then
+    exit "$labwc_status"
+fi
+echo "etude-labwc-session: labwc ended with no status from the app" >&2
+exit 1

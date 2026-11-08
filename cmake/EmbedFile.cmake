@@ -1,6 +1,6 @@
 # Writes a C++ source that holds a file's bytes as `std::span<const unsigned char> <symbol>()`
-# in namespace toonval::app, so the app can carry a font without installing files beside it.
-function(toonval_embed_file input symbol output)
+# in namespace etude::app, so the app can carry a font without installing files beside it.
+function(etude_embed_file input symbol output)
   file(READ "${input}" hex HEX)
   string(LENGTH "${hex}" hex_length)
   math(EXPR byte_count "${hex_length} / 2")
@@ -11,7 +11,7 @@ function(toonval_embed_file input symbol output)
 #include <cstddef>
 #include <span>
 
-namespace toonval::app {
+namespace etude::app {
 namespace {
 const unsigned char kData[${byte_count}] = {
 ${bytes}
@@ -20,7 +20,7 @@ ${bytes}
 
 std::span<const unsigned char> ${symbol}() { return {kData, sizeof(kData)}; }
 
-} // namespace toonval::app
+} // namespace etude::app
 ")
   # Only rewrite on change, so a reconfigure does not force a rebuild.
   if(EXISTS "${output}")

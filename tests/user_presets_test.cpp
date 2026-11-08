@@ -1,16 +1,19 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/look.hpp"
+#include "etude/look.hpp"
 
 #include <string>
 
 #include <doctest/doctest.h>
 
-using namespace toonval;
+#include "sample_looks.hpp"
+
+using namespace etude;
+using namespace etude::test;
 
 namespace {
 
 LookSettings odd_look() {
-    LookSettings s = preset(PresetId::NeonNight);
+    LookSettings s = sample_look(Sample::NeonNight);
     s.visible_seconds = 7.5f;
     s.names_on_keys = true;
     return s;
@@ -34,9 +37,9 @@ TEST_CASE("there are three slots and they start empty") {
     for (int i = 0; i < kUserPresetSlots; ++i) {
         CHECK_FALSE(p.is_used(i));
         CHECK(p.slot_name(i).empty());
-        LookSettings out = preset(PresetId::Glass);
+        LookSettings out = sample_look(Sample::Glass);
         CHECK_FALSE(p.load_slot(i, &out));
-        CHECK(out == preset(PresetId::Glass)); // an empty slot leaves the output alone
+        CHECK(out == sample_look(Sample::Glass)); // an empty slot leaves the output alone
     }
 }
 
@@ -54,12 +57,12 @@ TEST_CASE("save then load gives the look back, under its name") {
 
 TEST_CASE("saving into a used slot replaces it, clearing empties it") {
     UserPresets p;
-    p.save_slot(0, "One", preset(PresetId::Glass));
-    p.save_slot(0, "Two", preset(PresetId::Classic));
+    p.save_slot(0, "One", sample_look(Sample::Glass));
+    p.save_slot(0, "Two", sample_look(Sample::Classic));
     CHECK(p.slot_name(0) == "Two");
     LookSettings out;
     p.load_slot(0, &out);
-    CHECK(out == preset(PresetId::Classic));
+    CHECK(out == sample_look(Sample::Classic));
     CHECK(p.clear_slot(0));
     CHECK_FALSE(p.is_used(0));
     CHECK(p == UserPresets{});
@@ -133,9 +136,9 @@ TEST_CASE("empty user presets add nothing but three empty-slot lines") {
 
 TEST_CASE("slots round-trip with the look, including spaces and unicode in names") {
     LookDocument doc;
-    doc.look = preset(PresetId::FrostedPastel);
+    doc.look = sample_look(Sample::FrostedPastel);
     doc.user_presets.save_slot(0, "My favourite look", odd_look());
-    doc.user_presets.save_slot(2, "Café ☕ 練習 = #1", preset(PresetId::HighContrast));
+    doc.user_presets.save_slot(2, "Café ☕ 練習 = #1", sample_look(Sample::HighContrast));
     REQUIRE_FALSE(doc.user_presets.is_used(1));
 
     ParseReport report;
@@ -145,22 +148,22 @@ TEST_CASE("slots round-trip with the look, including spaces and unicode in names
     CHECK(back.user_presets.slot_name(0) == "My favourite look");
     CHECK(back.user_presets.slot_name(2) == "Café ☕ 練習 = #1");
     CHECK_FALSE(back.user_presets.is_used(1));
-    CHECK(back.look == preset(PresetId::FrostedPastel));
+    CHECK(back.look == sample_look(Sample::FrostedPastel));
 }
 
 TEST_CASE("every slot filled with a different built-in preset round-trips") {
     LookDocument doc;
-    doc.look = preset(PresetId::Classic);
+    doc.look = sample_look(Sample::Classic);
     for (int i = 0; i < kUserPresetSlots; ++i) {
         doc.user_presets.save_slot(i, std::string("slot ") + std::to_string(i),
-                                   preset(kAllPresets[static_cast<std::size_t>(i + 2)]));
+                                   sample_look(kAllSamples[static_cast<std::size_t>(i + 2)]));
     }
     CHECK(parse_look_document(serialize_document(doc)) == doc);
 }
 
 TEST_CASE("the look-only serialize and parse keep working and ignore slots") {
     LookDocument doc;
-    doc.look = preset(PresetId::Glass);
+    doc.look = sample_look(Sample::Glass);
     doc.user_presets.save_slot(0, "kept elsewhere", odd_look());
     const std::string text = serialize_document(doc);
     ParseReport report;
@@ -171,7 +174,7 @@ TEST_CASE("the look-only serialize and parse keep working and ignore slots") {
 
 TEST_CASE("a damaged slot is dropped and reported, the rest still loads") {
     LookDocument doc;
-    doc.look = preset(PresetId::Glass);
+    doc.look = sample_look(Sample::Glass);
     doc.user_presets.save_slot(0, "good", odd_look());
     doc.user_presets.save_slot(1, "bad", odd_look());
     std::string text = serialize_document(doc);

@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/song_builder.hpp"
+#include "etude/song_builder.hpp"
 
 #include <doctest/doctest.h>
 
-using namespace toonval;
+using namespace etude;
 
 namespace {
 
@@ -83,9 +83,44 @@ TEST_CASE("song_builder: bars come from the time signature and number from 1") {
     CHECK(s.notes[2].measure == 3);
 }
 
-TEST_CASE("song_builder: a first bar shorter than the next is a pickup, numbered 0") {
+TEST_CASE("song_builder: a first bar cut short by the same meter is a pickup, numbered 0") {
     Song s = empty_song();
-    s.time_signatures = {{0, 4, 4}, {480, 3, 4}}; // one beat, then 3/4 bars
+    s.time_signatures = {{0, 4, 4}, {480, 4, 4}}; // one beat, then 4/4 bars
+    s.notes = {make_note(0, 100, 60), make_note(480, 900, 62), make_note(2400, 2500, 64)};
+    CHECK(finish_song(s));
+    REQUIRE(s.measures.size() >= 3);
+    CHECK(s.measures[0].number == 0);
+    CHECK(s.measures[1].number == 1);
+    CHECK(s.measures[1].numerator == 4);
+    CHECK(s.notes[0].measure == 0);
+    CHECK(s.notes[1].measure == 1);
+}
+
+TEST_CASE("song_builder: a one-beat first bar before a longer one is a pickup") {
+    Song s = empty_song();
+    s.time_signatures = {{0, 1, 4}, {480, 3, 4}};
+    s.notes = {make_note(0, 100, 60), make_note(480, 900, 62), make_note(1920, 2000, 64)};
+    CHECK(finish_song(s));
+    REQUIRE(s.measures.size() >= 3);
+    CHECK(s.measures[0].number == 0);
+    CHECK(s.measures[1].number == 1);
+}
+
+TEST_CASE("song_builder: a full first bar of another meter than the next is bar 1") {
+    Song s = empty_song();
+    s.time_signatures = {{0, 3, 4}, {1440, 4, 4}}; // a full 3/4 bar, then 4/4
+    s.notes = {make_note(0, 100, 60), make_note(1440, 1900, 62), make_note(3360, 3400, 64)};
+    CHECK(finish_song(s));
+    REQUIRE(s.measures.size() >= 3);
+    CHECK(s.measures[0].number == 1);
+    CHECK(s.measures[1].number == 2);
+    CHECK(s.measures[2].number == 3);
+    CHECK(s.notes[1].measure == 2);
+}
+
+TEST_CASE("song_builder: a first bar cut short by another meter is a pickup too") {
+    Song s = empty_song();
+    s.time_signatures = {{0, 4, 4}, {480, 3, 4}}; // one beat of 4/4, then 3/4 bars
     s.notes = {make_note(0, 100, 60), make_note(480, 900, 62), make_note(1920, 2000, 64)};
     CHECK(finish_song(s));
     REQUIRE(s.measures.size() >= 3);

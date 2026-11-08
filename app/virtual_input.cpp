@@ -1,13 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "virtual_input.hpp"
 
+#include "dev_script.hpp"
 #include "midi_input.hpp"
+#include "touch_device.hpp"
 
 #include <imgui.h>
 
 #include <algorithm>
 
-namespace toonval::app {
+namespace etude::app {
 
 namespace {
 
@@ -43,8 +45,8 @@ std::int64_t event_time_ns(std::uint64_t sdl_timestamp_ns) {
 VirtualInput::VirtualInput() = default;
 
 void VirtualInput::set_geometry(const KeyboardLayout& layout, const KeyViewFrame& view,
-                                const RectF& key_area, float panel_x) {
-    geometry_.emplace(PointerGeometry{layout, view, key_area});
+                                const RectF& key_area, float panel_x, float px_per_mm) {
+    geometry_.emplace(PointerGeometry{layout, view, key_area, kKeySlideMarginMm * px_per_mm});
     panel_x_ = panel_x;
 }
 
@@ -61,7 +63,6 @@ float VirtualInput::pixel_scale(SDL_Window* window) {
 bool VirtualInput::handle(const SDL_Event& event, SDL_Window* window, bool ui_wants_keys,
                           std::vector<MidiEvent>& out) {
     const ImGuiIO& io = ImGui::GetIO();
-    const auto under_panel = [&](float x) { return panel_x_ >= 0.0f && x >= panel_x_; };
     switch (event.type) {
     case SDL_EVENT_KEY_DOWN:
     case SDL_EVENT_KEY_UP: {
@@ -108,33 +109,44 @@ bool VirtualInput::handle(const SDL_Event& event, SDL_Window* window, bool ui_wa
     }
     case SDL_EVENT_FINGER_DOWN:
     case SDL_EVENT_FINGER_MOTION:
-    case SDL_EVENT_FINGER_UP: {
-        // Only a touch screen plays; a trackpad's fingers are not on the keys.
-        if (SDL_GetTouchDeviceType(event.tfinger.touchID) != SDL_TOUCH_DEVICE_DIRECT) {
-            return false;
+    case SDL_EVENT_FINGER_UP:
+    case SDL_EVENT_FINGER_CANCELED: {
+        // A touch screen, or a device that does not say what it is (a Pi's panel may not): only a
+        // trackpad's fingers are left out, the way the editor and the bar's swipes leave them out.
+        const bool scripted = event.tfinger.touchID == kScriptedTouchId;
+        if (!scripted && event.type == SDL_EVENT_FINGER_DOWN) {
+            note_touch_device(event.tfinger.touchID);
         }
-        const std::int64_t t = event_time_ns(event.tfinger.timestamp);
-        const PointerKeys::PointerId id = event.tfinger.fingerID;
-        if (event.type == SDL_EVENT_FINGER_UP) {
-            pointers_.up(id, t, out);
-            return false;
-        }
-        if (!geometry_) {
-            return false;
-        }
+        const bool direct = scripted || is_screen_touch(event.tfinger.touchID);
         int pw = 0;
         int ph = 0;
         SDL_GetWindowSizeInPixels(window, &pw, &ph);
         const float x = event.tfinger.x * static_cast<float>(pw);
         const float y = event.tfinger.y * static_cast<float>(ph);
-        if (event.type == SDL_EVENT_FINGER_DOWN) {
-            if (!under_panel(x)) {
-                pointers_.down(id, x, y, *geometry_, t, out);
-            }
-        } else {
+        const FingerPhase phase = event.type == SDL_EVENT_FINGER_DOWN     ? FingerPhase::Down
+                                  : event.type == SDL_EVENT_FINGER_MOTION ? FingerPhase::Motion
+                                  : event.type == SDL_EVENT_FINGER_UP     ? FingerPhase::Up
+                                                                          : FingerPhase::Cancelled;
+        const bool ui_owns = under_panel(x) || (ui_owns_point_ ? ui_owns_point_(event.tfinger.x,
+                                                                             event.tfinger.y)
+                                                               : io.WantCaptureMouse);
+        const FingerAction action = finger_action(phase, direct, ui_owns, geometry_.has_value());
+        const std::int64_t t = event_time_ns(event.tfinger.timestamp);
+        const PointerKeys::PointerId id = event.tfinger.fingerID;
+        switch (action) {
+        case FingerAction::Press:
+            pointers_.down(id, x, y, *geometry_, t, out);
+            return true;
+        case FingerAction::Move:
             pointers_.move(id, x, y, *geometry_, t, out);
+            return true;
+        case FingerAction::Release:
+            pointers_.up(id, t, out);
+            return false;
+        case FingerAction::Ignore:
+            return false;
         }
-        return true;
+        return false;
     }
     case SDL_EVENT_WINDOW_FOCUS_LOST:
         release_all(out);
@@ -153,4 +165,4 @@ void VirtualInput::release_all(std::vector<MidiEvent>& out) {
     pointers_.release_all(now, out);
 }
 
-} // namespace toonval::app
+} // namespace etude::app

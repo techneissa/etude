@@ -1423,6 +1423,17 @@ ui_log_path() {
     printf '%s' "${UI_LOG_FILE:-${TMPDIR:-/tmp}/cli-ui-${name// /-}.log}" | sed 's://*:/:g'
 }
 
+# The raw logs pile up in $TMPDIR, one per checkout: keep the newest
+# UI_LOG_KEEP (default 20) of them and delete the rest.
+ui_prune_logs() {
+    local keep="${UI_LOG_KEEP:-20}" dir="${TMPDIR:-/tmp}" file n=0
+    while IFS= read -r file; do
+        n=$((n + 1))
+        (( n > keep )) && rm -f -- "$file"
+    done < <(ls -t "$dir"/cli-ui-*.log 2>/dev/null)
+    return 0
+}
+
 # Run a command with polished stdout+stderr. Preserves exit status.
 # The raw output is kept at $UI_LAST_LOG. When the command fails without a
 # diagnostic, the last unrecognized lines are printed so the cause shows.
@@ -1433,6 +1444,7 @@ ui_run() {
     export CARGO_TERM_COLOR="${CARGO_TERM_COLOR:-never}"
     UI_LAST_LOG="$(ui_log_path)"
     export UI_LAST_LOG
+    ui_prune_logs
     state="$(mktemp "${TMPDIR:-/tmp}/cli-ui-state.XXXXXX")"
     [[ -o pipefail ]] && had_pipefail=1
     set +e

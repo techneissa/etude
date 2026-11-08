@@ -3,7 +3,7 @@
 // crashes and always gives well-formed sections within the caps, a damaged entry costs only
 // itself, and what is read can be written and read again without change. Fixed seeds; the
 // iteration is printed on a failure.
-#include "toonval/sections_store.hpp"
+#include "etude/sections_store.hpp"
 
 #include "section_fixtures.hpp"
 
@@ -14,8 +14,8 @@
 #include <string>
 #include <vector>
 
-using namespace toonval;
-using namespace toonval::testing;
+using namespace etude;
+using namespace etude::testing;
 
 namespace {
 

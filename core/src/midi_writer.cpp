@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/midi_writer.hpp"
+#include "etude/midi_writer.hpp"
 
 #include <algorithm>
 #include <limits>
 #include <tuple>
 
-namespace toonval {
+namespace etude {
 namespace {
 
 constexpr std::uint32_t kNoMeta = std::numeric_limits<std::uint32_t>::max();
@@ -392,4 +392,4 @@ MidiWriteResult write_midi(const Song& song, const MidiWriteOptions& options) {
     }
 }
 
-} // namespace toonval
+} // namespace etude

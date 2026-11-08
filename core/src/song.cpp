@@ -1,11 +1,43 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/song.hpp"
+#include "etude/song.hpp"
+
+#include "part_index.hpp"
 
 #include <algorithm>
+#include <bit>
 #include <initializer_list>
 #include <string>
 
-namespace toonval {
+namespace etude {
+
+std::uint64_t song_fingerprint(const Song& song) {
+    std::uint64_t h = 0x9E3779B97F4A7C15ULL ^ (song.notes.size() << 20) ^ song.measures.size() ^
+                      (song.events.size() << 44);
+    const auto mix = [&h](std::uint64_t v) {
+        h = (h ^ v) * 0xFF51AFD7ED558CCDULL;
+        h ^= h >> 32;
+    };
+    for (const Note& n : song.notes) {
+        mix(std::bit_cast<std::uint64_t>(n.start_s));
+        mix(std::bit_cast<std::uint64_t>(n.duration_s));
+        mix(static_cast<std::uint64_t>(n.pitch) | static_cast<std::uint64_t>(n.hand) << 8 |
+            static_cast<std::uint64_t>(n.drum) << 16 |
+            static_cast<std::uint64_t>(n.accompaniment) << 17 |
+            static_cast<std::uint64_t>(n.velocity) << 24 |
+            static_cast<std::uint64_t>(n.channel) << 32 |
+            static_cast<std::uint64_t>(static_cast<std::uint32_t>(n.measure) & 0xFFFFFF) << 40);
+    }
+    for (const ChannelEvent& e : song.events) {
+        mix(std::bit_cast<std::uint64_t>(e.time_s));
+        mix(static_cast<std::uint64_t>(e.kind) | static_cast<std::uint64_t>(e.channel) << 8 |
+            static_cast<std::uint64_t>(e.number) << 16 | static_cast<std::uint64_t>(e.value) << 32);
+    }
+    for (const Measure& m : song.measures) {
+        mix(std::bit_cast<std::uint64_t>(m.start_s));
+        mix(static_cast<std::uint64_t>(static_cast<std::uint32_t>(m.number)));
+    }
+    return h;
+}
 
 double TempoMap::seconds_at(std::int64_t tick) const {
     auto it = std::upper_bound(changes.begin(), changes.end(), tick,
@@ -30,6 +62,15 @@ int Song::measure_at(std::int64_t tick) const {
     auto it = std::upper_bound(measures.begin(), measures.end(), tick,
                                [](std::int64_t t, const Measure& m) { return t < m.start_tick; });
     return it == measures.begin() ? measures.front().number : (it - 1)->number;
+}
+
+int Song::written_measure_at(std::int64_t tick) const {
+    if (measures.empty()) {
+        return 1;
+    }
+    auto it = std::upper_bound(measures.begin(), measures.end(), tick,
+                               [](std::int64_t t, const Measure& m) { return t < m.start_tick; });
+    return it == measures.begin() ? measures.front().written_number() : (it - 1)->written_number();
 }
 
 namespace {
@@ -106,18 +147,17 @@ void assign_hands_from_names(Song& song) {
         }
         part.hand = m.hand;
     }
+    const PartIndex part_at(song.parts);
     for (Note& note : song.notes) {
         note.hand = Hand::Unknown;
         if (note.drum) {
             continue;
         }
-        for (const Part& part : song.parts) {
-            if (part.track == note.track && part.channel == note.channel) {
-                note.hand = part.hand;
-                break;
-            }
+        const std::size_t at = part_at.find(note.track, note.channel);
+        if (at != PartIndex::kNone) {
+            note.hand = song.parts[at].hand;
         }
     }
 }
 
-} // namespace toonval
+} // namespace etude

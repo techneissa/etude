@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/midi_writer.hpp"
+#include "etude/midi_writer.hpp"
 
 #include "smf_builder.hpp"
 #include "song_compare.hpp"
-#include "toonval/midi_file.hpp"
-#include "toonval/song_builder.hpp"
+#include "etude/midi_file.hpp"
+#include "etude/song_builder.hpp"
 
 #include <doctest/doctest.h>
 
@@ -15,7 +15,7 @@
 #include <string>
 #include <tuple>
 
-using namespace toonval;
+using namespace etude;
 using test::Bytes;
 using test::Track;
 
@@ -159,7 +159,7 @@ Song random_song(std::uint64_t seed) {
 }
 
 Bytes read_test_file(const std::string& name) {
-    std::ifstream in(std::string(TOONVAL_TEST_DATA_DIR) + "/" + name, std::ios::binary);
+    std::ifstream in(std::string(ETUDE_TEST_DATA_DIR) + "/" + name, std::ios::binary);
     REQUIRE(in.good());
     return Bytes(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
 }
@@ -389,10 +389,13 @@ TEST_CASE("midi_writer: a song with no notes is a valid file with its tempo") {
     finish_song(s);
     const MidiWriteResult w = write_midi(s);
     REQUIRE(w.ok);
+    // The file is well formed and holds the tempo (100 BPM: 600000 us, 0x0927C0), but has no
+    // notes, which the loader refuses.
     const MidiLoadResult r = load_all(w.bytes);
-    REQUIRE(r.ok);
-    CHECK(r.song.notes.empty());
-    CHECK(r.song.tempo.changes[0].us_per_quarter == 600'000);
+    CHECK_FALSE(r.ok);
+    CHECK(r.error == MidiFileError::NoNotes);
+    const std::vector<std::uint8_t> tempo = {0xFF, 0x51, 0x03, 0x09, 0x27, 0xC0};
+    CHECK(std::search(w.bytes.begin(), w.bytes.end(), tempo.begin(), tempo.end()) != w.bytes.end());
 }
 
 TEST_CASE("midi_writer: a gap of empty source tracks keeps the track numbers") {

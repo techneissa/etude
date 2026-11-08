@@ -1,12 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/look.hpp"
+#include "etude/look.hpp"
 
 #include <random>
 #include <string>
+#include <utility>
 
 #include <doctest/doctest.h>
 
-using namespace toonval;
+#include "sample_looks.hpp"
+
+using namespace etude;
+using namespace etude::test;
 
 namespace {
 
@@ -25,10 +29,16 @@ LookSettings everything_changed() {
                  static_cast<std::uint8_t>(i), 255};
     }
     s.single_color = {17, 34, 51, 255};
+    s.saved_palettes[1].filled = true;
+    for (std::size_t i = 0; i < s.saved_palettes[1].colors.size(); ++i) {
+        s.saved_palettes[1].colors[i] = RGBA{static_cast<std::uint8_t>(5 + i), 60,
+                                             static_cast<std::uint8_t>(250 - i), 255};
+    }
+    s.note_slot = 1;
     s.high_contrast = true;
     s.name_mode = NameMode::Solfege;
     s.names_show_octave = true;
-    s.names_prefer_flats = true;
+    s.names_spelling = NameSpelling::Flats;
     s.names_on_blocks = false;
     s.names_on_keys = true;
     s.c_markers = false;
@@ -37,17 +47,22 @@ LookSettings everything_changed() {
     s.show_typing_keys = true;
     s.key_flash = false;
     s.held_glow = false;
-    s.sparks = false;
+    s.hit_effect = HitEffect::Ripple;
     s.trail_fade = false;
+    s.combo_number = false;
+    s.rising_in_song = true;
     s.background = BackgroundStyle::Motion;
     s.reduced_effects = true;
     s.chord_label = false;
+    s.show_key = false;
     s.chord_label_size = 1.7f;
     s.visible_seconds = 7.3f;
     s.keyboard_height = 0.2345f;
     s.grade_words = false;
     s.grade_position = GradePosition::Top;
     s.grade_opacity = 37;
+    s.black_key_names = BlackKeyNames::Always;
+    s.learn_picks = {LearnShade::Lime, LearnShade::Jade, LearnShade::Magenta, LearnShade::Coral};
     return s;
 }
 
@@ -62,9 +77,9 @@ bool has_issue(const ParseReport& r, ParseIssue::Kind kind, const std::string& k
 
 } // namespace
 
-TEST_CASE("every preset survives a text round trip exactly") {
-    for (PresetId id : kAllPresets) {
-        const LookSettings p = preset(id);
+TEST_CASE("every sample look survives a text round trip exactly") {
+    for (Sample id : kAllSamples) {
+        const LookSettings p = sample_look(id);
         ParseReport report;
         const LookSettings back = parse_look(serialize(p), &report);
         CHECK(back == p);
@@ -76,8 +91,8 @@ TEST_CASE("every preset survives a text round trip exactly") {
 TEST_CASE("a settings value with every field changed round-trips exactly") {
     const LookSettings s = everything_changed();
     REQUIRE(s.is_valid());
-    for (PresetId id : kAllPresets) {
-        REQUIRE_FALSE(s == preset(id));
+    for (Sample id : kAllSamples) {
+        REQUIRE_FALSE(s == sample_look(id));
     }
     ParseReport report;
     CHECK(parse_look(serialize(s), &report) == s);
@@ -96,7 +111,7 @@ TEST_CASE("floats round-trip bit for bit") {
 TEST_CASE("the text starts with a version line and uses key = value") {
     const std::string text = serialize(LookSettings{});
     CHECK(text.rfind("version = 1\n", 0) == 0);
-    CHECK(text.find("note_style = glassy\n") != std::string::npos);
+    CHECK(text.find("note_style = glass\n") != std::string::npos);
     CHECK(text.find("right_color = #5AAAFF\n") != std::string::npos);
     CHECK(text.find("name_mode = letters\n") != std::string::npos);
     CHECK(text.find("background = gradient\n") != std::string::npos);
@@ -113,10 +128,66 @@ TEST_CASE("empty text and missing keys keep the defaults") {
 
     const LookSettings s = parse_look("version = 1\nnote_style = ghost\n", &report);
     LookSettings expected;
-    expected.note_style = NoteStyle::Ghost;
+    expected.note_style = NoteStyle::Outline; // ghost is read as Outline
     CHECK(s == expected);
     CHECK(report.clean());
     CHECK(report.applied == 2);
+}
+
+TEST_CASE("the key label setting: on by default, saved with the look, kept by a reset") {
+    CHECK(LookSettings{}.show_key);
+    LookSettings off;
+    off.show_key = false;
+    const std::string text = serialize(off);
+    CHECK(text.find("show_key = false\n") != std::string::npos);
+    CHECK(parse_look(text) == off);
+    CHECK(serialize(LookSettings{}).find("show_key = true\n") != std::string::npos);
+    // A look saved before the setting existed shows the key, and that is no error.
+    ParseReport report;
+    CHECK(parse_look("version = 1\nname_mode = solfege\n", &report).show_key);
+    CHECK(report.clean());
+    // A bad value is reported and the default stays.
+    CHECK(parse_look("show_key = maybe\n", &report).show_key);
+    CHECK(has_issue(report, ParseIssue::Kind::BadValue, "show_key"));
+    // A user slot carries its own switch.
+    LookDocument doc;
+    doc.user_presets.save_slot(0, "No key", off);
+    CHECK_FALSE(parse_look_document(serialize_document(doc)).user_presets.slots[0].look.show_key);
+    for (const Sample id : kAllSamples) {
+        CHECK(sample_look(id).show_key);
+    }
+}
+
+TEST_CASE("black key spelling: By key by default, saved, and the old switch keeps its choice") {
+    CHECK(LookSettings{}.names_spelling == NameSpelling::ByKey);
+    for (const NameSpelling sp : {NameSpelling::ByKey, NameSpelling::Sharps, NameSpelling::Flats}) {
+        LookSettings s;
+        s.names_spelling = sp;
+        CHECK(parse_look(serialize(s)) == s);
+    }
+    LookSettings flats;
+    flats.names_spelling = NameSpelling::Flats;
+    CHECK(serialize(flats).find("names_spelling = flats\n") != std::string::npos);
+    CHECK(serialize(flats).find("names_prefer_flats") == std::string::npos); // no longer written
+    // A look saved when this was a switch: on is Flats, off is Sharps (not By key), and it is no error.
+    ParseReport report;
+    CHECK(parse_look("version = 1\nnames_prefer_flats = true\n", &report).names_spelling ==
+          NameSpelling::Flats);
+    CHECK(report.clean());
+    CHECK(parse_look("version = 1\nnames_prefer_flats = false\n", &report).names_spelling ==
+          NameSpelling::Sharps);
+    CHECK(report.clean());
+    // A look with neither is By key.
+    CHECK(parse_look("version = 1\n").names_spelling == NameSpelling::ByKey);
+    // The new key wins over a stale old one that comes before it; a bad value is reported.
+    CHECK(parse_look("names_prefer_flats = true\nnames_spelling = by_key\n").names_spelling ==
+          NameSpelling::ByKey);
+    CHECK(parse_look("names_spelling = maybe\n", &report).names_spelling == NameSpelling::ByKey);
+    CHECK(has_issue(report, ParseIssue::Kind::BadValue, "names_spelling"));
+    // A user slot saved with the old switch keeps it too.
+    const LookDocument doc = parse_look_document(
+        "version = 1\nslot_1_used = true\nslot_1_name = Old\nslot_1_names_prefer_flats = true\n");
+    CHECK(doc.user_presets.slots[0].look.names_spelling == NameSpelling::Flats);
 }
 
 TEST_CASE("octave numbering and C markers: defaults, text form and a file without them") {
@@ -211,21 +282,22 @@ TEST_CASE("whitespace, CRLF line ends and a missing final newline are fine") {
     ParseReport report;
     const LookSettings s =
         parse_look("  note_style=filled  \r\n\tsparks =\tfalse\r\nright_color = #010203", &report);
-    CHECK(s.note_style == NoteStyle::Filled);
-    CHECK_FALSE(s.sparks);
+    CHECK(s.note_style == NoteStyle::Solid);
+    CHECK(s.hit_effect == HitEffect::None);
     CHECK(s.right_color == RGBA{1, 2, 3, 255});
     CHECK(report.clean());
 }
 
 TEST_CASE("a later line for the same key wins") {
-    CHECK(parse_look("note_style = ghost\nnote_style = shiny\n").note_style == NoteStyle::Shiny);
+    CHECK(parse_look("note_style = ghost\nnote_style = shiny\n").note_style == NoteStyle::Candy);
+    CHECK(parse_look("note_style = pixel\nnote_style = ink\n").note_style == NoteStyle::Ink);
 }
 
 TEST_CASE("a newer format version is reported but still read") {
     ParseReport report;
     const LookSettings s =
         parse_look("version = 99\nnote_style = ghost\nfuture_key = 1\n", &report);
-    CHECK(s.note_style == NoteStyle::Ghost);
+    CHECK(s.note_style == NoteStyle::Outline);
     CHECK(report.version == 99);
     CHECK(has_issue(report, ParseIssue::Kind::NewerVersion, "version"));
     CHECK(has_issue(report, ParseIssue::Kind::UnknownKey, "future_key"));
@@ -410,22 +482,244 @@ TEST_CASE("the grade switch and the opacity slider stay consistent") {
     CHECK(s.grade_opacity == 1);
 }
 
-TEST_CASE("built-in presets set grade words that are valid and shown") {
-    for (PresetId id : kAllPresets) {
-        const LookSettings p = preset(id);
+TEST_CASE("sample looks have grade words that are valid and shown; reset keeps the player's") {
+    for (Sample id : kAllSamples) {
+        const LookSettings p = sample_look(id);
         CHECK(p.is_valid());
         CHECK(p.grade_words_shown());
         CHECK(p.grade_opacity >= 40);
     }
-    CHECK(preset(PresetId::Default).grade_opacity == 100);
-    // Applying a built-in look keeps the player's grade-word choices.
+    CHECK(LookSettings{}.grade_opacity == 100);
+    // Resetting keeps the player's grade-word choices.
     LookSettings mine;
     mine.grade_words = false;
     mine.grade_position = GradePosition::Top;
     mine.grade_opacity = 35;
-    const LookSettings applied = apply_preset(mine, PresetId::MinimalReduced);
+    const LookSettings applied = reset_look(mine);
     CHECK_FALSE(applied.grade_words);
     CHECK(applied.grade_position == GradePosition::Top);
     CHECK(applied.grade_opacity == 35);
-    CHECK(is_preset(applied, PresetId::MinimalReduced));
+}
+
+TEST_CASE("note names on black keys default to Auto and round trip") {
+    CHECK(LookSettings{}.black_key_names == BlackKeyNames::Auto);
+    // A file from before the option keeps the default.
+    CHECK(parse_look("style_intensity = 0.5\n").black_key_names == BlackKeyNames::Auto);
+    for (BlackKeyNames mode : {BlackKeyNames::Auto, BlackKeyNames::Always, BlackKeyNames::Off}) {
+        LookSettings s;
+        s.black_key_names = mode;
+        const std::string text = serialize(s);
+        CHECK(text.find("black_key_names = ") != std::string::npos);
+        CHECK(parse_look(text).black_key_names == mode);
+    }
+    CHECK(parse_look("black_key_names = off\n").black_key_names == BlackKeyNames::Off);
+    // A word we do not know leaves the default and is reported.
+    ParseReport report;
+    CHECK(parse_look("black_key_names = sometimes\n", &report).black_key_names ==
+          BlackKeyNames::Auto);
+    CHECK_FALSE(report.clean());
+}
+
+TEST_CASE("a stray black key names value is brought back to Auto") {
+    LookSettings s;
+    s.black_key_names = static_cast<BlackKeyNames>(7);
+    CHECK_FALSE(s.is_valid());
+    CHECK(s.clamped().black_key_names == BlackKeyNames::Auto);
+}
+
+TEST_CASE("a reset keeps the player's black key names choice") {
+    LookSettings current = sample_look(Sample::Glass);
+    current.black_key_names = BlackKeyNames::Off;
+    CHECK(reset_look(current).black_key_names == BlackKeyNames::Off);
+}
+
+TEST_CASE("the block layout defaults to Key width, round trips and survives a reset") {
+    CHECK(LookSettings{}.block_layout == BlockLayout::KeyWidth);
+    // A look saved before the option gets Key width.
+    CHECK(parse_look("style_intensity = 0.5\n").block_layout == BlockLayout::KeyWidth);
+    for (BlockLayout mode : {BlockLayout::KeyWidth, BlockLayout::EvenLanes}) {
+        LookSettings s;
+        s.block_layout = mode;
+        const std::string text = serialize(s);
+        CHECK(text.find("block_layout = ") != std::string::npos);
+        CHECK(parse_look(text).block_layout == mode);
+    }
+    CHECK(parse_look("block_layout = even_lanes\n").block_layout == BlockLayout::EvenLanes);
+    ParseReport report;
+    CHECK(parse_look("block_layout = wide\n", &report).block_layout == BlockLayout::KeyWidth);
+    CHECK_FALSE(report.clean());
+    LookSettings stray;
+    stray.block_layout = static_cast<BlockLayout>(5);
+    CHECK(stray.clamped().block_layout == BlockLayout::KeyWidth);
+    LookSettings current = sample_look(Sample::Glass);
+    current.block_layout = BlockLayout::EvenLanes;
+    CHECK(reset_look(current).block_layout == BlockLayout::EvenLanes);
+}
+
+TEST_CASE("the hit effect is saved by name, and a look from before it keeps its sparks") {
+    for (const HitEffect e : kAllHitEffects) {
+        LookSettings s;
+        s.hit_effect = e;
+        ParseReport report;
+        CHECK(parse_look(serialize(s), &report).hit_effect == e);
+        CHECK(report.clean());
+    }
+    LookSettings glow;
+    CHECK(serialize(glow).find("hit_effect = glow\n") != std::string::npos);
+    // The old switch is read, never written.
+    CHECK(serialize(glow).find("sparks =") == std::string::npos);
+    ParseReport report;
+    CHECK(parse_look("sparks = true\n", &report).hit_effect == HitEffect::Sparks);
+    CHECK(report.clean());
+    CHECK(parse_look("sparks = false\n", &report).hit_effect == HitEffect::None);
+    CHECK(report.clean());
+    // No sparks key at all: the new default.
+    CHECK(parse_look("note_style = filled\n").hit_effect == HitEffect::Glow);
+    CHECK(parse_look("hit_effect = fireworks\n", &report).hit_effect == HitEffect::Glow);
+    CHECK(has_issue(report, ParseIssue::Kind::BadValue, "hit_effect"));
+    // A user slot saved before keeps its sparks too.
+    const LookDocument doc = parse_look_document("slot_1_used = true\nslot_1_sparks = true\n");
+    CHECK(doc.user_presets.slots[0].look.hit_effect == HitEffect::Sparks);
+}
+
+TEST_CASE("the six older note styles load as the styles that replaced them, and save as those") {
+    const struct {
+        const char* old_name;
+        NoteStyle now;
+        const char* saved;
+    } kMoves[] = {{"filled", NoteStyle::Solid, "solid"},    {"glassy", NoteStyle::Glass, "glass"},
+                  {"frosted", NoteStyle::Glass, "glass"},   {"shiny", NoteStyle::Candy, "candy"},
+                  {"ghost", NoteStyle::Outline, "outline"}, {"neon", NoteStyle::Neon, "neon"}};
+    for (const auto& m : kMoves) {
+        CAPTURE(m.old_name);
+        ParseReport report;
+        const LookSettings s =
+            parse_look(std::string("version = 1\nnote_style = ") + m.old_name + "\n", &report);
+        CHECK(s.note_style == m.now);
+        CHECK(report.clean()); // an old name is not a bad value
+        CHECK(serialize(s).find(std::string("note_style = ") + m.saved + "\n") !=
+              std::string::npos);
+    }
+    ParseReport report;
+    CHECK(parse_look("note_style = sparkly\n", &report).note_style == LookSettings{}.note_style);
+    CHECK_FALSE(report.clean());
+}
+
+TEST_CASE("block glow and beat lines: defaults, saved, clamped and read back") {
+    const LookSettings d;
+    CHECK(d.block_glow == kDefaultBlockGlow);
+    CHECK(d.beat_lines == BeatLines::Off);
+    LookSettings s;
+    s.block_glow = 85;
+    s.beat_lines = BeatLines::HalfBeats;
+    const std::string text = serialize(s);
+    CHECK(text.find("block_glow = 85\n") != std::string::npos);
+    CHECK(text.find("beat_lines = half_beats\n") != std::string::npos);
+    CHECK(parse_look(text) == s);
+    for (const auto& [name, mode] :
+         {std::pair{"off", BeatLines::Off}, std::pair{"beats", BeatLines::Beats},
+          std::pair{"half_beats", BeatLines::HalfBeats}, std::pair{"bars", BeatLines::Bars}}) {
+        CHECK(parse_look(std::string("beat_lines = ") + name + "\n").beat_lines == mode);
+    }
+    ParseReport report;
+    CHECK(parse_look("block_glow = 400\n", &report).block_glow == kMaxBlockGlow);
+    CHECK(parse_look("block_glow = -3\n").block_glow == kMinBlockGlow);
+    LookSettings bad;
+    bad.block_glow = 1000;
+    bad.beat_lines = static_cast<BeatLines>(9);
+    CHECK_FALSE(bad.is_valid());
+    CHECK(bad.clamped().block_glow == kMaxBlockGlow);
+    CHECK(bad.clamped().beat_lines == BeatLines::Off);
+}
+
+TEST_CASE("sheet music's helps: off by default, letters, their own text form") {
+    const LookSettings d;
+    CHECK_FALSE(d.names_on_sheet);
+    CHECK_FALSE(d.sheet_note_colours);
+    CHECK(d.sheet_naming == SheetNaming::Letters);
+    CHECK(d.sheet_chords == SheetChords::NoteNames);
+    LookSettings s;
+    s.names_on_sheet = true;
+    s.sheet_naming = SheetNaming::Solfege;
+    s.sheet_note_colours = true;
+    s.sheet_chords = SheetChords::Symbols;
+    const std::string text = serialize(s);
+    CHECK(text.find("names_on_sheet = true\n") != std::string::npos);
+    CHECK(text.find("sheet_naming = solfege\n") != std::string::npos);
+    CHECK(text.find("sheet_chords = symbols\n") != std::string::npos);
+    CHECK(text.find("sheet_note_colours = true\n") != std::string::npos);
+    CHECK(parse_look(text) == s);
+    // The blocks' Do Re Mi does not make the sheet's names Do Re Mi.
+    ParseReport report;
+    const LookSettings blocks = parse_look("version = 1\nname_mode = solfege\n", &report);
+    CHECK(blocks.sheet_naming == SheetNaming::Letters);
+    CHECK(report.clean());
+}
+
+TEST_CASE("a look saved before notes could rise during a song reads as off") {
+    LookSettings s;
+    s.rising_in_song = true;
+    std::string text = serialize(s);
+    const std::size_t at = text.find("rising_in_song");
+    REQUIRE(at != std::string::npos);
+    text.erase(at, text.find('\n', at) - at + 1);
+    ParseReport report;
+    CHECK_FALSE(parse_look(text, &report).rising_in_song);
+    CHECK(report.clean());
+}
+
+TEST_CASE("a settings file that still has the dropped combo rail switch loads clean") {
+    ParseReport report;
+    const LookSettings look = parse_look("combo_rail = false\ncombo_number = false\n", &report);
+    CHECK(report.clean());
+    CHECK_FALSE(look.combo_number);
+    // And it is not written again.
+    CHECK(serialize(look).find("combo_rail") == std::string::npos);
+}
+
+TEST_CASE("the Learn sections' shades: teal, pink, coral and violet by default, saved by name") {
+    const LookSettings d;
+    CHECK(d.learn_picks == kLearnDefaultPicks);
+    CHECK(learn_shade_info(d.learn_picks[static_cast<std::size_t>(LearnSection::Scales)]).key == "teal");
+    CHECK(learn_shade_info(d.learn_picks[static_cast<std::size_t>(LearnSection::Chords)]).key == "pink");
+    CHECK(learn_shade_info(d.learn_picks[static_cast<std::size_t>(LearnSection::Ear)]).key == "coral");
+    CHECK(learn_shade_info(d.learn_picks[static_cast<std::size_t>(LearnSection::Melodies)]).key == "violet");
+
+    LookSettings mine;
+    mine.learn_picks = {LearnShade::Lime, LearnShade::Lime, LearnShade::Jade, LearnShade::Magenta};
+    const std::string text = serialize(mine);
+    CHECK(text.find("learn_scales_colour = lime\n") != std::string::npos);
+    CHECK(text.find("learn_chords_colour = lime\n") != std::string::npos);
+    CHECK(text.find("learn_ear_colour = jade\n") != std::string::npos);
+    CHECK(text.find("learn_melodies_colour = magenta\n") != std::string::npos);
+    ParseReport report;
+    const LookSettings back = parse_look(text, &report);
+    CHECK(report.clean());
+    CHECK(back == mine); // two sections may share a shade
+    CHECK(back.learn_picks == mine.learn_picks);
+}
+
+TEST_CASE("a look saved before the Learn colours loads with the default shades, a bad one keeps the "
+          "default and says so") {
+    ParseReport report;
+    const LookSettings old = parse_look("version = 1\nnote_style = neon\nhigh_contrast = true\n", &report);
+    CHECK(report.clean());
+    CHECK(old.learn_picks == kLearnDefaultPicks);
+
+    const LookSettings bad = parse_look("learn_ear_colour = chartreuse\nlearn_scales_colour = jade\n", &report);
+    CHECK_FALSE(report.clean());
+    CHECK(bad.learn_picks[static_cast<std::size_t>(LearnSection::Ear)] == LearnShade::Coral);
+    CHECK(bad.learn_picks[static_cast<std::size_t>(LearnSection::Scales)] == LearnShade::Jade);
+}
+
+TEST_CASE("a saved look slot keeps its Learn shades") {
+    UserPresets presets;
+    LookSettings mine;
+    mine.learn_picks[static_cast<std::size_t>(LearnSection::Chords)] = LearnShade::Teal;
+    REQUIRE(presets.save_slot(1, "Night", mine));
+    const LookDocument doc{mine, presets};
+    const LookDocument back = parse_look_document(serialize_document(doc));
+    LookSettings loaded;
+    REQUIRE(back.user_presets.load_slot(1, &loaded));
+    CHECK(loaded.learn_picks == mine.learn_picks);
 }

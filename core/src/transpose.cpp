@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/transpose.hpp"
+#include "etude/transpose.hpp"
 
 #include <algorithm>
 
-namespace toonval {
+namespace etude {
 namespace {
 
 constexpr int kOctave = 12;
@@ -39,4 +39,23 @@ TransposedPitch Transposition::map_note(int song_pitch, bool drum) const {
     return drum ? TransposedPitch{song_pitch, false, 0, true} : map(song_pitch);
 }
 
-} // namespace toonval
+std::optional<KeyRange> drawn_key_range(std::span<const Note> notes, const Transposition& t) {
+    int lo = 128;
+    int hi = -1;
+    for (const Note& n : notes) {
+        if (n.drum || n.accompaniment) {
+            continue;
+        }
+        const TransposedPitch p = t.map(n.pitch);
+        if (p.playable) {
+            lo = std::min(lo, p.pitch);
+            hi = std::max(hi, p.pitch);
+        }
+    }
+    if (hi < 0) {
+        return std::nullopt;
+    }
+    return KeyRange{lo, hi};
+}
+
+} // namespace etude

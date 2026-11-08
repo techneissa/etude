@@ -2,17 +2,16 @@
 #pragma once
 
 #include "synth_sink.hpp"
-#include "toonval/playback.hpp"
-#include "toonval/sound_sink.hpp"
+#include "etude/playback.hpp"
+#include "etude/sound_sink.hpp"
 
-#include <bitset>
 #include <cstddef>
 
-namespace toonval::app {
+namespace etude::app {
 
 // The built-in piano as a core SoundSink, so taps and typing sound when no piano is connected.
 // The built-in piano has one channel, so the channel is ignored.
-class BuiltinPianoSink final : public toonval::SoundSink {
+class BuiltinPianoSink final : public etude::SoundSink {
   public:
     explicit BuiltinPianoSink(app::SynthSink& synth) : synth_(synth) {}
 
@@ -25,64 +24,20 @@ class BuiltinPianoSink final : public toonval::SoundSink {
     app::SynthSink& synth_;
 };
 
-// The song's MIDI (SongController) on the built-in piano, when no piano is connected. One channel:
-// the channel is ignored, program changes and bends too. It remembers the song notes it started,
-// so All Notes Off (CC123, CC120) and all_off() stop exactly those, not the player's own.
+// The song's sound (SongController) on the built-in piano, when no piano is connected. The synth
+// starts each note on the sample its due time falls on and keeps the record of the song's notes
+// itself, so a stop affects exactly those, not the player's own. One channel: the channel is
+// ignored, program changes and bends too.
 class BuiltinSongSink {
   public:
     explicit BuiltinSongSink(app::SynthSink& synth) : synth_(synth) {}
 
-    void play(const PlaybackMessage& m) {
-        switch (m.kind) {
-        case PlaybackMessage::Kind::NoteOn:
-            if (m.value > 0) {
-                synth_.note_on(m.data & 127, m.value & 127);
-                sounding_.set(m.data & 127u);
-                break;
-            }
-            [[fallthrough]];
-        case PlaybackMessage::Kind::NoteOff:
-            if (sounding_.test(m.data & 127u)) {
-                synth_.note_off(m.data & 127);
-                sounding_.reset(m.data & 127u);
-            }
-            break;
-        case PlaybackMessage::Kind::ControlChange:
-            if (m.data == 64) {
-                pedal_ = m.value >= 64;
-                synth_.sustain(pedal_);
-            } else if (m.data == 123 || m.data == 120) {
-                stop_notes();
-            }
-            break;
-        case PlaybackMessage::Kind::ProgramChange:
-        case PlaybackMessage::Kind::PitchBend:
-            break;
-        }
-    }
-    // Every song note off and the pedal up.
-    void all_off() {
-        stop_notes();
-        if (pedal_) {
-            synth_.sustain(false);
-            pedal_ = false;
-        }
-    }
-    std::size_t sounding() const { return sounding_.count(); }
+    void submit(const etude::SongSoundEvent& event) { synth_.song_event(event); }
+    // Every song note off, the pedal up, and nothing left scheduled.
+    void all_off() { synth_.song_event({etude::SongSoundEvent::Kind::StopAll, {}}); }
 
   private:
-    void stop_notes() {
-        for (int n = 0; n < 128; ++n) {
-            if (sounding_.test(static_cast<std::size_t>(n))) {
-                synth_.note_off(n);
-            }
-        }
-        sounding_.reset();
-    }
-
     app::SynthSink& synth_;
-    std::bitset<128> sounding_;
-    bool pedal_ = false;
 };
 
-} // namespace toonval::app
+} // namespace etude::app

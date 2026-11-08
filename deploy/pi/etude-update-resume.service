@@ -1,0 +1,23 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# At boot: finishes what a reboot or a power cut interrupted in the middle of an app update. A new
+# version that was started but never said ready is waited for again, and goes back to the old version
+# after two starts without ready, across reboots too; an interrupted switch or going back is
+# finished. With no update in progress it ends at once.
+# deploy/pi/setup.sh fills in @PREFIX@ and installs it as /etc/systemd/system/etude-update-resume.service,
+# with the sandbox drop-in beside it (etude-update-sandbox.conf).
+[Unit]
+Description=etude: settle an app update after a reboot
+ConditionPathExists=/etc/etude-update.conf
+After=etude.service etude-labwc.service
+
+[Service]
+Type=exec
+ExecStart=/usr/local/lib/etude/etude-update-helper resume
+StandardOutput=journal
+StandardError=journal
+# A stop (SIGTERM) goes back short, as etude-update.service's does: worst_case_stop_seconds.
+TimeoutStopSec=1200
+# The sandbox is a drop-in, etude-update-sandbox.conf, the one list shared with etude-update.service.
+
+[Install]
+WantedBy=multi-user.target

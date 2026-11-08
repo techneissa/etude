@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/content_hash.hpp"
+#include "etude/content_hash.hpp"
 
 #include <doctest/doctest.h>
 
@@ -7,7 +7,7 @@
 #include <string>
 #include <vector>
 
-using namespace toonval;
+using namespace etude;
 
 TEST_CASE("content_hash matches the published FNV-1a 64 test vectors") {
     CHECK(content_hash("") == 0xcbf29ce484222325ULL);
@@ -19,6 +19,14 @@ TEST_CASE("content_hash of bytes equals the hash of the same text") {
     const std::vector<std::uint8_t> bytes{'f', 'o', 'o', 'b', 'a', 'r'};
     CHECK(content_hash(bytes.data(), bytes.size()) == content_hash("foobar"));
     CHECK(content_hash(nullptr, 0) == content_hash(""));
+}
+
+TEST_CASE("content_hash_extend goes on where a hash left off") {
+    CHECK(content_hash_extend(content_hash("foo"), "bar", 3) == content_hash("foobar"));
+    CHECK(content_hash_extend(content_hash(""), "foobar", 6) == content_hash("foobar"));
+    CHECK(content_hash_extend(content_hash("foobar"), nullptr, 0) == content_hash("foobar"));
+    CHECK(content_hash_extend(content_hash("a"), "b", 1) !=
+          content_hash_extend(content_hash("b"), "a", 1));
 }
 
 TEST_CASE("content_hash changes with one flipped bit, an appended byte, or a swap") {

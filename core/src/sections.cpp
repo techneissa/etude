@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/sections.hpp"
+#include "etude/sections.hpp"
 
-#include "toonval/content_hash.hpp"
+#include "etude/content_hash.hpp"
 
 #include <algorithm>
 #include <cmath>
 #include <limits>
 #include <unordered_set>
 
-namespace toonval {
+namespace etude {
 
 namespace {
 
@@ -477,6 +477,32 @@ EditResult SongSections::add_range(const Song& song, double start_s, double end_
     return done(id);
 }
 
+EditResult SongSections::move_marker(const Song& song, std::size_t index, double to_s,
+                                     bool snap_to_bars) {
+    if (index + 1 >= sections.size()) {
+        return fail(EditError::NotFound);
+    }
+    double t = 0.0;
+    if (!resolve_time(song, to_s, snap_to_bars, t)) {
+        return fail(EditError::OutOfRange);
+    }
+    const Section& before = sections[index];
+    const Section& after = sections[index + 1];
+    if (t < before.start_s - kEps || t > after.end_s + kEps) {
+        return fail(EditError::OutOfRange);
+    }
+    if (t - before.start_s < kMinSectionSeconds || after.end_s - t < kMinSectionSeconds) {
+        return fail(EditError::TooShort);
+    }
+    SongSections work = *this;
+    work.sections[index].end_s = t;
+    work.sections[index + 1].start_s = t;
+    refresh(work, song);
+    const SectionId id = after.id;
+    *this = std::move(work);
+    return done(id);
+}
+
 EditResult SongSections::remove_marker(const Song& song, double near_s,
                                        std::vector<SectionId>* absorbed) {
     if (std::isnan(near_s)) {
@@ -815,4 +841,4 @@ void SectionLibrary::trim() {
     }
 }
 
-} // namespace toonval
+} // namespace etude

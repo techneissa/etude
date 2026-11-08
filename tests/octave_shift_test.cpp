@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/octave_shift.hpp"
+#include "etude/octave_shift.hpp"
 
 #include <doctest/doctest.h>
 
@@ -7,7 +7,7 @@
 #include <cstdint>
 #include <vector>
 
-using namespace toonval;
+using namespace etude;
 
 namespace {
 

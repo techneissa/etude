@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/keyboard_view.hpp"
+#include "etude/keyboard_view.hpp"
 
-#include "toonval/pitch.hpp"
+#include "etude/pitch.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -11,7 +11,7 @@
 
 #include <doctest/doctest.h>
 
-using namespace toonval;
+using namespace etude;
 
 namespace {
 
@@ -75,16 +75,12 @@ TEST_CASE("fit keyboard shows every key of 49, 61 and 88 key keyboards") {
         const KeyViewTarget t = compute_key_view(params(kb, 1280.0f, KeySize::FitKeyboard));
         CHECK(t.range.lowest == kb.lowest);
         CHECK(t.range.highest == kb.highest);
-        CHECK_FALSE(t.zoomed_out);
-    }
+        }
 }
 
-TEST_CASE("fit keyboard ignores the width, the song and the notes in play") {
-    const int up[] = {40, 90};
+TEST_CASE("fit keyboard ignores the width and the song") {
     KeyViewParams p = params(kRange61, 100.0f, KeySize::FitKeyboard);
     p.song = KeyRange{60, 72};
-    p.upcoming = up;
-    p.current = KeyRange{50, 70};
     const KeyViewTarget t = compute_key_view(p);
     CHECK(t.range.lowest == 36);
     CHECK(t.range.highest == 96);
@@ -111,7 +107,6 @@ TEST_CASE("fit song zooms to the song plus two white keys each side") {
     CHECK(white_rank(t.range.lowest) == white_rank(60) - kSongMarginWhites);
     CHECK(white_rank(t.range.highest) == white_rank(72) + kSongMarginWhites);
     CHECK(white_edges(t.range));
-    CHECK_FALSE(t.zoomed_out);
 }
 
 TEST_CASE("fit song with a black key at the top of the song keeps the key and its neighbours") {
@@ -155,24 +150,6 @@ TEST_CASE("fit song without a song shows the whole keyboard") {
     const KeyViewTarget t = compute_key_view(params(kRange88, 1280.0f, KeySize::FitSong));
     CHECK(t.range.lowest == 21);
     CHECK(t.range.highest == 108);
-}
-
-TEST_CASE("fit song widens for an upcoming note outside the song range") {
-    const int up[] = {48};
-    KeyViewParams p = params(kRange88, 1280.0f, KeySize::FitSong);
-    p.song = KeyRange{60, 72};
-    p.upcoming = up;
-    const KeyViewTarget t = compute_key_view(p);
-    CHECK(fully_visible(t.range, 48));
-    CHECK(fully_visible(t.range, 72));
-}
-
-TEST_CASE("fit song ignores held keys outside the song") {
-    const int held[] = {30};
-    KeyViewParams p = params(kRange88, 1280.0f, KeySize::FitSong);
-    p.song = KeyRange{60, 72};
-    p.held = held;
-    CHECK(whites_in(compute_key_view(p).range) == 8 + 2 * kSongMarginWhites);
 }
 
 TEST_CASE("a fixed size shows as many whole white keys as fit the width") {
@@ -223,146 +200,6 @@ TEST_CASE("a keyboard without middle C starts on its own middle") {
     CHECK(inside(t.range, KeyRange{72, 108}));
 }
 
-TEST_CASE("the window stays put while the notes stay inside it with their margin") {
-    const int held[] = {62, 64};
-    KeyViewParams p = params(kRange88, 1280.0f, KeySize::Medium);
-    p.held = held;
-    const KeyViewTarget first = compute_key_view(p);
-    p.current = first.range;
-    const int held2[] = {64, 65, 67};
-    p.held = held2;
-    const KeyViewTarget second = compute_key_view(p);
-    CHECK(second.range.lowest == first.range.lowest);
-    CHECK(second.range.highest == first.range.highest);
-}
-
-TEST_CASE("the window stays put with no notes to show") {
-    KeyViewParams p = params(kRange88, 1280.0f, KeySize::Medium);
-    p.current = KeyRange{36, 71}; // 21 white keys
-    const KeyViewTarget t = compute_key_view(p);
-    CHECK(t.range.lowest == 36);
-    CHECK(t.range.highest == 71);
-}
-
-TEST_CASE("a held key past the right edge moves the window the least it can") {
-    KeyViewParams p = params(kRange88, 1280.0f, KeySize::Medium); // 21 white keys, margin 2
-    const int held[] = {84};
-    p.held = held;
-    p.current = KeyRange{48, 83}; // ranks 28..48, 84 is rank 49 (C6): off the right
-    const KeyViewTarget t = compute_key_view(p);
-    CHECK(whites_in(t.range) == 21);
-    CHECK(fully_visible(t.range, 84));
-    // The key sits two white keys from the right edge, not centred: moved by 3 keys only.
-    CHECK(white_rank(t.range.highest) - white_rank(84) == 2);
-    CHECK(white_rank(t.range.lowest) == 28 + 3);
-}
-
-TEST_CASE("a held key past the left edge moves the window the least it can") {
-    KeyViewParams p = params(kRange88, 1280.0f, KeySize::Medium);
-    const int held[] = {40};
-    p.held = held;
-    p.current = KeyRange{60, 95}; // 21 white keys, ranks 35..55
-    const KeyViewTarget t = compute_key_view(p);
-    CHECK(fully_visible(t.range, 40));
-    CHECK(white_rank(40) - white_rank(t.range.lowest) == 2);
-}
-
-TEST_CASE("a far jump centres the notes in the new window") {
-    KeyViewParams p = params(kRange88, 1280.0f, KeySize::Medium);
-    const int up[] = {67};
-    p.upcoming = up;
-    // No current window: start centred on the note.
-    const KeyViewTarget t = compute_key_view(p);
-    CHECK(fully_visible(t.range, 67));
-    const int mid = (white_rank(t.range.lowest) + white_rank(t.range.highest)) / 2;
-    CHECK(std::abs(mid - white_rank(67)) <= 1);
-}
-
-TEST_CASE("the window never leaves the keyboard") {
-    KeyViewParams p = params(kRange61, 1280.0f, KeySize::Medium);
-    const int lo[] = {36};
-    p.upcoming = lo;
-    CHECK(compute_key_view(p).range.lowest == 36);
-    const int hi[] = {96};
-    p.upcoming = hi;
-    CHECK(compute_key_view(p).range.highest == 96);
-}
-
-TEST_CASE("upcoming notes are never cut off, even if that means smaller keys") {
-    const int up[] = {40, 55, 70, 84}; // E2 to C6: 27 white keys; Extra large shows 14
-    KeyViewParams p = params(kRange88, 1280.0f, KeySize::ExtraLarge);
-    p.upcoming = up;
-    const KeyViewTarget t = compute_key_view(p);
-    CHECK(t.zoomed_out);
-    for (const int n : up) {
-        CHECK(fully_visible(t.range, n));
-    }
-    CHECK(whites_in(t.range) > 14);
-    // The widest zoom that fits: exactly the span of the notes, no more.
-    CHECK(whites_in(t.range) == white_rank(84) - white_rank(40) + 1);
-}
-
-TEST_CASE("upcoming notes that fit leave the size alone") {
-    const int up[] = {60, 64, 67};
-    KeyViewParams p = params(kRange88, 1280.0f, KeySize::ExtraLarge);
-    p.upcoming = up;
-    const KeyViewTarget t = compute_key_view(p);
-    CHECK_FALSE(t.zoomed_out);
-    CHECK(whites_in(t.range) == 14);
-}
-
-TEST_CASE("a black upcoming note brings both its white neighbours into view") {
-    // Window ends exactly at C#5's lower neighbour: C#5 needs D5 too.
-    const int up[] = {73}; // C#5
-    KeyViewParams p = params(kRange88, 1280.0f, KeySize::ExtraLarge);
-    p.upcoming = up;
-    p.current = KeyRange{note_of_rank(white_rank(72) - 13), 72}; // right edge is C5
-    const KeyViewTarget t = compute_key_view(p);
-    CHECK(fully_visible(t.range, 73));
-}
-
-TEST_CASE("held keys stay in view when they fit with the upcoming notes") {
-    const int up[] = {60};
-    const int held[] = {64};
-    KeyViewParams p = params(kRange88, 1280.0f, KeySize::ExtraLarge);
-    p.upcoming = up;
-    p.held = held;
-    const KeyViewTarget t = compute_key_view(p);
-    CHECK(fully_visible(t.range, 60));
-    CHECK(fully_visible(t.range, 64));
-}
-
-TEST_CASE("held keys give way to upcoming notes when both do not fit") {
-    const int up[] = {96};
-    const int held[] = {30}; // an octave-shifted key far below
-    KeyViewParams p = params(kRange88, 1280.0f, KeySize::ExtraLarge);
-    p.upcoming = up;
-    p.held = held;
-    const KeyViewTarget t = compute_key_view(p);
-    CHECK(fully_visible(t.range, 96));
-    CHECK_FALSE(t.zoomed_out);
-}
-
-TEST_CASE("held keys alone also widen the view rather than being cut off") {
-    const int held[] = {40, 90};
-    KeyViewParams p = params(kRange88, 1280.0f, KeySize::ExtraLarge);
-    p.held = held;
-    const KeyViewTarget t = compute_key_view(p);
-    CHECK(t.zoomed_out);
-    CHECK(fully_visible(t.range, 40));
-    CHECK(fully_visible(t.range, 90));
-}
-
-TEST_CASE("notes off the keyboard are ignored") {
-    const int up[] = {-5, 3, 120, 200};
-    KeyViewParams p = params(kRange61, 1280.0f, KeySize::Medium);
-    p.upcoming = up;
-    p.current = KeyRange{48, 83}; // 21 white keys
-    const KeyViewTarget t = compute_key_view(p);
-    CHECK(t.range.lowest == 48);
-    CHECK_FALSE(t.zoomed_out);
-}
-
 TEST_CASE("a bad width or pixel density falls back instead of failing") {
     const float nan = std::numeric_limits<float>::quiet_NaN();
     for (const float width : {0.0f, -10.0f, nan, std::numeric_limits<float>::infinity()}) {
@@ -384,36 +221,125 @@ TEST_CASE("a stray key size value shows the whole keyboard") {
     CHECK(compute_key_view(p).range.lowest == 36);
 }
 
-TEST_CASE("property: the target is a valid white-edged window that holds the upcoming notes") {
-    std::mt19937 rng(20261012);
+TEST_CASE("auto shows the whole song range: C2 to C5 shows C2 to C5 with two white keys each side") {
+    KeyViewParams p = params(kRange88, 1280.0f, KeySize::FitSong);
+    p.song = KeyRange{36, 72}; // C2 to C5
+    const KeyViewTarget t = compute_key_view(p);
+    CHECK(t.range.lowest == note_of_rank(white_rank(36) - kSongMarginWhites)); // A1
+    CHECK(t.range.highest == note_of_rank(white_rank(72) + kSongMarginWhites)); // E5
+    CHECK(fully_visible(t.range, 36));
+    CHECK(fully_visible(t.range, 72));
+}
+
+TEST_CASE("a fixed size is centred on the song and keeps its count when the song is wider") {
+    // Large, 20 mm: 16 white keys at 1280 px.
+    KeyViewParams p = params(kRange88, 1280.0f, KeySize::Large);
+    p.song = KeyRange{60, 72}; // C4 to C5: 8 white keys, centre G4 (rank 39)
+    const KeyViewTarget t = compute_key_view(p);
+    CHECK(whites_in(t.range) == 16);
+    CHECK(fully_visible(t.range, 60));
+    CHECK(fully_visible(t.range, 72));
+    const int mid2 = white_rank(t.range.lowest) + white_rank(t.range.highest);
+    CHECK(std::abs(mid2 - (white_rank(60) + white_rank(72))) <= 1);
+    // A song of 4 octaves: still 16 keys, both ends cut alike.
+    p.song = KeyRange{36, 84};
+    const KeyViewTarget wide = compute_key_view(p);
+    CHECK(whites_in(wide.range) == 16);
+    const int cut_low = white_rank(wide.range.lowest) - white_rank(36);
+    const int cut_high = white_rank(84) - white_rank(wide.range.highest);
+    CHECK(std::abs(cut_low - cut_high) <= 1);
+}
+
+TEST_CASE("a fixed size centred on a song at the keyboard's edge stays on the keyboard") {
+    KeyViewParams p = params(kRange61, 1280.0f, KeySize::Large);
+    p.song = KeyRange{36, 40};
+    const KeyViewTarget t = compute_key_view(p);
+    CHECK(t.range.lowest == 36);
+    CHECK(whites_in(t.range) == 16);
+    p.song = KeyRange{93, 96};
+    CHECK(compute_key_view(p).range.highest == 96);
+}
+
+TEST_CASE("free play: a fixed size moves once, the least it can, to show a key held off it") {
+    KeyViewParams p = params(kRange88, 1280.0f, KeySize::Medium); // 21 white keys
+    const KeyViewTarget start = compute_key_view(p);
+    CHECK(fully_visible(start.range, 60)); // middle C to begin with
+    // A key held past the right edge: the window's right edge comes to it, no further.
+    const int far[] = {96};
+    p.current = start.range;
+    p.held = far;
+    const KeyViewTarget moved = compute_key_view(p);
+    CHECK(whites_in(moved.range) == 21);
+    CHECK(moved.range.highest == 96);
+    // Let go: it stays where it moved to.
+    p.current = moved.range;
+    p.held = {};
+    const KeyViewTarget stays = compute_key_view(p);
+    CHECK(stays.range.lowest == moved.range.lowest);
+    CHECK(stays.range.highest == moved.range.highest);
+    // A key held inside the window moves nothing.
+    const int inside_key[] = {84};
+    p.held = inside_key;
+    CHECK(compute_key_view(p).range.lowest == moved.range.lowest);
+    // Past the left edge: the left edge comes to it.
+    const int low[] = {36};
+    p.held = low;
+    CHECK(compute_key_view(p).range.lowest == 36);
+}
+
+TEST_CASE("free play: a black key held past the right edge brings its upper neighbour too") {
+    KeyViewParams p = params(kRange88, 1280.0f, KeySize::Medium);
+    p.current = compute_key_view(p).range;
+    const int black[] = {85}; // C#6
+    p.held = black;
+    const KeyViewTarget t = compute_key_view(p);
+    CHECK(fully_visible(t.range, 85));
+    CHECK(t.range.highest == 86);
+}
+
+TEST_CASE("free play: held keys wider than the window centre it on them") {
+    KeyViewParams p = params(kRange88, 1280.0f, KeySize::ExtraLarge); // 14 white keys
+    p.current = compute_key_view(p).range;
+    const int wide[] = {36, 96};
+    p.held = wide;
+    const KeyViewTarget t = compute_key_view(p);
+    CHECK(whites_in(t.range) == 14);
+    const int mid2 = white_rank(t.range.lowest) + white_rank(t.range.highest);
+    CHECK(std::abs(mid2 - (white_rank(36) + white_rank(96))) <= 1);
+}
+
+TEST_CASE("with a song the view never moves for a held key, nor for Auto or Fit keyboard") {
+    const int far[] = {100};
+    KeyViewParams p = params(kRange88, 1280.0f, KeySize::Medium);
+    p.song = KeyRange{60, 72};
+    const KeyViewTarget rest = compute_key_view(p);
+    p.current = KeyRange{21, 50};
+    p.held = far;
+    const KeyViewTarget t = compute_key_view(p);
+    CHECK(t.range.lowest == rest.range.lowest);
+    CHECK(t.range.highest == rest.range.highest);
+    // No song, Auto: the whole keyboard whatever is held.
+    p.song.reset();
+    p.size = KeySize::FitSong;
+    CHECK(compute_key_view(p).range.lowest == 21);
+    p.size = KeySize::FitKeyboard;
+    CHECK(compute_key_view(p).range.highest == 108);
+}
+
+TEST_CASE("property: every size gives a valid window that only the song, the size and the width decide") {
+    std::mt19937 rng(20261013);
     const KeyRange keyboards[] = {kRange49, kRange61, kRange76, kRange88, KeyRange{48, 84}};
     const KeySize sizes[] = {KeySize::FitKeyboard, KeySize::FitSong, KeySize::Small,
                              KeySize::Medium,      KeySize::Large,   KeySize::ExtraLarge};
-    std::optional<KeyRange> current;
     for (int iter = 0; iter < 4000; ++iter) {
         KeyViewParams p;
         p.keyboard = keyboards[rng() % 5];
         p.size = sizes[rng() % 6];
         p.width_px = 200.0f + static_cast<float>(rng() % 4000);
         p.px_per_mm = 2.0f + static_cast<float>(rng() % 60) / 10.0f;
-        std::vector<int> up;
-        std::vector<int> held;
-        const int n_up = static_cast<int>(rng() % 6);
-        const int n_held = static_cast<int>(rng() % 4);
-        for (int i = 0; i < n_up; ++i) {
-            up.push_back(static_cast<int>(rng() % 128));
-        }
-        for (int i = 0; i < n_held; ++i) {
-            held.push_back(static_cast<int>(rng() % 128));
-        }
-        p.upcoming = up;
-        p.held = held;
         if (rng() % 2 == 0) {
             const int a = p.keyboard.lowest + static_cast<int>(rng() % 40);
             p.song = KeyRange{a, a + static_cast<int>(rng() % 30)};
-        }
-        if (rng() % 3 != 0) {
-            p.current = current;
         }
         const KeyboardLayout normalised(p.keyboard);
         const KeyViewTarget t = compute_key_view(p);
@@ -422,20 +348,17 @@ TEST_CASE("property: the target is a valid white-edged window that holds the upc
         CHECK(inside(t.range, normalised.range()));
         CHECK(t.range.lowest <= t.range.highest);
         CHECK(whites_in(t.range) <= normalised.white_key_count());
-        if (p.size != KeySize::FitKeyboard) {
-            CHECK(whites_in(t.range) >= std::min(kMinFixedWhites, normalised.white_key_count()));
-        }
-        for (const int note : up) {
-            if (normalised.range().contains(note)) {
-                // A black upcoming note at the very top of the keyboard has no upper neighbour.
+        if (p.size == KeySize::FitSong && p.song) {
+            // Auto holds every key of the song that the keyboard has.
+            for (const int note : {std::max(p.song->lowest, normalised.range().lowest),
+                                   std::min(p.song->highest, normalised.range().highest)}) {
                 const bool top_black = is_black_key(note) && note + 1 > normalised.range().highest;
-                if (!top_black) {
+                if (note <= normalised.range().highest && note >= normalised.range().lowest &&
+                    !top_black) {
                     CHECK(fully_visible(t.range, note));
                 }
             }
         }
-        current = t.range;
-        // Deterministic: the same inputs give the same window.
         const KeyViewTarget again = compute_key_view(p);
         CHECK(again.range.lowest == t.range.lowest);
         CHECK(again.range.highest == t.range.highest);

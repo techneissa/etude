@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/sound_sink.hpp"
+#include "etude/sound_sink.hpp"
 
-#include "toonval/keyboard.hpp"
+#include "etude/keyboard.hpp"
 
 #include <algorithm>
 #include <cctype>
 
-namespace toonval {
+namespace etude {
 
 bool forward_to_sink(SoundSink& sink, const MidiEvent& ev) {
     if (!ev.is_virtual() || ev.synthetic) {
@@ -50,7 +50,7 @@ bool contains_ignoring_case(std::string_view text, std::string_view part) {
 } // namespace
 
 bool is_piano_output(std::string_view output_name, std::span<const std::string> open_input_names) {
-    if (output_name.empty() || output_name.starts_with("toonval") ||
+    if (output_name.empty() || output_name.starts_with("etude") ||
         contains_ignoring_case(output_name, "Midi Through")) {
         return false;
     }
@@ -61,4 +61,4 @@ bool is_piano_output(std::string_view output_name, std::span<const std::string> 
                        [&](const std::string& in) { return equal_ignoring_case(in, output_name); });
 }
 
-} // namespace toonval
+} // namespace etude

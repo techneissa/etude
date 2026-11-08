@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/scales.hpp"
+#include "etude/scales.hpp"
 
-#include "toonval/pitch.hpp"
+#include "etude/pitch.hpp"
 
 #include <doctest/doctest.h>
 
@@ -9,7 +9,7 @@
 #include <string>
 #include <vector>
 
-using namespace toonval;
+using namespace etude;
 
 namespace {
 
@@ -346,6 +346,21 @@ TEST_CASE("scales: the default tonic is the spelling with the fewest accidentals
     CHECK((six_sharps.letter == 'F' && six_sharps.accidental == 1));
     const Tonic six_flats = default_tonic(Gb, ScaleType::Major, true);
     CHECK((six_flats.letter == 'G' && six_flats.accidental == -1));
+    // Eb minor and D# minor need six signs each: the flat black keys keep their flats there.
+    const Tonic ebm = default_tonic(Eb, ScaleType::NaturalMinor);
+    CHECK((ebm.letter == 'E' && ebm.accidental == -1));
+    const Tonic abd = default_tonic(Ab, ScaleType::Dorian);
+    CHECK((abd.letter == 'A' && abd.accidental == -1));
+    // G# harmonic minor is not a key signature's tie: it keeps the sharp.
+    const Tonic gsh = default_tonic(Ab, ScaleType::HarmonicMinor);
+    CHECK((gsh.letter == 'G' && gsh.accidental == 1));
+    CHECK(tie_prefers_flats(Eb));
+    CHECK(tie_prefers_flats(Ab));
+    CHECK(tie_prefers_flats(Bb));
+    CHECK(tie_prefers_flats(Db));
+    CHECK(tie_prefers_flats(F));        // F locrian, not E#
+    CHECK_FALSE(tie_prefers_flats(Gb)); // F#, the sixth
+    CHECK_FALSE(tie_prefers_flats(C));
     // A white key is always spelled as itself.
     for (int white : {C, D, E, F, G, A, B}) {
         for (ScaleType t : kAllScaleTypes) {

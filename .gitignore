@@ -4,3 +4,5 @@
 /.cache/
 .DS_Store
 
+/build-tsan/
+__pycache__/

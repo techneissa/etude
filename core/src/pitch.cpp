@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/pitch.hpp"
+#include "etude/pitch.hpp"
 
 #include <array>
 #include <cmath>
 
-namespace toonval {
+namespace etude {
 
 double frequency_hz(int note, double a4_hz) { return a4_hz * std::exp2((note - kA4) / 12.0); }
 
@@ -28,4 +28,4 @@ std::string note_name(int note, bool prefer_flats, int octave_offset) {
            std::to_string(octave(note) + octave_offset);
 }
 
-} // namespace toonval
+} // namespace etude

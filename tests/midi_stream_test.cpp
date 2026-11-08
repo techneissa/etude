@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/midi_event.hpp"
+#include "etude/midi_event.hpp"
 
 #include <cstdint>
 #include <vector>
 
 #include <doctest/doctest.h>
 
-using namespace toonval;
+using namespace etude;
 
 namespace {
 using Bytes = std::vector<std::uint8_t>;

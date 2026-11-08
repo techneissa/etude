@@ -1,0 +1,596 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>etude</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{background:#0b0d12;color:#EEF2FA;font:16px/1.3 -apple-system,system-ui,sans-serif}
+body{min-height:100vh;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+.i{width:1em;height:1em;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.hide{display:none!important}
+.app{max-width:560px;margin:0 auto;padding-bottom:40px}
+.top{height:52px;display:flex;align-items:center;justify-content:space-between;padding:0 16px}
+.brand{display:flex;align-items:center;gap:8px;font-weight:700;font-size:18px}
+.brand .i{color:#5AAAFF;font-size:20px}
+.left{font-size:13px;color:#9AA4B8;display:flex;align-items:center;gap:6px}
+.left .i{font-size:15px}
+.page{padding:0 16px}
+.zone{display:flex;gap:10px;margin-top:4px}
+.drop{flex:1;min-width:0;height:76px;border-radius:16px;border:1.5px dashed rgba(90,170,255,.55);background:rgba(90,170,255,.07);display:flex;align-items:center;gap:14px;padding:0 16px;text-align:left}
+.drop .i{font-size:26px;color:#5AAAFF}
+.drop b{font-size:17px;display:block}
+.drop span{font-size:13px;color:#9AA4B8}
+.cam{width:76px;height:76px;border-radius:16px;background:rgba(255,255,255,.055);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:4px;font-size:12px;color:#9AA4B8}
+.cam .i{font-size:24px;color:#EEF2FA}
+.ib{width:44px;height:44px;margin-left:2px;display:flex;align-items:center;justify-content:center;color:#9AA4B8;font-size:20px;border-radius:22px}
+.ib:active{background:rgba(255,255,255,.08)}
+.about{font-size:15px;line-height:1.5;color:#c9d1e0;margin:6px 0 14px}
+.q{margin-top:12px;display:flex;flex-direction:column;gap:6px}
+.qi{min-height:52px;border-radius:12px;background:#161922;padding:8px 6px 8px 12px;position:relative;display:flex;align-items:center;gap:12px}
+.qi>.i{font-size:20px;color:#9AA4B8}
+.qi.done>.i{color:#3fb27f}
+.qi.fail>.i{color:#FF7373}
+.qi .n{flex:1;min-width:0}
+.qi .n b{display:block;font-weight:600;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.qi .n span{font-size:12px;color:#9AA4B8}
+.qi.fail .n span{color:#FF7373}
+.qi .x{width:40px;height:40px;display:flex;align-items:center;justify-content:center;color:#9AA4B8;font-size:18px}
+.qi .pr{position:absolute;left:12px;right:12px;bottom:5px;height:3px;border-radius:2px;background:rgba(255,255,255,.1)}
+.qi .pr i{display:block;height:100%;border-radius:2px;background:#5AAAFF}
+.sec{position:relative;height:44px;display:flex;align-items:center;justify-content:space-between;margin:14px 0 6px;font-size:13px;color:#9AA4B8}
+.sec b{font-size:15px;color:#EEF2FA}
+.sec #find{width:44px;height:44px;margin-right:-12px;display:flex;align-items:center;justify-content:center;font-size:20px;color:#9AA4B8}
+.sec.open b,.sec.open #find{visibility:hidden}
+.sf{position:absolute;left:0;right:0;top:0;height:44px;border-radius:12px;background:#1b1f2b;display:flex;align-items:center;gap:10px;padding:0 0 0 14px;color:#6B7488}
+.sf input{flex:1;min-width:0;height:44px;background:none;border:0;outline:0;color:#EEF2FA;font:inherit;font-size:16px}
+.sf input::-webkit-search-cancel-button,.sf input::-webkit-search-decoration{-webkit-appearance:none;display:none}
+.sf button{width:44px;height:44px;flex:none;display:flex;align-items:center;justify-content:center;color:#9AA4B8;font-size:18px}
+.fc{display:flex;gap:8px;overflow-x:auto;margin-bottom:8px;padding-bottom:2px;scrollbar-width:none}
+.fc::-webkit-scrollbar{display:none}
+.fc button{flex:none;height:36px;padding:0 14px;border-radius:18px;background:rgba(255,255,255,.055);display:flex;align-items:center;font-size:14px;gap:6px}
+.fc button.sel{background:rgba(90,170,255,.18);box-shadow:inset 0 0 0 1px rgba(90,170,255,.45)}
+.fc em{font-style:normal;color:#9AA4B8;font-size:12px}
+#list{min-height:290px}
+.fi{height:58px;display:flex;align-items:center;gap:12px;border-bottom:1px solid rgba(255,255,255,.06)}
+.fi .t{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex:none;background:rgba(90,170,255,.14);color:#5AAAFF;font-size:18px}
+.fi .t.d{background:rgba(255,154,61,.14);color:#ff9a3d}
+.fi .t.p{background:rgba(224,87,122,.14);color:#e0577a}
+.fi .n{flex:1;min-width:0}
+.fi .n b{display:block;font-weight:600;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fi .n span{font-size:12px;color:#9AA4B8;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fi .m{width:44px;height:44px;display:flex;align-items:center;justify-content:center;color:#9AA4B8;font-size:20px;flex:none}
+.dot{width:7px;height:7px;border-radius:4px;background:#5AAAFF;display:inline-block;margin-right:6px}
+.empty{height:58px;display:flex;align-items:center;justify-content:center;font-size:14px;color:#9AA4B8}
+.note{margin-top:22px;font-size:12px;color:#6B7488;display:flex;gap:6px;align-items:flex-start;line-height:1.4}
+.note .i{margin-top:1px;font-size:14px}
+.scrim{position:fixed;inset:0;background:rgba(4,6,10,.6);z-index:5}
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:6;max-width:560px;margin:0 auto;max-height:86vh;overflow-y:auto;border-radius:20px 20px 0 0;background:#202430;padding:8px 16px calc(24px + env(safe-area-inset-bottom))}
+.grab{width:36px;height:4px;border-radius:2px;background:rgba(255,255,255,.2);margin:0 auto 10px}
+.who{display:flex;align-items:center;gap:12px;min-height:44px;margin-bottom:4px}
+.who .n{min-width:0}
+.who b{font-size:16px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.who span{font-size:12px;color:#9AA4B8}
+.act{width:100%;height:52px;display:flex;align-items:center;gap:14px;font-size:16px;text-align:left;border-top:1px solid rgba(255,255,255,.06)}
+.act .i{font-size:20px;color:#9AA4B8;width:24px}
+.act.del,.act.del .i{color:#FF7373}
+.act em{font-style:normal;color:#9AA4B8;font-size:12px;margin-left:auto}
+.field{width:100%;height:46px;border-radius:12px;background:rgba(255,255,255,.07);border:0;outline:0;color:#EEF2FA;font:inherit;padding:0 14px;margin:8px 0}
+.field:focus{box-shadow:inset 0 0 0 2px #5AAAFF}
+.confirm{margin-top:4px;padding:12px;border-radius:12px;background:rgba(255,115,115,.1);box-shadow:inset 0 0 0 1px rgba(255,115,115,.35);font-size:14px}
+.btns{display:flex;gap:8px;margin-top:10px}
+.btns button{flex:1;height:44px;border-radius:10px;background:rgba(255,255,255,.07);font-size:15px}
+.btns button.go{background:#5AAAFF;color:#06101c;font-weight:700}
+.btns button.red{background:#FF7373;color:#1a0a0a;font-weight:700}
+.err{margin-top:6px;font-size:13px;color:#FF7373;min-height:18px}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:9;max-width:90vw;padding:10px 16px;border-radius:12px;background:#2a2e3b;font-size:14px;box-shadow:0 4px 18px rgba(0,0,0,.4)}
+.sign{display:flex;flex-direction:column;align-items:center;padding:14vh 16px 0;gap:22px;text-align:center}
+.logo{width:64px;height:64px;border-radius:18px;background:rgba(90,170,255,.14);display:flex;align-items:center;justify-content:center;color:#5AAAFF;font-size:30px}
+.sign h1{font-size:22px}
+.sign p{font-size:14px;color:#9AA4B8;max-width:280px}
+.cells{display:flex;gap:12px;position:relative}
+.cells b{width:60px;height:72px;border-radius:14px;background:rgba(255,255,255,.055);box-shadow:inset 0 0 0 1px rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;font-size:34px;font-weight:600}
+.cells b.cur{box-shadow:inset 0 0 0 2px #5AAAFF}
+.cells b.cur:after{content:"";width:2px;height:30px;background:#5AAAFF}
+.cells input{position:absolute;inset:0;width:100%;height:100%;opacity:0;font-size:16px;border:0;background:none}
+.cells.bad b{box-shadow:inset 0 0 0 2px #FF7373}
+.small{font-size:12px;color:#6B7488;display:flex;gap:6px;align-items:center;max-width:300px;line-height:1.4}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<symbol id="i-music" viewBox="0 0 24 24"><path d="M9 18V6l10-2v12"/><circle cx="7" cy="18" r="2.5"/><circle cx="17" cy="16" r="2.5"/></symbol>
+<symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5M4 20h16"/></symbol>
+<symbol id="i-camera" viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+<symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M16 16l4 4"/></symbol>
+<symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+<symbol id="i-file" viewBox="0 0 24 24"><path d="M7 3h8l4 4v14H7zM15 3v4h4"/></symbol>
+<symbol id="i-image" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.5"/><path d="M4 17l5-5 4 4 3-3 4 4"/></symbol>
+<symbol id="i-dots" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="19" cy="12" r="1.2"/></symbol>
+<symbol id="i-pencil" viewBox="0 0 24 24"><path d="M4 20l1-4L16 5l3 3L8 19z"/></symbol>
+<symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 6h6l2 2h10v11H3z"/></symbol>
+<symbol id="i-trash" viewBox="0 0 24 24"><path d="M5 7h14M9 7V4h6v3M7 7l1 13h8l1-13"/></symbol>
+<symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></symbol>
+</svg>
+
+<div id="sign" class="sign hide">
+  <div class="logo"><svg class="i"><use href="#i-music"/></svg></div>
+  <h1>Add songs to etude</h1>
+  <p>Type the 4-digit PIN shown on the Pi's screen.</p>
+  <div class="cells" id="cells"><b></b><b></b><b></b><b></b>
+    <input id="pin" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="one-time-code" aria-label="PIN">
+  </div>
+  <div class="err" id="signerr"></div>
+  <div class="small"><svg class="i"><use href="#i-info"/></svg><span>This page and your PIN are not encrypted (plain HTTP). Use it on your own home network only.</span></div>
+</div>
+
+<div id="app" class="app hide">
+  <div class="top">
+    <div class="brand"><svg class="i"><use href="#i-music"/></svg>Etude<button class="ib" id="about" aria-label="About adding songs"><svg class="i"><use href="#i-info"/></svg></button></div>
+    <div class="left"><svg class="i"><use href="#i-clock"/></svg><span id="left"></span></div>
+  </div>
+  <div class="page">
+    <div class="zone">
+      <button class="drop" id="pick"><svg class="i"><use href="#i-upload"/></svg><div><b>Add songs</b><span>MIDI, MusicXML, PDF, photos</span></div></button>
+      <button class="cam" id="photo"><svg class="i"><use href="#i-camera"/></svg>Photo</button>
+    </div>
+    <input id="files" type="file" multiple class="hide">
+    <input id="shot" type="file" accept="image/*" capture="environment" class="hide">
+    <div class="q" id="queue"></div>
+    <div class="sec" id="sec"><b>Library</b><button id="find" aria-label="Search"><svg class="i"><use href="#i-search"/></svg></button>
+      <div class="sf hide" id="sf"><svg class="i"><use href="#i-search"/></svg><input id="q" type="search" placeholder="Search songs" autocomplete="off" aria-label="Search songs"><button id="qx" aria-label="Close search"><svg class="i"><use href="#i-x"/></svg></button></div>
+    </div>
+    <div class="fc" id="chips"></div>
+    <div id="list"></div>
+    <div class="note"><svg class="i"><use href="#i-info"/></svg><span>Plain HTTP: this page and your PIN are not encrypted. Use it on your own home network only.</span></div>
+  </div>
+</div>
+
+<div id="gone" class="sign hide">
+  <div class="logo"><svg class="i"><use href="#i-clock"/></svg></div>
+  <h1>The Pi stopped listening</h1>
+  <p>Turn Phone on again under Add songs on the Pi, then reload this page.</p>
+</div>
+
+<div id="overlay"></div>
+<div id="toast" class="toast hide"></div>
+
+<script>
+(function () {
+"use strict";
+var NS = "http://www.w3.org/2000/svg";
+var $ = function (id) { return document.getElementById(id); };
+function el(tag, cls, text) {
+  var e = document.createElement(tag);
+  if (cls) { e.className = cls; }
+  if (text != null) { e.textContent = text; }
+  return e;
+}
+function icon(name) {
+  var s = document.createElementNS(NS, "svg");
+  s.setAttribute("class", "i");
+  var u = document.createElementNS(NS, "use");
+  u.setAttribute("href", "#i-" + name);
+  s.appendChild(u);
+  return s;
+}
+function show(id) {
+  ["sign", "app", "gone"].forEach(function (v) { $(v).classList.toggle("hide", v !== id); });
+}
+function size(n) {
+  if (n < 1024) { return n + " B"; }
+  if (n < 1048576) { return Math.max(1, Math.round(n / 1024)) + " KB"; }
+  return (n / 1048576).toFixed(1) + " MB";
+}
+function mmss(s) {
+  var m = Math.floor(s / 60), r = s % 60;
+  return m + ":" + (r < 10 ? "0" : "") + r;
+}
+function facts(f) { return size(f.size) + (f.length ? " \u00b7 " + mmss(f.length) : ""); }
+function base(p) { return p.slice(p.lastIndexOf("/") + 1); }
+function dir(p) { var k = p.lastIndexOf("/"); return k < 0 ? "" : p.slice(0, k); }
+
+var left = 0, tick = null, toastTimer = null;
+function toast(msg) {
+  var t = $("toast");
+  t.textContent = msg;
+  t.classList.remove("hide");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function () { t.classList.add("hide"); }, 3500);
+}
+
+// One request. Resolves {status, data}; a 401 sends the page back to the PIN and a dead network
+// to the "stopped listening" page.
+function call(method, path, params) {
+  var opts = { method: method, credentials: "same-origin" };
+  if (params) { opts.body = new URLSearchParams(params); }
+  return fetch(path, opts).then(function (r) {
+    return r.json().catch(function () { return {}; }).then(function (data) {
+      if (r.status === 401 && path !== "/api/login") { signin(); }
+      return { status: r.status, data: data };
+    });
+  }, function () { gone(); return { status: 0, data: { error: "No answer from the Pi" } }; });
+}
+function gone() { clearInterval(tick); show("gone"); }
+
+// ---- sign in
+function signin() {
+  clearInterval(tick);
+  closeSheet();
+  show("sign");
+  var input = $("pin");
+  input.value = "";
+  paint();
+  input.focus();
+}
+function paint() {
+  var v = $("pin").value, cells = $("cells").children;
+  for (var k = 0; k < 4; k++) {
+    cells[k].textContent = v[k] || "";
+    cells[k].className = k === Math.min(v.length, 3) && v.length < 4 ? "cur" : "";
+  }
+}
+$("pin").addEventListener("input", function () {
+  var input = $("pin");
+  input.value = input.value.replace(/[^0-9]/g, "").slice(0, 4);
+  $("cells").classList.remove("bad");
+  $("signerr").textContent = "";
+  paint();
+  if (input.value.length === 4) {
+    var pin = input.value;
+    call("POST", "/api/login", { pin: pin }).then(function (r) {
+      if (r.status === 200) { enter(); return; }
+      $("cells").classList.add("bad");
+      $("signerr").textContent = r.data.error || "That did not work";
+      input.value = "";
+      paint();
+    });
+  }
+});
+$("cells").addEventListener("click", function () { $("pin").focus(); });
+
+// ---- the signed-in page
+function enter() {
+  show("app");
+  poll();
+  clearInterval(tick);
+  tick = setInterval(function () {
+    left = Math.max(0, left - 1);
+    clock();
+    if (left % 15 === 0) { poll(); }
+  }, 1000);
+  load();
+}
+function clock() {
+  var m = Math.floor(left / 60), s = left % 60;
+  $("left").textContent = "off in " + m + ":" + (s < 10 ? "0" : "") + s;
+}
+function poll() {
+  call("GET", "/api/session").then(function (r) {
+    if (r.status === 200 && r.data.signed_in) { left = r.data.remaining_s || 0; clock(); }
+    else if (r.status === 200) { signin(); }
+  });
+}
+
+// ---- uploads, one at a time
+var queue = [], working = false, fresh = {}, later = null;
+function add(list) {
+  for (var k = 0; k < list.length; k++) {
+    queue.push({ file: list[k], state: "wait", pct: 0, msg: "" });
+  }
+  drawQueue();
+  pump();
+}
+function pump() {
+  if (working) { return; }
+  var item = queue.filter(function (q) { return q.state === "wait"; })[0];
+  if (!item) { return; }
+  working = true;
+  item.state = "up";
+  var fd = new FormData();
+  fd.append("file", item.file, item.file.name);
+  var x = new XMLHttpRequest();
+  item.xhr = x;
+  x.open("POST", "/api/upload");
+  x.upload.onprogress = function (e) {
+    if (e.lengthComputable) { item.pct = Math.min(99, Math.round(100 * e.loaded / e.total)); drawQueue(); }
+  };
+  x.onload = function () {
+    var data = {};
+    try { data = JSON.parse(x.responseText); } catch (e) { data = {}; }
+    if (x.status === 200 && data.ok) {
+      item.state = "done"; item.pct = 100; item.saved = data.saved_as || item.file.name;
+      fresh["Inbox/" + item.saved] = true;
+    } else {
+      item.state = "fail"; item.msg = data.error || "Did not upload";
+      if (x.status === 401) { signin(); }
+    }
+    finish();
+  };
+  x.onerror = function () { item.state = "fail"; item.msg = "Lost the connection"; finish(); };
+  x.onabort = function () { item.state = "gone"; finish(); };
+  x.send(fd);
+  drawQueue();
+}
+function finish() {
+  working = false;
+  queue = queue.filter(function (q) { return q.state !== "gone"; });
+  var done = queue.filter(function (q) { return q.state === "done" || q.state === "fail"; });
+  while (done.length > 5) { queue.splice(queue.indexOf(done.shift()), 1); }
+  drawQueue();
+  load();
+  pump();
+  // The Pi learns a song's length a moment after the file lands: look again once the queue is done.
+  if (!working) {
+    clearTimeout(later);
+    later = setTimeout(load, 3500);
+  }
+}
+function drawQueue() {
+  var box = $("queue");
+  box.textContent = "";
+  queue.forEach(function (q) {
+    var row = el("div", "qi " + q.state);
+    row.appendChild(icon(q.state === "done" ? "check" : q.state === "fail" ? "x" : "file"));
+    var n = el("div", "n");
+    n.appendChild(el("b", null, q.state === "done" ? q.saved : q.file.name));
+    var sub = q.state === "done" ? "Added to Inbox · " + size(q.file.size)
+      : q.state === "fail" ? q.msg
+      : q.state === "up" ? size(Math.round(q.file.size * q.pct / 100)) + " of " + size(q.file.size) + " · " + q.pct + "%"
+      : "Waiting · " + size(q.file.size);
+    n.appendChild(el("span", null, sub));
+    row.appendChild(n);
+    if (q.state === "wait" || q.state === "up") {
+      var x = el("button", "x");
+      x.setAttribute("aria-label", "Cancel");
+      x.appendChild(icon("x"));
+      x.onclick = function () {
+        if (q.state === "up") { q.xhr.abort(); } else { queue.splice(queue.indexOf(q), 1); drawQueue(); }
+      };
+      row.appendChild(x);
+    }
+    if (q.state === "up") {
+      var pr = el("div", "pr"), bar = el("i");
+      bar.style.width = q.pct + "%";
+      pr.appendChild(bar);
+      row.appendChild(pr);
+    }
+    box.appendChild(row);
+  });
+}
+$("pick").onclick = function () { $("files").click(); };
+$("photo").onclick = function () { $("shot").click(); };
+$("files").onchange = function (e) { add(e.target.files); e.target.value = ""; };
+$("shot").onchange = function (e) { add(e.target.files); e.target.value = ""; };
+
+// ---- the library
+var lib = { files: [], folders: [] }, pick = "Inbox", term = "";
+function load() {
+  return call("GET", "/api/files").then(function (r) {
+    if (r.status === 200) { lib = r.data; drawLib(); }
+  });
+}
+function top(p) { var k = p.indexOf("/"); return k < 0 ? "" : p.slice(0, k); }
+function drawLib() {
+  var counts = {}, all = lib.files.length;
+  lib.files.forEach(function (f) { var t = top(f.path); counts[t] = (counts[t] || 0) + 1; });
+  var names = {};
+  lib.folders.forEach(function (f) { names[top(f + "/") || f] = true; });
+  Object.keys(counts).forEach(function (t) { if (t) { names[t] = true; } });
+  delete names.Inbox;
+  var chips = [["Inbox", counts.Inbox || 0], ["All", all]];
+  Object.keys(names).sort(function (a, b) { return a.localeCompare(b); }).forEach(function (t) { chips.push([t, counts[t] || 0]); });
+  if (!chips.some(function (c) { return c[0] === pick; })) { pick = "All"; }
+  var row = $("chips");
+  row.textContent = "";
+  chips.forEach(function (c) {
+    var b = el("button", c[0] === pick ? "sel" : "", c[0]);
+    b.appendChild(el("em", null, String(c[1])));
+    b.onclick = function () { pick = c[0]; drawLib(); };
+    row.appendChild(b);
+  });
+  var box = $("list"), shown = 0, t = term.toLowerCase();
+  box.textContent = "";
+  lib.files.forEach(function (f) {
+    if (pick !== "All" && top(f.path) !== pick) { return; }
+    if (t && f.path.toLowerCase().indexOf(t) < 0) { return; }
+    if (++shown > 300) { return; }
+    box.appendChild(fileRow(f));
+  });
+  if (!shown) {
+    box.appendChild(el("div", "empty", t ? "No songs match" : pick === "Inbox" ? "The Inbox is empty. Add a song above." : "Nothing here yet."));
+  }
+}
+// After the list changes under a search: the Library header stays where it was, and a page scrolled
+// past it comes back to it, so the rows start at the same place however many there are.
+function holdTop() {
+  var top = $("sec").getBoundingClientRect().top + window.pageYOffset;
+  if (window.pageYOffset > top) { window.scrollTo(0, top); }
+}
+function fileRow(f) {
+  var row = el("div", "fi");
+  var tile = el("div", "t" + (f.kind === "document" ? " d" : f.kind === "image" ? " p" : ""));
+  tile.appendChild(icon(f.kind === "document" ? "file" : f.kind === "image" ? "image" : "music"));
+  row.appendChild(tile);
+  var n = el("div", "n");
+  n.appendChild(el("b", null, base(f.path)));
+  var sub = el("span");
+  if (fresh[f.path]) { sub.appendChild(el("i", "dot")); }
+  sub.appendChild(document.createTextNode((dir(f.path) || "Songs") + " · " + facts(f)));
+  n.appendChild(sub);
+  row.appendChild(n);
+  var m = el("button", "m");
+  m.setAttribute("aria-label", "More about " + base(f.path));
+  m.appendChild(icon("dots"));
+  m.onclick = function () { openSheet(f); };
+  row.appendChild(m);
+  return row;
+}
+var typing = null;
+function searchOpen(on) {
+  $("sf").classList.toggle("hide", !on);
+  $("sec").classList.toggle("open", on);
+  clearTimeout(typing);
+  if (on) { $("q").focus(); return; }
+  $("q").value = "";
+  if (term) { term = ""; drawLib(); holdTop(); }
+}
+$("find").onclick = function () { searchOpen(true); };
+$("qx").onclick = function () { searchOpen(false); };
+// The list follows the typing a moment after the last key, not on every one.
+$("q").oninput = function () {
+  clearTimeout(typing);
+  typing = setTimeout(function () { term = $("q").value; drawLib(); holdTop(); }, 150);
+};
+
+// ---- what the page does with a file, from the (i) by the title
+var ABOUT = "Everything lands in the Inbox. The piano plays MIDI, MusicXML, MuseScore and ABC. A PDF or photo is kept in the Inbox, but to play it, convert it on a computer first and upload the MusicXML.";
+$("about").onclick = function () {
+  var o = $("overlay");
+  o.textContent = "";
+  var scrim = el("div", "scrim");
+  scrim.onclick = closeSheet;
+  var sheet = el("div", "sheet");
+  sheet.appendChild(el("div", "grab"));
+  sheet.appendChild(el("b", null, "Adding songs"));
+  sheet.appendChild(el("p", "about", ABOUT));
+  var b = el("div", "btns");
+  var close = el("button", "go", "Close");
+  close.onclick = closeSheet;
+  b.appendChild(close);
+  sheet.appendChild(b);
+  o.appendChild(scrim);
+  o.appendChild(sheet);
+};
+
+// ---- the menu of one file
+function closeSheet() { $("overlay").textContent = ""; }
+function openSheet(f) {
+  var o = $("overlay");
+  o.textContent = "";
+  var scrim = el("div", "scrim");
+  scrim.onclick = closeSheet;
+  var sheet = el("div", "sheet");
+  o.appendChild(scrim);
+  o.appendChild(sheet);
+  menu(sheet, f);
+}
+function head(sheet, f) {
+  sheet.textContent = "";
+  sheet.appendChild(el("div", "grab"));
+  var who = el("div", "who");
+  var tile = el("div", "t" + (f.kind === "document" ? " d" : f.kind === "image" ? " p" : ""));
+  tile.style.cssText = "width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:rgba(90,170,255,.14);color:#5AAAFF;font-size:18px;flex:none";
+  tile.appendChild(icon(f.kind === "document" ? "file" : f.kind === "image" ? "image" : "music"));
+  var n = el("div", "n");
+  n.appendChild(el("b", null, base(f.path)));
+  n.appendChild(el("span", null, (dir(f.path) || "Songs") + " · " + facts(f)));
+  who.appendChild(tile);
+  who.appendChild(n);
+  sheet.appendChild(who);
+}
+function action(sheet, name, label, extra, cls) {
+  var b = el("button", "act" + (cls ? " " + cls : ""));
+  b.appendChild(icon(name));
+  b.appendChild(document.createTextNode(label));
+  if (extra) { b.appendChild(el("em", null, extra)); }
+  sheet.appendChild(b);
+  return b;
+}
+function menu(sheet, f) {
+  head(sheet, f);
+  action(sheet, "pencil", "Rename").onclick = function () { renameForm(sheet, f); };
+  action(sheet, "folder", "Move to…", dir(f.path) || "Songs").onclick = function () { moveList(sheet, f); };
+  action(sheet, "trash", "Delete", null, "del").onclick = function () { confirmDelete(sheet, f); };
+  var err = el("div", "err");
+  err.id = "sheeterr";
+  sheet.appendChild(err);
+}
+function done(r, f, text) {
+  if (r.status === 200 && r.data.ok) { closeSheet(); toast(text); load(); return; }
+  var e = $("sheeterr");
+  if (e) { e.textContent = r.data.error || "That did not work"; }
+}
+function renameForm(sheet, f) {
+  head(sheet, f);
+  var input = el("input", "field");
+  input.value = base(f.path);
+  input.setAttribute("autocapitalize", "off");
+  input.setAttribute("aria-label", "New name");
+  sheet.appendChild(input);
+  var b = el("div", "btns");
+  var no = el("button", null, "Cancel"), go = el("button", "go", "Rename");
+  no.onclick = function () { menu(sheet, f); };
+  go.onclick = function () {
+    call("POST", "/api/rename", { path: f.path, name: input.value }).then(function (r) { done(r, f, "Renamed"); });
+  };
+  input.onkeydown = function (e) { if (e.key === "Enter") { go.click(); } };
+  b.appendChild(no);
+  b.appendChild(go);
+  sheet.appendChild(b);
+  var err = el("div", "err");
+  err.id = "sheeterr";
+  sheet.appendChild(err);
+  input.focus();
+  var dot = input.value.lastIndexOf(".");
+  input.setSelectionRange(0, dot > 0 ? dot : input.value.length);
+}
+function moveList(sheet, f) {
+  head(sheet, f);
+  var places = ["Inbox"];
+  lib.folders.forEach(function (p) { if (places.indexOf(p) < 0) { places.push(p); } });
+  places.sort(function (a, b) { return a.localeCompare(b); });
+  var go = function (folder, label) {
+    call("POST", "/api/move", { path: f.path, folder: folder }).then(function (r) { done(r, f, "Moved to " + label); });
+  };
+  action(sheet, "folder", "Songs (top level)").onclick = function () { go("", "Songs"); };
+  places.forEach(function (p) {
+    if (p !== dir(f.path)) { action(sheet, "folder", p).onclick = function () { go(p, p); }; }
+  });
+  var input = el("input", "field");
+  input.placeholder = "New folder";
+  input.setAttribute("aria-label", "New folder");
+  sheet.appendChild(input);
+  var b = el("div", "btns");
+  var no = el("button", null, "Back"), mk = el("button", "go", "Move to new folder");
+  no.onclick = function () { menu(sheet, f); };
+  mk.onclick = function () { if (input.value.trim()) { go(input.value.trim(), input.value.trim()); } };
+  b.appendChild(no);
+  b.appendChild(mk);
+  sheet.appendChild(b);
+  var err = el("div", "err");
+  err.id = "sheeterr";
+  sheet.appendChild(err);
+}
+function confirmDelete(sheet, f) {
+  head(sheet, f);
+  var c = el("div", "confirm", "Delete " + base(f.path) + "? It moves to “Removed songs” on the Pi, so it can be put back there.");
+  var b = el("div", "btns");
+  var keep = el("button", null, "Keep"), del = el("button", "red", "Delete");
+  keep.onclick = function () { menu(sheet, f); };
+  del.onclick = function () {
+    call("POST", "/api/delete", { path: f.path }).then(function (r) { done(r, f, "Deleted"); });
+  };
+  b.appendChild(keep);
+  b.appendChild(del);
+  c.appendChild(b);
+  sheet.appendChild(c);
+  var err = el("div", "err");
+  err.id = "sheeterr";
+  sheet.appendChild(err);
+}
+
+// ---- start
+call("GET", "/api/session").then(function (r) {
+  if (r.status === 0) { return; }
+  if (r.data.signed_in) { left = r.data.remaining_s || 0; enter(); } else { signin(); }
+});
+})();
+</script>
+</body>
+</html>

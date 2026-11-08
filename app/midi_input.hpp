@@ -2,32 +2,36 @@
 // Live MIDI input from every connected keyboard, with hot-plug.
 #pragma once
 
-#include "toonval/keyboard.hpp"
-#include "toonval/keyboard_identity.hpp"
-#include "toonval/midi_event.hpp"
+#include "midi_input_info.hpp"
+#include "midi_ports.hpp"
+#include "port_watcher.hpp"
+
+#include "etude/keyboard.hpp"
+#include "etude/keyboard_identity.hpp"
+#include "etude/midi_event.hpp"
 
 #include <array>
 #include <atomic>
 #include <condition_variable>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <mutex>
+#include <span>
 #include <string>
 #include <thread>
 #include <vector>
 
-namespace libremidi {
-class midi_in;
-class observer;
-} // namespace libremidi
-
-namespace toonval::app {
+namespace etude::app {
 
 // The clock every MidiEvent::time_ns is on: std::chrono::steady_clock in nanoseconds. libremidi
 // stamps with it on the MIDI thread in timestamp_mode::SystemMonotonic, and the frame loop reads it
 // here to compare against those stamps.
 std::int64_t midi_clock_ns();
+// Developer (--fake-clock-hz): the clock stands still and the frame loop moves it a fixed step per
+// frame, so a scripted headless run is the same every time. Never used by a window run.
+void set_fake_clock_ns(std::int64_t ns);
 
 // What changed during one update().
 struct PortChanges {
@@ -38,18 +42,23 @@ struct PortChanges {
 // Opens every MIDI input port except the app's own and software loopbacks, and reopens them as
 // devices come and go.
 //
-// Threads: libremidi calls each port's message callback on its own MIDI thread. That callback
-// splits and decodes the bytes (the port's splitter keeps running status and a partial message
-// between callbacks), keeps only the events the trainer uses, and pushes them into the port's own
-// single-producer queue, so several keyboards never share a producer. Each open gets a new splitter
-// and queue, so a reused slot never inherits state. Port changes are noticed two ways, both of
-// which only bump an atomic counter: libremidi's observer callbacks, and a watcher thread that
-// lists the ports every 500 ms and bumps the counter when the list differs (CoreMIDI on macOS 27
-// delivered no observer notifications in testing). The list includes each port's USB instance
-// where the platform gives one (Linux), so a quick unplug and replug is seen as a change too.
-// update() on the frame thread sees the counter move and rescans; it also rescans when a port that
-// failed to open is due for a retry. Every other member, including opening and closing ports, is
-// used from the frame loop's thread only.
+// Threads: the watcher thread (PortWatcher) does everything that can block. It lists the ports
+// every 500 ms and when libremidi's observer reports a change (CoreMIDI on macOS 27 delivered no
+// observer notifications in testing, hence the listing), opens the new inputs and closes the
+// vanished ones, retries a port that failed to open, runs the port tasks (the piano's output port,
+// see add_port_task) and publishes what is open as one immutable set. It owns the libremidi
+// objects, observers and open ports alike, so quitting waits at most kWatchJoinTimeout for it even
+// when CoreMIDI hangs. The list includes each port's USB instance where the platform gives one
+// (Linux), so a quick unplug and replug is seen as a change too.
+//
+// The frame thread's update() takes the latest published set without ever waiting (Handover) and
+// reads the queues of the ports in it; every other member is used from the frame loop's thread
+// only. libremidi calls each port's message callback on its own MIDI thread. That callback splits
+// and decodes the bytes (the port's splitter keeps running status and a partial message between
+// callbacks), keeps only the events the trainer uses, and pushes them into the port's own
+// single-producer queue, so several keyboards never share a producer. Each open gets a new
+// splitter and queue, so a reused slot never inherits state; a closed port's queue leaves the
+// published set, so nothing from an unplugged keyboard arrives after update() reported it.
 class MidiInput {
   public:
     static constexpr std::size_t kMaxPorts = 8;
@@ -66,10 +75,29 @@ class MidiInput {
     MidiInput(const MidiInput&) = delete;
     MidiInput& operator=(const MidiInput&) = delete;
 
-    // Opens new inputs and closes vanished ones when a port change was reported since the last
-    // call. The first call always scans. A closed input's queued events are discarded, so nothing
-    // from an unplugged keyboard arrives after the caller clears its keys.
+    // Takes the set of open inputs the watcher thread published since the last call, if there is
+    // one, and says what changed. Never waits and opens nothing itself. A closed input's queued
+    // events are discarded, so nothing from an unplugged keyboard arrives after the caller clears
+    // its keys.
     PortChanges update();
+
+    // False until update() has taken the first set: the watcher thread has listed the ports and
+    // opened what it found. The first listing in a process can take hundreds of milliseconds and
+    // blocks every thread that asks CoreMIDI meanwhile; the frame thread leaves MIDI alone until
+    // this is true (the "connect a keyboard" prompt, for one, waits for it).
+    bool ready() const { return scanned_; }
+
+    // The player's choice of ports going to the watcher thread and the lists coming back. With a
+    // named input that is listed, only that input is held open; the rest are closed, and opened
+    // again when the choice goes back to Auto or the name is gone.
+    std::shared_ptr<MidiPorts> ports();
+
+    // Work for the watcher thread to do after each scan of the inputs, given the names of the
+    // open ones: the piano's output port (MidiOutput::port_task). May be called from the frame
+    // thread at any time; the task runs on the watcher thread, so it must not touch the frame
+    // thread's data, and it lives as long as the watcher thread does.
+    using PortTask = std::function<void(std::span<const std::string> open_input_names)>;
+    void add_port_task(PortTask task);
 
     // Runs the main thread's run loop once without waiting. On macOS CoreMIDI updates the port list
     // through it, so a loop without SDL's event pump (the headless --midi-log) calls this each
@@ -77,13 +105,17 @@ class MidiInput {
     static void pump_system_events();
 
     // Pops every queued event from every open input and calls `fn(const MidiEvent&)` for each, in
-    // time order across inputs (equal times in slot order). Closed slots are skipped. When an
+    // time order across inputs (equal times in slot order). `fn` may take the input's slot as a
+    // second argument. Closed slots are skipped. When an
     // input's queue overflowed, its events include a synthetic All Notes Off at the gap.
     template <typename Fn> void drain(Fn&& fn) {
         merge_by_time<kMaxPorts>(
             [this](std::size_t i, MidiEvent& ev) {
-                Slot& slot = slots_[i];
-                return slot.in != nullptr && slot.stream != nullptr && slot.stream->queue.pop(ev);
+                if (view_ == nullptr) {
+                    return false;
+                }
+                const OpenPort& port = view_->slots[i];
+                return port.stream != nullptr && port.stream->queue.pop(ev);
             },
             fn, kQueueCapacity);
     }
@@ -98,6 +130,10 @@ class MidiInput {
     int open_count() const;
     // Names of the open inputs, in slot order.
     std::vector<std::string> open_names() const;
+    // The open inputs with their slot (the index `drain` passes to a callback that takes one) and
+    // the profile each matched (nullptr: unknown).
+    using InputInfo = MidiInputInfo;
+    std::vector<InputInfo> inputs() const;
 
   private:
     // State the MIDI thread owns while the port is open; shared with its callback.
@@ -105,44 +141,25 @@ class MidiInput {
         MidiStreamSplitter splitter;          // MIDI thread only
         MidiEventQueue<kQueueCapacity> queue; // MIDI thread -> frame thread
     };
-
-    struct Slot {
-        std::unique_ptr<libremidi::midi_in> in; // null when the slot is free
-        std::shared_ptr<PortStream> stream;     // new for every open
-        std::uint64_t port = 0;                 // libremidi port handle
+    // What the frame thread sees of an open input (the libremidi port itself stays on the watcher).
+    struct OpenPort {
+        std::shared_ptr<PortStream> stream; // null when the slot is free; new for every open
         std::string name;
-        std::string instance; // USB instance when known; a change means a replug
         KeyboardMatch match;
     };
-
-    // A listed port that failed to open, retried with backoff.
-    struct FailedOpen {
-        std::uint64_t port = 0;
-        std::string name;
-        int attempts = 0;
-        std::int64_t retry_at_ns = 0;
+    // The open inputs by slot, published whole and never changed after.
+    struct OpenPorts {
+        std::array<OpenPort, kMaxPorts> slots;
     };
+    struct Shared;  // what the frame thread and the watcher thread share
+    class Opener;   // the watcher thread's: libremidi observers, the open ports, the retries
 
-    void rescan(PortChanges& changes);
-    void close_slot(Slot& slot);
-    void watch_ports();
-    bool retry_due(std::int64_t now_ns) const;
-
-    std::atomic<std::uint32_t> port_events_{0}; // bumped on any port change
-    std::uint32_t seen_port_events_ = 0;
+    std::shared_ptr<Shared> shared_;
+    std::shared_ptr<const OpenPorts> view_; // the set update() last took; frame thread only
     bool scanned_ = false;
-    std::size_t next_slot_ = 0;                       // free slots are reused round-robin
-    std::unique_ptr<libremidi::observer> watcher_;    // callbacks only
-    std::unique_ptr<libremidi::observer> enumerator_; // port lists, frame thread only
-    std::array<Slot, kMaxPorts> slots_;
-    std::vector<FailedOpen> failed_;
     std::uint64_t closed_dropped_ = 0; // from ports already closed
     std::uint64_t closed_resyncs_ = 0;
-
-    std::mutex watch_mutex_; // guards stop_watching_ only
-    std::condition_variable watch_wake_;
-    bool stop_watching_ = false;
-    std::thread watch_thread_;
+    std::unique_ptr<PortWatcher> watcher_; // the thread; last, so it ends first
 };
 
-} // namespace toonval::app
+} // namespace etude::app

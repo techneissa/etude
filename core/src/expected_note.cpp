@@ -2,14 +2,14 @@
 // Expected-note mode: instead of "what note is this?", ask "is this the expected
 // note, a neighbour, or an octave off?", which is a much easier question to answer correctly.
 #include "pitch_dsp.hpp"
-#include "toonval/pitch.hpp"
-#include "toonval/pitch_detect.hpp"
+#include "etude/pitch.hpp"
+#include "etude/pitch_detect.hpp"
 
 #include <algorithm>
 #include <array>
 #include <cmath>
 
-namespace toonval {
+namespace etude {
 
 namespace {
 
@@ -320,4 +320,4 @@ ChordCheckResult ExpectedNoteChecker::check_chord(const float* frame, int length
     return result;
 }
 
-} // namespace toonval
+} // namespace etude

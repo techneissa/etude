@@ -1,55 +1,18 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/song_builder.hpp"
+#include "etude/song_builder.hpp"
+
+#include "part_index.hpp"
 
 #include <algorithm>
 #include <cmath>
 
-namespace toonval {
+namespace etude {
 namespace {
 
 constexpr std::uint8_t kDrumChannel = 9;
 
 std::int64_t bar_ticks(const TimeSignature& t, int ppq, std::int64_t bars) {
     return bars * 4 * ppq * t.numerator / t.denominator;
-}
-
-// The same bars the MIDI loader builds from the same signatures (see build_measures in
-// midi_file.cpp); the writer round-trip tests keep the two together.
-bool build_measures(Song& song) {
-    const int ppq = song.tempo.ticks_per_quarter;
-    const auto& sigs = song.time_signatures;
-    std::vector<Measure>& bars = song.measures;
-    bars.clear();
-    for (std::size_t i = 0; i < sigs.size(); ++i) {
-        const TimeSignature& t = sigs[i];
-        const bool last = i + 1 == sigs.size();
-        if (t.tick >= song.end_tick && !bars.empty()) {
-            break;
-        }
-        const std::int64_t segment_end = last ? song.end_tick : sigs[i + 1].tick;
-        for (std::int64_t k = 0;; ++k) {
-            const std::int64_t start = t.tick + bar_ticks(t, ppq, k);
-            if (start >= segment_end && !(bars.empty() && k == 0)) {
-                break;
-            }
-            if (bars.size() >= kMaxSongMeasures) {
-                return false;
-            }
-            bars.push_back({0, start, song.tempo.seconds_at(start), t.numerator, t.denominator});
-        }
-    }
-    int first = 1;
-    if (bars.size() >= 2) {
-        const std::int64_t len0 = bars[1].start_tick - bars[0].start_tick;
-        const TimeSignature next{0, bars[1].numerator, bars[1].denominator};
-        if (len0 < bar_ticks(next, ppq, 1)) {
-            first = 0;
-        }
-    }
-    for (std::size_t i = 0; i < bars.size(); ++i) {
-        bars[i].number = first + static_cast<int>(i);
-    }
-    return true;
 }
 
 void normalize_time_signatures(Song& song) {
@@ -99,6 +62,59 @@ void normalize_tempo(TempoMap& map) {
 
 } // namespace
 
+bool first_bar_is_pickup(const FirstBar& bar) {
+    // A lone 1/4 bar before another signature is how exporters write a one-beat pickup.
+    const bool lone_quarter =
+        bar.numerator == 1 && bar.denominator == 4 && bar.next_signature_differs;
+    return bar.marked_pickup || bar.length < bar.nominal || lone_quarter;
+}
+
+bool build_song_measures(Song& song) {
+    const int ppq = song.tempo.ticks_per_quarter;
+    const auto& sigs = song.time_signatures;
+    std::vector<Measure>& bars = song.measures;
+    bars.clear();
+    for (std::size_t i = 0; i < sigs.size(); ++i) {
+        const TimeSignature& t = sigs[i];
+        const bool last = i + 1 == sigs.size();
+        if (t.tick >= song.end_tick && !bars.empty()) {
+            break;
+        }
+        const std::int64_t segment_end = last ? song.end_tick : sigs[i + 1].tick;
+        for (std::int64_t k = 0;; ++k) {
+            const std::int64_t start = t.tick + bar_ticks(t, ppq, k);
+            if (start >= segment_end && !(bars.empty() && k == 0)) {
+                break;
+            }
+            if (bars.size() >= kMaxSongMeasures) {
+                return false;
+            }
+            bars.push_back({0, start, song.tempo.seconds_at(start), t.numerator, t.denominator});
+        }
+    }
+    // Only the first bar can be a pickup, numbered 0 (see first_bar_is_pickup). Here the bar is as
+    // long as the next signature event leaves it. A pickup written with no signature event at its
+    // end can't be told from a full bar, and stays bar 1.
+    int first = 1;
+    if (bars.size() >= 2) {
+        const Measure& a = bars[0];
+        const Measure& b = bars[1];
+        FirstBar bar;
+        bar.length = b.start_tick - a.start_tick;
+        bar.nominal = bar_ticks({0, a.numerator, a.denominator}, ppq, 1);
+        bar.numerator = a.numerator;
+        bar.denominator = a.denominator;
+        bar.next_signature_differs = a.numerator != b.numerator || a.denominator != b.denominator;
+        if (first_bar_is_pickup(bar)) {
+            first = 0;
+        }
+    }
+    for (std::size_t i = 0; i < bars.size(); ++i) {
+        bars[i].number = first + static_cast<int>(i);
+    }
+    return true;
+}
+
 std::uint32_t us_per_quarter_from_bpm(double bpm) {
     constexpr std::uint32_t kSlowest = 0xFFFFFF;
     if (!(bpm > 0.0)) {
@@ -141,7 +157,7 @@ bool finish_song(Song& song) {
     }
     song.duration_s = song.tempo.seconds_at(song.end_tick);
 
-    const bool complete = build_measures(song);
+    const bool complete = build_song_measures(song);
     for (Note& n : song.notes) {
         n.measure = song.measure_at(n.start_tick);
     }
@@ -155,32 +171,32 @@ bool finish_song(Song& song) {
     for (Part& p : song.parts) {
         p.note_count = 0;
     }
+    PartIndex part_at(song.parts);
     for (const Note& n : song.notes) {
-        auto it = std::find_if(song.parts.begin(), song.parts.end(), [&](const Part& p) {
-            return p.track == n.track && p.channel == n.channel;
-        });
-        if (it == song.parts.end()) {
+        std::size_t at = part_at.find(n.track, n.channel);
+        if (at == PartIndex::kNone) {
             Part p;
             p.track = n.track;
             p.channel = n.channel;
             p.drum = n.drum;
             p.hand = n.hand;
             song.parts.push_back(std::move(p));
-            it = song.parts.end() - 1;
+            at = song.parts.size() - 1;
+            part_at.add(n.track, n.channel, at);
         }
-        it->drum = it->drum || n.drum;
-        ++it->note_count;
+        Part& part = song.parts[at];
+        part.drum = part.drum || n.drum;
+        ++part.note_count;
     }
     // Like the loader: the first program change of a part names its instrument.
     for (const ChannelEvent& e : song.events) {
         if (e.kind != ChannelEventKind::Program) {
             continue;
         }
-        for (Part& p : song.parts) {
-            if (p.track == e.track && p.channel == e.channel && !p.has_program) {
-                p.program = static_cast<std::uint8_t>(e.value);
-                p.has_program = true;
-            }
+        const std::size_t at = part_at.find(e.track, e.channel);
+        if (at != PartIndex::kNone && !song.parts[at].has_program) {
+            song.parts[at].program = static_cast<std::uint8_t>(e.value);
+            song.parts[at].has_program = true;
         }
     }
     std::sort(song.parts.begin(), song.parts.end(), [](const Part& a, const Part& b) {
@@ -189,4 +205,4 @@ bool finish_song(Song& song) {
     return complete;
 }
 
-} // namespace toonval
+} // namespace etude

@@ -1,19 +1,20 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Render-only constants of the free-play renderer: geometry shares, key and background colours,
 // text colours. Note colours, names, layout sizes, the flash/glow/fade switches and how many
-// seconds fit on screen all come from toonval::LookSettings (core/include/toonval/look.hpp), so
+// seconds fit on screen all come from etude::LookSettings (core/include/etude/look.hpp), so
 // the settings panel and presets drive them. What is here has no setting yet.
 #pragma once
 
 #include "mesh.hpp"
-#include "toonval/color.hpp"
-#include "toonval/hand.hpp"
+#include "etude/color.hpp"
+#include "etude/hand.hpp"
+#include "etude/press_effects.hpp"
 
 #include <SDL3/SDL.h>
 
 #include <cstdint>
 
-namespace toonval::app {
+namespace etude::app {
 
 // Free play has no song, so no note belongs to a hand. Its notes use the right-hand colour of the
 // look: the default scheme gives the accent blue the first renderer drew, where Hand::Unknown
@@ -37,19 +38,17 @@ struct Look {
     float block_radius_max = 9.0f;  // 1080p px
     float min_block_height = 10.0f; // 1080p px, so a staccato tap still shows
     float block_gap = 2.0f;         // 1080p px between repeated notes on one key
-    float white_note_inset = 0.10f; // share of the key width left free on each side
-    float black_note_inset = 0.06f;
+    // The outline of a black key's block where it lies over white keys' blocks (its width is core's
+    // `kBlackBlockOutlineShare`).
+    SDL_FColor black_block_outline = rgba(8, 9, 13, 0.92f);
     float held_highlight = 0.32f; // how far a held note's key end (and its key) blends to white
     float fade_start = 0.62f;     // released blocks fade out above this share of the note area
     float top_fade = 0.10f;       // share of the note area at its top where every block dissolves
     float glow_size = 0.45f;      // share of a white key's width
     float glow_strength = 0.14f;
-    float held_glow_strength = 0.26f;
 
-    // Press flash, on the key and on its new block alike.
-    std::int64_t flash_ns = 160'000'000; // brighter for this long after each note-on
-    float flash_whiten = 0.45f;          // how far a fresh press blends toward white
-    float flash_glow_strength = 0.55f;
+    // Key flash and Held glow, on the key and on its block alike (core press_effects.hpp).
+    PressEffects press;
 
     // Keys.
     SDL_FColor key_white_top = rgba(226, 227, 224);
@@ -57,7 +56,6 @@ struct Look {
     SDL_FColor key_black_top = rgba(44, 45, 52);
     SDL_FColor key_black_bottom = rgba(12, 12, 16);
     SDL_FColor key_black_lip = rgba(70, 72, 82);
-    float black_length = 0.62f; // black keys' share of the white keys' length
     // A pressed key is tipped down: a darker band at its top, as tall as the bed's shadow.
     float pressed_band_darken = 0.55f;
     float pressed_band_alpha = 0.7f;
@@ -78,8 +76,6 @@ struct Look {
     SDL_FColor guide_faint = rgba(255, 255, 255, 0.025f); // and at every F
 
     // Text.
-    SDL_FColor chord_text = rgba(242, 246, 255);
-    SDL_FColor chord_backdrop = rgba(6, 8, 12, 0.62f);
     SDL_FColor status_text = rgba(186, 194, 210, 0.9f);
     SDL_FColor prompt_text = rgba(140, 150, 170, 0.85f);
     SDL_FColor key_label_white = rgba(88, 92, 104);   // names on unlit white keys
@@ -94,4 +90,4 @@ struct Look {
     float c_underline_height = 0.11f; // of the font size
 };
 
-} // namespace toonval::app
+} // namespace etude::app

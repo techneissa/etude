@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/recorder.hpp"
+#include "etude/recorder.hpp"
 
-#include "toonval/song_builder.hpp"
+#include "etude/song_builder.hpp"
 
 #include <algorithm>
 #include <cmath>
 
-namespace toonval {
+namespace etude {
 namespace {
 
 // Events held at once in the reorder buffer, whatever their times: a flood cannot grow it.
@@ -233,4 +233,4 @@ RecordedSong Recorder::finish(std::int64_t stop_time_ns) {
     return result;
 }
 
-} // namespace toonval
+} // namespace etude

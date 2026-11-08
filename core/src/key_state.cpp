@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/key_state.hpp"
+#include "etude/key_state.hpp"
 
-namespace toonval {
+namespace etude {
 
 namespace {
 constexpr std::uint8_t kSustainDownThreshold = 64;
@@ -98,4 +98,4 @@ std::optional<std::uint8_t> KeyState::press_velocity(int note) const {
     return keys_[index(note)].velocity;
 }
 
-} // namespace toonval
+} // namespace etude

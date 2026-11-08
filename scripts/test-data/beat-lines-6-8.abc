@@ -1,0 +1,15 @@
+%abc-2.1
+% CC0 1.0: written for this repo, no rights reserved. A two-hand jig in 6/8 at a dotted quarter
+% = 60, for the beat lines: a beat is a dotted quarter, two to a bar.
+X:1
+T:Beat lines in 6/8
+M:6/8
+L:1/8
+Q:3/8=60
+K:G
+V:1 clef=treble name="Right hand"
+V:2 clef=bass name="Left hand"
+V:1
+G3 B3|d6|c3 A3|B6|G3 B3|d6|c3 A3|G6|]
+V:2
+G,,6|D,6|A,,6|G,,6|G,,6|D,6|A,,6|G,,6|]

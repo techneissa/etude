@@ -1,19 +1,18 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/keyboard_view.hpp"
+#include "etude/keyboard_view.hpp"
 
-#include "toonval/pitch.hpp"
+#include "etude/pitch.hpp"
 
 #include <algorithm>
 #include <cmath>
 
-namespace toonval {
+namespace etude {
 namespace {
 
 constexpr int kStepOfPitchClass[12] = {0, 0, 1, 1, 2, 3, 3, 4, 4, 5, 5, 6};
 constexpr int kPitchClassOfStep[7] = {0, 2, 4, 5, 7, 9, 11};
 
 constexpr float kFallbackWidthPx = 1280.0f;
-constexpr int kMaxMarginWhites = 3;
 constexpr double kRankEpsilon = 1e-6;    // frame(): a position this close to a key edge is on it
 constexpr double kSettleDistance = 1e-3; // white keys
 constexpr double kSettleSpeed = 1e-2;    // white keys per second
@@ -52,37 +51,10 @@ bool add_note(Extent& e, int note, const KeyRange& kb, int base) {
     return true;
 }
 
-Extent extent_of(std::span<const int> notes, const KeyRange& kb, int base) {
-    Extent e;
-    for (const int n : notes) {
-        add_note(e, n, kb, base);
-    }
-    return e;
-}
-
 int clamp_int(int v, int lo, int hi) { return std::max(lo, std::min(v, hi)); }
 
 KeyRange range_of(int base, int left, int whites) {
     return {note_of_rank(base + left), note_of_rank(base + left + whites - 1)};
-}
-
-// Where the `n`-white-key window starts so `focus` is inside it with a margin from each edge,
-// moving as little as possible from `current_left`/`current_w` (or centred on the focus when there
-// is no current window). Result is inside 0..total-n.
-int place(int n, int total, const Extent& focus, bool has_current, int current_left, int current_w,
-          int fallback_center) {
-    // The window the caller had, resized around its own middle.
-    int desired = has_current
-                      ? current_left + (current_w - n) / 2
-                      : (focus.any ? focus.lo + (focus.width() - n) / 2 : fallback_center - n / 2);
-    if (focus.any) {
-        const int extra = n - focus.width();
-        const int margin = std::min(clamp_int(n / 8, 1, kMaxMarginWhites), extra / 2);
-        const int lowest_left = focus.hi + margin - n + 1;
-        const int highest_left = focus.lo - margin;
-        desired = clamp_int(desired, lowest_left, highest_left);
-    }
-    return clamp_int(desired, 0, std::max(0, total - n));
 }
 
 } // namespace
@@ -132,23 +104,20 @@ KeyViewTarget compute_key_view(const KeyViewParams& p) {
         return out; // FitKeyboard, and any stray value
     }
 
-    const Extent upcoming = extent_of(p.upcoming, kb, base);
-    const Extent held = extent_of(p.held, kb, base);
-
-    int n = total;
-    Extent focus;
-    if (fit_song) {
-        if (!p.song || p.song->highest < kb.lowest || p.song->lowest > kb.highest ||
-            p.song->lowest > p.song->highest) {
-            return out;
-        }
-        Extent song;
+    // The song's notes on this keyboard, as white keys.
+    Extent song;
+    if (p.song && p.song->lowest <= p.song->highest && p.song->highest >= kb.lowest &&
+        p.song->lowest <= kb.highest) {
         add_note(song, std::max(p.song->lowest, kb.lowest), kb, base);
         add_note(song, std::min(p.song->highest, kb.highest), kb, base);
-        focus.add(song);
-        focus.add(upcoming); // held keys are left out: a wrong key must not zoom the view
-        n = clamp_int(focus.width() + 2 * kSongMarginWhites, std::min(kMinSongWhites, total),
-                      total);
+    }
+
+    int n = total;
+    if (fit_song) {
+        if (!song.any) {
+            return out;
+        }
+        n = clamp_int(song.width() + 2 * kSongMarginWhites, std::min(kMinSongWhites, total), total);
     } else {
         const float width =
             std::isfinite(p.width_px) && p.width_px > 0.0f ? p.width_px : kFallbackWidthPx;
@@ -157,35 +126,34 @@ KeyViewTarget compute_key_view(const KeyViewParams& p) {
         const float fit = std::floor(width / (mm * ppmm));
         n = clamp_int(static_cast<int>(std::min(fit, 1e6f)), std::min(kMinFixedWhites, total),
                       total);
-        // The notes that must be seen: upcoming ones, else the held keys.
-        const Extent& primary = upcoming.any ? upcoming : held;
-        if (primary.any && primary.width() > n) {
-            n = std::min(primary.width(), total);
-            out.zoomed_out = true;
-        }
-        if (upcoming.any && held.any) {
-            Extent both = upcoming;
-            both.add(held);
-            focus = both.width() <= n ? both : upcoming;
-        } else {
-            focus = primary;
-        }
     }
     if (n >= total) {
         return out;
     }
-
-    bool has_current = false;
-    int current_left = 0;
-    int current_w = n;
-    if (p.current && p.current->lowest <= p.current->highest) {
-        has_current = true;
-        current_left = white_rank(p.current->lowest) - base;
-        current_w = std::max(1, white_rank(p.current->highest) - white_rank(p.current->lowest) + 1);
+    // Centred on the song (a fixed size narrower than the song cuts both ends alike), else on
+    // middle C or the keyboard's middle; inside the keyboard.
+    const int centre2 = song.any ? song.lo + song.hi
+                                 : 2 * (kb.contains(kMiddleC) ? white_rank(kMiddleC) - base : total / 2);
+    int left = clamp_int((centre2 - n + 1) / 2, 0, total - n);
+    if (!song.any && fixed) {
+        // Free play: where it was, as wide as now, and moved only to show a held key.
+        if (p.current && p.current->lowest <= p.current->highest && kb.contains(p.current->lowest)) {
+            left = clamp_int(white_rank(p.current->lowest) - base, 0, total - n);
+        }
+        Extent held;
+        for (const int note : p.held) {
+            add_note(held, note, kb, base);
+        }
+        if (held.any) {
+            if (held.width() > n) {
+                left = clamp_int((held.lo + held.hi - n + 1) / 2, 0, total - n);
+            } else if (held.lo < left) {
+                left = held.lo;
+            } else if (held.hi > left + n - 1) {
+                left = held.hi - n + 1;
+            }
+        }
     }
-    // With nothing to show and no window yet, start on middle C (or the keyboard's middle).
-    const int anchor = kb.contains(kMiddleC) ? white_rank(kMiddleC) - base : total / 2;
-    const int left = place(n, total, focus, has_current, current_left, current_w, anchor);
     out.range = range_of(base, left, n);
     return out;
 }
@@ -298,4 +266,4 @@ KeyViewFrame KeyViewFollower::frame() const {
     return f;
 }
 
-} // namespace toonval
+} // namespace etude

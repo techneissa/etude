@@ -2,9 +2,9 @@
 // A real piece, "Die Ehre Gottes aus der Natur" (Beethoven, Op. 48 No. 4, voice and piano), read
 // from MusicXML (.mxl) and from the same score as MuseScore 3 and MuseScore 4 files, and checked
 // against the MIDI file MuseScore 4 exports from the same MusicXML. See tests/data/README.md.
-#include "toonval/musicxml.hpp"
+#include "etude/musicxml.hpp"
 
-#include "toonval/midi_file.hpp"
+#include "etude/midi_file.hpp"
 
 #include <doctest/doctest.h>
 
@@ -16,14 +16,14 @@
 #include <tuple>
 #include <vector>
 
-using namespace toonval;
+using namespace etude;
 
 namespace {
 
 using Bytes = std::vector<std::uint8_t>;
 
 Bytes read_data(const std::string& name) {
-    std::ifstream in(std::string(TOONVAL_TEST_DATA_DIR) + "/" + name, std::ios::binary);
+    std::ifstream in(std::string(ETUDE_TEST_DATA_DIR) + "/" + name, std::ios::binary);
     REQUIRE_MESSAGE(in.good(), "missing test data " << name);
     return Bytes(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
 }

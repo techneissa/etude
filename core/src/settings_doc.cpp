@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/settings_doc.hpp"
+#include "etude/settings_doc.hpp"
 
 #include <algorithm>
 #include <charconv>
 #include <cstddef>
 
-namespace toonval {
+namespace etude {
 
 namespace {
 
@@ -170,14 +170,13 @@ SettingsDocument SettingsDocument::parse(std::string_view text,
             part.name = std::string(name);
             part.header = std::string(line.content) + std::string(line.eol);
             part.first_body_line = line_no + 1;
-            part.duplicate = std::any_of(doc.parts_.begin(), doc.parts_.end(), [&](const Part& p) {
-                return !p.duplicate && p.name == part.name && !p.header.empty();
-            });
+            part.duplicate = doc.first_.contains(part.name);
             if (part.duplicate && issues != nullptr) {
                 issues->push_back({SettingsIssueKind::DuplicateSection, line_no, part.name, "",
                                    "section appears twice; only the first one is used"});
             }
             doc.parts_.push_back(std::move(part));
+            doc.index_part(doc.parts_.size() - 1);
         } else {
             doc.parts_.back().body.append(line.content);
             doc.parts_.back().body.append(line.eol);
@@ -229,12 +228,29 @@ SettingsDocument::Part* SettingsDocument::find(std::string_view name) {
     if (name.empty()) {
         return &parts_.front();
     }
-    for (std::size_t i = 1; i < parts_.size(); ++i) {
-        if (parts_[i].name == name) {
-            return &parts_[i];
-        }
+    auto it = first_.find(name);
+    return it == first_.end() ? nullptr : &parts_[it->second];
+}
+
+void SettingsDocument::index_part(std::size_t index) {
+    const Part& part = parts_[index];
+    if (part.duplicate) {
+        repeats_[part.name].push_back(index);
+    } else {
+        first_.emplace(part.name, index);
     }
-    return nullptr;
+}
+
+void SettingsDocument::compact() {
+    parts_.erase(
+        std::remove_if(parts_.begin() + 1, parts_.end(), [](const Part& p) { return p.removed; }),
+        parts_.end());
+    removed_count_ = 0;
+    first_.clear();
+    repeats_.clear();
+    for (std::size_t i = 1; i < parts_.size(); ++i) {
+        index_part(i);
+    }
 }
 
 const SettingsDocument::Part* SettingsDocument::find(std::string_view name) const {
@@ -244,7 +260,7 @@ const SettingsDocument::Part* SettingsDocument::find(std::string_view name) cons
 std::vector<std::string> SettingsDocument::section_names() const {
     std::vector<std::string> names;
     for (std::size_t i = 1; i < parts_.size(); ++i) {
-        if (!parts_[i].duplicate) {
+        if (!parts_[i].duplicate && !parts_[i].removed) {
             names.push_back(parts_[i].name);
         }
     }
@@ -302,6 +318,7 @@ SettingsDocument::Part& SettingsDocument::find_or_add(std::string_view name) {
     part.name = std::string(name);
     part.header = "[" + part.name + "]\n";
     parts_.push_back(std::move(part));
+    index_part(parts_.size() - 1);
     return parts_.back();
 }
 
@@ -357,6 +374,28 @@ void SettingsDocument::set(std::string_view section, std::string_view key, std::
     part.body.insert(anchor_end, new_line + eol);
 }
 
+void SettingsDocument::remove(std::string_view section, std::string_view key) {
+    Part* part = find(section);
+    if (part == nullptr) {
+        return;
+    }
+    std::string kept;
+    bool changed = false;
+    for_each_line(part->body, [&](const Line& line) {
+        std::string_view k;
+        std::string_view v;
+        if (classify(line.content, k, v) == LineKind::Pair && k == key) {
+            changed = true;
+        } else {
+            kept.append(part->body, line.begin, line.content.size() + line.eol.size());
+        }
+        return true;
+    });
+    if (changed) {
+        part->body = std::move(kept);
+    }
+}
+
 std::string SettingsDocument::section_text(std::string_view name) const {
     const Part* part = find(name);
     if (part == nullptr) {
@@ -382,9 +421,35 @@ void SettingsDocument::remove_section(std::string_view name) {
     if (name.empty()) {
         return;
     }
-    parts_.erase(std::remove_if(parts_.begin() + 1, parts_.end(),
-                                [&](const Part& p) { return p.name == name; }),
-                 parts_.end());
+    auto first = first_.find(name);
+    if (first == first_.end()) {
+        return;
+    }
+    const std::string key(name); // `name` may view a part's own name, which mark clears
+    auto mark = [&](std::size_t index) {
+        Part& p = parts_[index];
+        p.name.clear();
+        p.header.clear();
+        p.body.clear();
+        p.removed = true;
+        ++removed_count_;
+    };
+    mark(first->second);
+    first_.erase(first);
+    if (auto again = repeats_.find(key); again != repeats_.end()) {
+        for (std::size_t index : again->second) {
+            mark(index);
+        }
+        repeats_.erase(again);
+    }
+    // The last part is never a removed one: a new section is appended after it.
+    while (parts_.size() > 1 && parts_.back().removed) {
+        parts_.pop_back();
+        --removed_count_;
+    }
+    if (removed_count_ > 32 && removed_count_ * 2 > parts_.size()) {
+        compact();
+    }
 }
 
 void SettingsDocument::ensure_format() {
@@ -398,7 +463,7 @@ void SettingsDocument::ensure_format() {
         empty = empty && p.header.empty() && p.body.empty();
     }
     if (empty) {
-        parts_[0].body = "# toonval settings\n";
+        parts_[0].body = "# etude settings\n";
     }
     set("", "format",
         std::to_string(kSettingsFormat.major) + "." + std::to_string(kSettingsFormat.minor));
@@ -500,4 +565,4 @@ bool settings_unquote(std::string_view raw, std::string& out) {
     return false; // no closing quote
 }
 
-} // namespace toonval
+} // namespace etude

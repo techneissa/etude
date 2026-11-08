@@ -1,0 +1,49 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# The crash screen: started by systemd (OnFailure= of etude.service) after the app crashed, or was ended
+# by its watchdog, or could not start because a going back could not put the data back. The app is not
+# restarted by itself: `etude --crash-screen` opens no history, no audio, no MIDI and no song and draws
+# only a screen that says etude closed unexpectedly, with Restart and Restart and send report (or, when
+# the data is not back, the reason with Try again and Send report). Restart exits 0 and OnSuccess= starts
+# the app; a crash in the crash screen just stops (no Restart=, no OnFailure=, nothing that starts it
+# again). The same terms as etude.service otherwise (keep the two in step).
+# ExecCondition= skips the start when the helper itself is stopping or starting the app (a stop that had
+# to be killed leaves the unit failed, and that is not a crash): `etude-update-helper idle`. A crash
+# while the helper only watches a version on trial is a crash, and the screen shows.
+# ExecStartPre= goes back from a version on trial that crashed, before the screen is drawn
+# (`etude-update-helper crashed`): no question is asked, since the player did not choose the crash.
+# Installed to /etc/systemd/system/etude-crash-screen.service by deploy/pi/setup.sh; never enabled.
+[Unit]
+Description=etude (crash screen)
+After=systemd-user-sessions.service systemd-logind.service
+After=getty@tty1.service sound.target
+Wants=systemd-logind.service
+Conflicts=getty@tty1.service etude.service etude-labwc.service
+ConditionPathExists=/dev/tty0
+# Restart and Try again exit 0: the app starts. (A stop of this unit by the app's own start does the same
+# and finds the app already starting.)
+OnSuccess=etude.service
+
+[Service]
+Type=simple
+User=etude
+SupplementaryGroups=video render input audio
+Environment=SDL_VIDEO_DRIVER=kmsdrm
+ExecCondition=+/usr/local/lib/etude/etude-update-helper sandboxed idle
+ExecStartPre=+/usr/local/lib/etude/etude-update-helper sandboxed crashed
+TimeoutStartSec=600
+ExecStart=@PREFIX@/current/bin/etude --crash-screen
+ExecStartPost=-+/usr/bin/chvt 1
+Restart=no
+# NoNewPrivileges=yes, as in etude.service (read the comment there).
+NoNewPrivileges=yes
+
+PAMName=etude
+StandardInput=tty-fail
+StandardOutput=journal
+StandardError=journal
+TTYPath=/dev/tty1
+TTYReset=yes
+TTYVHangup=yes
+TTYVTDisallocate=yes
+UtmpIdentifier=tty1
+UtmpMode=user

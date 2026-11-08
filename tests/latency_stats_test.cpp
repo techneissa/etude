@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/latency_stats.hpp"
+#include "etude/latency_stats.hpp"
 
 #include <doctest/doctest.h>
 
-using namespace toonval;
+using namespace etude;
 
 TEST_CASE("an empty LatencyStats summarises to zero samples") {
     LatencyStats stats;

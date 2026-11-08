@@ -10,7 +10,7 @@
 #include <cstdint>
 #include <vector>
 
-namespace toonval::pitch_dsp {
+namespace etude::pitch_dsp {
 
 inline constexpr int kMinFft = 64;
 
@@ -162,18 +162,78 @@ float harmonicity(const FrameAnalyzer& a, float f0, float b, float max_hz);
 bool partials_complete(const FrameAnalyzer& a, float f0, float b, float max_hz,
                        float notch_hz = 0.0f);
 
-// Fundamental refined from the spectral peaks of partials 1..4, undoing the stretch: the mean of
-// peak_n / (n sqrt(1 + B n^2)) weighted by magnitude / n, over the partials within 14 dB of the
-// best. Stretched partials pull the autocorrelation period sharp (tens of cents in the treble);
-// this does not. Returns `f0` if no partial is found.
+// The energy at f0's fundamental over that of its strongest partial among 1..8 below max_hz, each
+// searched as in partial_energy: near 0 for the period several notes share an octave or more
+// below the lowest of them, whose partials are only where those notes are. In a frame too short
+// to separate partials well the fundamental's search stops where the second partial's main lobe
+// begins, so that partial's leak is not taken for it.
+float fundamental_share(const FrameAnalyzer& a, float f0, float b, float max_hz);
+// Whether f0's fundamental stands out of the spectrum around it: its energy at least `ratio`
+// times that half a fundamental below it or above it (one of the two; the other may be another
+// note's partial). Broadband sound, such as hammer noise, fills the fundamental's place and its
+// surroundings alike. True when the frame cannot separate partials closer than a third of f0.
+bool fundamental_stands_out(const FrameAnalyzer& a, float f0, float b, float ratio);
+// The frames fundamental_stands_out can judge: a Hann main lobe under this fraction of f0.
+inline constexpr float kBesideLobe = 0.3f;
+
+// Whether a note at f0 is really there next to a still-ringing note at `ringing_hz`, a whole
+// multiple of f0. Two notes in a simple ratio repeat together at a common subharmonic, which
+// carries only the partials the two notes share with it. A real note at f0 also has its own
+// partials, off the ringing note's series: of f0's partials 1..6 that are not near a multiple of
+// `ringing_hz`, all must stand within 26 dB of the strongest peak (one may be missing when four
+// or more are checked). False while the frame cannot separate partials f0 apart.
+bool own_partials_present(const FrameAnalyzer& a, float f0, float b, float max_hz,
+                          float ringing_hz);
+
+// What a note at f0 shows of new sound: the frame `after` (audio after the onset) against `before`
+// (audio just before the onset), both of the same length, partial by partial over partials 1..8
+// below max_hz. A piano partial only grows at an attack, so growth there is the new strike; a
+// partial that does not grow was already ringing.
+struct FreshEvidence {
+    bool resolved = false;   // `after` separates partials f0 apart
+    float before = 0.0f;     // summed squared magnitude of the partials before the onset
+    float after = 0.0f;      // ... after it
+    float grown = 0.0f;      // summed squared growth, max(0, after - before) per partial
+    float grown_odd = 0.0f;  // growth at the odd partials
+    float grown_even = 0.0f; // ... at the even ones
+    // The least, over k >= 3, of the growth off the multiples of k against the growth on them
+    // (1 when none grew): near 0 when only the partials of a note k times higher grew.
+    float off_series = 1.0f;
+    float before_odd = 0.0f; // `before` and `after` at the odd partials only
+    float after_odd = 0.0f;
+    float before_fundamental = 0.0f; // `before` and `after` at the fundamental only
+    float after_fundamental = 0.0f;
+    float grown_fundamental = 0.0f; // the growth at the fundamental
+    float grown_strongest = 0.0f;   // ... and at the partial that grew most
+};
+FreshEvidence fresh_evidence(const FrameAnalyzer& before, const FrameAnalyzer& after, float f0,
+                             float b, float max_hz);
+
+// Growth at an onset at f0's own partials against growth at the partials of the notes a
+// semitone and a tone above and below, over the partials (1..8, below max_hz) where `after`
+// separates a semitone. A note struck again grows at its own partials; a neighbour struck under
+// it grows a step away. `separable` counts the partials compared.
+struct NeighbourGrowth {
+    int separable = 0;
+    float own = 0.0f;
+    float own_after = 0.0f;  // the pitch's own partials after the onset
+    float neighbours = 0.0f; // the largest neighbour's growth
+};
+NeighbourGrowth neighbour_growth(const FrameAnalyzer& before, const FrameAnalyzer& after, float f0,
+                                 float b, float max_hz);
+
 // Relative sharpening of a period-based f0 estimate caused by stretched partials, for when the
 // spectrum cannot resolve the partials to refine_f0: the autocorrelation peak moves by about
 // (B/2) <n^4>/<n^2>, the moments taken over the spectrum's energy up to 16 f0 (no need to
 // resolve individual partials). Divide the estimate by (1 + result).
 float stretch_bias(const FrameAnalyzer& a, float f0, float b, float max_hz);
 
+// Fundamental refined from the spectral peaks of partials 1..4, undoing the stretch: the mean of
+// peak_n / (n sqrt(1 + B n^2)) weighted by magnitude / n, over the partials whose weight is at
+// least a fifth of the best one's (14 dB). Stretched partials pull the autocorrelation period
+// sharp (tens of cents in the treble); this does not. Returns `f0` if no partial is found.
 // `search` is the relative half-width searched around each partial (0.02 by default; 0.06, a
 // semitone, to pull in an estimate that is still far off).
 float refine_f0(const FrameAnalyzer& a, float f0, float b, float max_hz, float search = 0.02f);
 
-} // namespace toonval::pitch_dsp
+} // namespace etude::pitch_dsp

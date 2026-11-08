@@ -6,7 +6,7 @@
 #include <cstring>
 #include <vector>
 
-namespace toonval::app {
+namespace etude::app {
 
 namespace {
 
@@ -52,7 +52,9 @@ std::uint32_t hash(std::uint32_t x) {
 
 } // namespace
 
-EffectTextures::EffectTextures(SDL_Renderer* renderer) {
+EffectTextures::EffectTextures(SDL_Renderer* renderer) { make(renderer); }
+
+void EffectTextures::make(SDL_Renderer* renderer) {
     constexpr int n = kSize;
     std::vector<std::uint32_t> pixels(static_cast<std::size_t>(n * n));
     // Glow: distance from the centre point, so the corners are round falloffs and the middle
@@ -110,12 +112,16 @@ EffectTextures::EffectTextures(SDL_Renderer* renderer) {
     grain_ = make_texture(renderer, pixels, n);
 }
 
-EffectTextures::~EffectTextures() {
+EffectTextures::~EffectTextures() { drop(); }
+
+void EffectTextures::drop() {
     if (glow_ != nullptr) {
         SDL_DestroyTexture(glow_);
+        glow_ = nullptr;
     }
     if (grain_ != nullptr) {
         SDL_DestroyTexture(grain_);
+        grain_ = nullptr;
     }
 }
 
@@ -136,6 +142,17 @@ void StylePainter::begin(const StyleRecipe& recipe, float unit) {
     rim_.clear();
 }
 
+// What one shape adds to a layer at most, over the note styles: a rounded rectangle is 21 vertices
+// and 60 indices, 41 and 180 with a soft edge; a ring is 40 and 120. The body holds an underlay and
+// a soft-edged body, the inner layer two rings, the extras three rounded rectangles.
+void StylePainter::reserve(std::size_t shapes) {
+    body_.reserve(shapes * 62, shapes * 240);
+    inner_.reserve(shapes * 80, shapes * 240);
+    extras_.reserve(shapes * 63, shapes * 180);
+    grain_.reserve(shapes * 21, shapes * 60);
+    rim_.reserve(shapes * 40, shapes * 120);
+}
+
 void StylePainter::add(const SDL_FRect& rect, float radius, SDL_FColor fill, SDL_FColor key_end,
                        float alpha, SDL_FColor underlay) {
     if (rect.w <= 0.0f || rect.h <= 0.0f || alpha <= 0.0f) {
@@ -143,7 +160,7 @@ void StylePainter::add(const SDL_FRect& rect, float radius, SDL_FColor fill, SDL
     }
     const StyleRecipe& r = recipe_;
     const auto body_colour = [&](SDL_FColor c) {
-        return mix(saturated(c, r.saturation), kBlack, r.core_darken);
+        return mix(mix(saturated(c, r.saturation), kBlack, r.core_darken), kWhite, r.body_lighten);
     };
     const SDL_FColor far = mix(scaled(body_colour(fill), r.top_shade), kWhite, r.top_lighten);
     const SDL_FColor near = body_colour(key_end);
@@ -198,10 +215,34 @@ void StylePainter::add(const SDL_FRect& rect, float radius, SDL_FColor fill, SDL
                                   kGrainTilePx * unit_);
     }
     if (r.rim_alpha > 0.0f && r.rim_width_px > 0.0f) {
-        const SDL_FColor rim =
-            with_alpha(mix(saturated(fill, r.saturation), kWhite, r.rim_lighten), r.rim_alpha * a);
+        const SDL_FColor rim = with_alpha(
+            mix(mix(saturated(fill, r.saturation), kWhite, r.rim_lighten), kBlack, r.rim_darken),
+            r.rim_alpha * a);
         rim_.ring(rect, radius, r.rim_width_px * unit_, rim, rim);
     }
+    if (r.bevel_alpha > 0.0f && r.bevel_share > 0.0f) {
+        // Lit from the top left: light strips along the top and left, dark ones along the
+        // bottom and right, each at most a quarter of the block's width.
+        const float b = std::min(std::max(r.bevel_share * w, r.bevel_min_px * unit_),
+                                 0.25f * std::min(w, rect.h));
+        const SDL_FColor light = with_alpha(kWhite, r.bevel_alpha * a);
+        const SDL_FColor dark = with_alpha(kBlack, r.bevel_alpha * a);
+        rim_.rect({rect.x, rect.y, w, b}, light, light);
+        rim_.rect({rect.x, rect.y + b, b, rect.h - b}, light, light);
+        rim_.rect({rect.x + b, rect.y + rect.h - b, w - b, b}, dark, dark);
+        rim_.rect({rect.x + w - b, rect.y + b, b, rect.h - 2.0f * b}, dark, dark);
+    }
+}
+
+void StylePainter::add_beat_line(const SDL_FRect& line, SDL_FColor note, float alpha) {
+    const StyleRecipe& r = recipe_;
+    if (r.beat_line_alpha <= 0.0f || alpha <= 0.0f) {
+        return;
+    }
+    const SDL_FColor tone =
+        r.beat_line_dark ? kBlack : mix(saturated(note, r.saturation), kWhite, 0.45f);
+    const SDL_FColor c = with_alpha(tone, r.beat_line_alpha * alpha * note.a);
+    rim_.rect(line, c, c);
 }
 
 void StylePainter::draw(SDL_Renderer* renderer, const EffectTextures& textures) const {
@@ -212,110 +253,35 @@ void StylePainter::draw(SDL_Renderer* renderer, const EffectTextures& textures) 
     rim_.draw(renderer, SDL_BLENDMODE_BLEND);
 }
 
-float Sparks::random01() {
-    rng_ = rng_ * 1664525u + 1013904223u;
-    return static_cast<float>(rng_ >> 8) / 16777216.0f;
-}
-
-void Sparks::spawn(float x, float y, float key_width, SDL_FColor colour, int velocity, float unit) {
-    const float v = static_cast<float>(std::clamp(velocity, 1, 127)) / 127.0f;
-    const auto take = [&]() -> Spark& {
-        Spark& s = pool_[static_cast<std::size_t>(next_)];
-        next_ = (next_ + 1) % kCapacity;
-        return s;
-    };
-    // The burst: a still, wide flash of the note's colour where it lands.
-    Spark& burst = take();
-    burst = {x, y, 0.0f, 0.0f, 0.0f, 0.3f, 2.4f * key_width + 34.0f * unit, 0.0f,
-             mix(colour, kWhite, 0.35f)};
-    const int count = 6 + static_cast<int>(10.0f * v);
-    for (int i = 0; i < count; ++i) {
-        Spark& s = take();
-        const float angle = (-0.5f + (random01() - 0.5f) * 0.75f) * kTau * 0.5f; // mostly up
-        const float speed = (420.0f + 780.0f * random01()) * (0.7f + 0.5f * v) * unit;
-        s.x = x + (random01() - 0.5f) * key_width;
-        s.y = y;
-        s.vx = std::cos(angle) * speed;
-        s.vy = std::sin(angle) * speed;
-        s.age = 0.0f;
-        s.life = 0.35f + 0.45f * random01();
-        s.size = (6.0f + 6.0f * random01()) * unit;
-        s.gravity = 1.0f;
-        s.colour = mix(colour, kWhite, 0.45f + 0.3f * random01());
-    }
-}
-
-void Sparks::update(std::int64_t now_ns, float unit) {
-    if (!started_) {
-        started_ = true;
-        last_ns_ = now_ns;
+void add_hit_shape(const HitShape& shape, SDL_FColor colour, float unit, Mesh& soft, Mesh& lines) {
+    const SDL_FColor c = with_alpha(mix(colour, kWhite, shape.whiten), shape.alpha);
+    switch (shape.kind) {
+    case HitShapeKind::Soft: {
+        const SDL_FPoint p[4] = {{shape.x - shape.rx, shape.y - shape.ry},
+                                 {shape.x + shape.rx, shape.y - shape.ry},
+                                 {shape.x + shape.rx, shape.y + shape.ry},
+                                 {shape.x - shape.rx, shape.y + shape.ry}};
+        soft.quad(p, c);
         return;
     }
-    const float dt = std::clamp(static_cast<float>(now_ns - last_ns_) * 1e-9f, 0.0f, 0.05f);
-    last_ns_ = now_ns;
-    const float g = 1700.0f * unit;
-    const float drag = std::exp(-1.8f * dt);
-    for (Spark& s : pool_) {
-        if (s.life <= 0.0f) {
-            continue;
-        }
-        s.age += dt;
-        if (s.age >= s.life) {
-            s.life = 0.0f;
-            continue;
-        }
-        s.vx *= drag;
-        s.vy = s.vy * drag + g * s.gravity * dt;
-        s.x += s.vx * dt;
-        s.y += s.vy * dt;
+    case HitShapeKind::Streak: {
+        // Along the direction of travel, `rx` each way, `ry` to each side.
+        const float lx = shape.dx * shape.rx;
+        const float ly = shape.dy * shape.rx;
+        const float wx = -shape.dy * shape.ry;
+        const float wy = shape.dx * shape.ry;
+        const SDL_FPoint p[4] = {{shape.x - lx + wx, shape.y - ly + wy},
+                                 {shape.x - lx - wx, shape.y - ly - wy},
+                                 {shape.x + lx - wx, shape.y + ly - wy},
+                                 {shape.x + lx + wx, shape.y + ly + wy}};
+        soft.quad(p, c);
+        return;
     }
-}
-
-void Sparks::build(Mesh& mesh) const {
-    for (const Spark& s : pool_) {
-        if (s.life <= 0.0f) {
-            continue;
-        }
-        const float t = s.age / s.life;
-        if (s.gravity == 0.0f) {
-            const SDL_FColor c = with_alpha(s.colour, s.colour.a * (1.0f - t));
-            // The burst: a flat ellipse along the hit line.
-            const float w = s.size * (0.8f + 0.4f * t);
-            const float h = 0.35f * w;
-            const SDL_FPoint p[4] = {{s.x - w, s.y - h}, {s.x + w, s.y - h}, {s.x + w, s.y + h},
-                                     {s.x - w, s.y + h}};
-            mesh.quad(p, c);
-            continue;
-        }
-        const SDL_FColor c = with_alpha(s.colour, s.colour.a * (1.0f - t * t));
-        // A streak along the direction of travel, longer when faster, with a hot white head.
-        const float speed = std::sqrt(s.vx * s.vx + s.vy * s.vy);
-        const float dx = speed > 1e-3f ? s.vx / speed : 0.0f;
-        const float dy = speed > 1e-3f ? s.vy / speed : -1.0f;
-        const float half_len = s.size + 0.018f * speed;
-        const float half_w = 0.6f * s.size;
-        const SDL_FPoint p[4] = {
-            {s.x - dx * half_len - dy * half_w, s.y - dy * half_len + dx * half_w},
-            {s.x - dx * half_len + dy * half_w, s.y - dy * half_len - dx * half_w},
-            {s.x + dx * half_len + dy * half_w, s.y + dy * half_len - dx * half_w},
-            {s.x + dx * half_len - dy * half_w, s.y + dy * half_len + dx * half_w}};
-        mesh.quad(p, c);
-        const float head = 0.8f * s.size;
-        const SDL_FPoint q[4] = {{s.x - head, s.y - head}, {s.x + head, s.y - head},
-                                 {s.x + head, s.y + head}, {s.x - head, s.y + head}};
-        mesh.quad(q, with_alpha(mix(s.colour, kWhite, 0.6f), c.a));
+    case HitShapeKind::Ring:
+        lines.upper_arc(shape.x, shape.y, shape.rx, shape.ry, shape.thickness, std::max(1.0f, unit),
+                        c);
+        return;
     }
-}
-
-void Sparks::clear() {
-    for (Spark& s : pool_) {
-        s.life = 0.0f;
-    }
-}
-
-int Sparks::live() const {
-    return static_cast<int>(
-        std::count_if(pool_.begin(), pool_.end(), [](const Spark& s) { return s.life > 0.0f; }));
 }
 
 void build_motion_background(Mesh& mesh, const SDL_FRect& area, double seconds) {
@@ -345,4 +311,4 @@ void build_motion_background(Mesh& mesh, const SDL_FRect& area, double seconds) 
     }
 }
 
-} // namespace toonval::app
+} // namespace etude::app

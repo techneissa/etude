@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/grade_words.hpp"
+#include "etude/grade_words.hpp"
 
-#include "toonval/keyboard_view.hpp"
-#include "toonval/screen_layout.hpp"
+#include "etude/keyboard_view.hpp"
+#include "etude/screen_layout.hpp"
 
 #include <algorithm>
 #include <array>
@@ -13,7 +13,7 @@
 
 #include <doctest/doctest.h>
 
-using namespace toonval;
+using namespace etude;
 
 namespace {
 

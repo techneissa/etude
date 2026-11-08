@@ -1,11 +1,39 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/note_window.hpp"
+#include "etude/note_window.hpp"
 
 #include <algorithm>
 #include <limits>
 #include <numeric>
 
-namespace toonval {
+namespace etude {
+
+std::size_t densest_window(const Song& song, double ahead_s, double behind_s) {
+    if (!(ahead_s > 0.0)) {
+        return 0;
+    }
+    // A note is in view while the hit line's song position t has start - ahead < t < end + behind.
+    std::vector<double> in;
+    std::vector<double> out;
+    in.reserve(song.notes.size());
+    out.reserve(song.notes.size());
+    for (const Note& n : song.notes) {
+        if (!n.drum) {
+            in.push_back(n.start_s - ahead_s);
+            out.push_back(n.start_s + n.duration_s + behind_s);
+        }
+    }
+    std::sort(in.begin(), in.end());
+    std::sort(out.begin(), out.end());
+    std::size_t best = 0;
+    std::size_t gone = 0;
+    for (std::size_t i = 0; i < in.size(); ++i) {
+        while (gone < out.size() && out[gone] <= in[i]) {
+            ++gone;
+        }
+        best = std::max(best, i + 1 - gone);
+    }
+    return best;
+}
 
 void NoteWindow::build(const Song& song) {
     std::vector<std::uint32_t> order(song.notes.size());
@@ -76,4 +104,4 @@ std::size_t NoteWindow::query(double position_s, const NoteWindowOptions& option
     return examined;
 }
 
-} // namespace toonval
+} // namespace etude

@@ -1,18 +1,17 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/look.hpp"
+#include "etude/look.hpp"
 
 #include <limits>
-#include <set>
 #include <string>
 
 #include <doctest/doctest.h>
 
-using namespace toonval;
+using namespace etude;
 
 TEST_CASE("defaults are valid and match the documented values") {
     const LookSettings d;
     CHECK(d.is_valid());
-    CHECK(d.note_style == NoteStyle::Glassy);
+    CHECK(d.note_style == NoteStyle::Glass);
     CHECK(d.style_intensity == doctest::Approx(0.6f));
     CHECK(d.color_scheme == ColorScheme::ByHand);
     CHECK(d.right_color == RGBA{90, 170, 255, 255}); // the app's accent
@@ -23,10 +22,11 @@ TEST_CASE("defaults are valid and match the documented values") {
     CHECK_FALSE(d.names_show_octave);
     CHECK(d.c_markers);
     CHECK(d.octave_numbering == OctaveNumbering::Scientific);
-    CHECK_FALSE(d.names_prefer_flats);
+    CHECK(d.names_spelling == NameSpelling::ByKey); // black keys spelled by the key
     CHECK(d.background == BackgroundStyle::Gradient);
     CHECK_FALSE(d.reduced_effects);
     CHECK(d.chord_label);
+    CHECK(d.show_key); // the key label is on by default
     CHECK(d.chord_label_size == doctest::Approx(1.0f));
     CHECK(d.visible_seconds == doctest::Approx(4.0f));
     CHECK(d.keyboard_height == doctest::Approx(0.18f));
@@ -94,16 +94,20 @@ TEST_CASE("a stray enum value is reset to its default") {
     CHECK(c.octave_numbering == LookSettings{}.octave_numbering);
 }
 
-TEST_CASE("reduced effects forces motion and particles off, and only those") {
+TEST_CASE("reduced effects forces motion and the hit effect off, and only those") {
     LookSettings s;
     s.background = BackgroundStyle::Motion;
-    s.sparks = true;
+    s.hit_effect = HitEffect::Sparks;
     CHECK(s.effective_background() == BackgroundStyle::Motion);
-    CHECK(s.effective_sparks());
+    CHECK(s.effective_hit_effect() == HitEffect::Sparks);
 
     s.reduced_effects = true;
     CHECK(s.effective_background() == BackgroundStyle::Gradient);
-    CHECK_FALSE(s.effective_sparks());
+    for (const HitEffect e : kAllHitEffects) {
+        s.hit_effect = e;
+        CHECK(s.effective_hit_effect() == HitEffect::None);
+    }
+    s.hit_effect = HitEffect::Sparks;
 
     s.background = BackgroundStyle::Plain;
     CHECK(s.effective_background() == BackgroundStyle::Plain);
@@ -116,81 +120,77 @@ TEST_CASE("reduced effects forces motion and particles off, and only those") {
     CHECK(s.effective_background() == BackgroundStyle::Motion);
 }
 
-TEST_CASE("sparks stay off when the option itself is off") {
+TEST_CASE("the hit effect is Glow by default and is drawn as chosen") {
     LookSettings s;
-    s.sparks = false;
-    CHECK_FALSE(s.effective_sparks());
-}
-
-TEST_CASE("every preset is valid, named, and different from the others") {
-    std::set<std::string> names;
-    std::vector<std::string> texts;
-    for (PresetId id : kAllPresets) {
-        const LookSettings p = preset(id);
-        CHECK(p.is_valid());
-        CHECK_FALSE(preset_name(id).empty());
-        names.insert(std::string(preset_name(id)));
-        texts.push_back(serialize(p));
+    CHECK(s.hit_effect == HitEffect::Glow);
+    for (const HitEffect e : kAllHitEffects) {
+        s.hit_effect = e;
+        CHECK(s.effective_hit_effect() == e);
     }
-    CHECK(names.size() == kAllPresets.size());
-    std::set<std::string> distinct(texts.begin(), texts.end());
-    CHECK(distinct.size() == kAllPresets.size());
+    s.hit_effect = static_cast<HitEffect>(9);
+    CHECK_FALSE(s.is_valid());
+    CHECK(s.clamped().hit_effect == HitEffect::Glow);
 }
 
-TEST_CASE("the Default preset is the default settings") {
-    CHECK(preset(PresetId::Default) == LookSettings{});
-}
-
-TEST_CASE("Classic is plain, filled and by hand") {
-    const LookSettings p = preset(PresetId::Classic);
-    CHECK(p.note_style == NoteStyle::Filled);
-    CHECK(p.color_scheme == ColorScheme::ByHand);
-    CHECK(p.background == BackgroundStyle::Plain);
-    CHECK_FALSE(p.sparks);
-    CHECK_FALSE(p.held_glow);
-}
-
-TEST_CASE("the other presets set what their names say") {
-    CHECK(preset(PresetId::NeonNight).note_style == NoteStyle::Neon);
-    CHECK(preset(PresetId::NeonNight).color_scheme == ColorScheme::ByPitchClass);
-    CHECK(preset(PresetId::Glass).note_style == NoteStyle::Glassy);
-    CHECK(preset(PresetId::FrostedPastel).note_style == NoteStyle::Frosted);
-    CHECK(preset(PresetId::HighContrast).high_contrast);
-    CHECK(preset(PresetId::HighContrast).note_style == NoteStyle::Filled);
-    const LookSettings m = preset(PresetId::MinimalReduced);
-    CHECK(m.reduced_effects);
-    CHECK_FALSE(m.effective_sparks());
-    CHECK(m.effective_background() != BackgroundStyle::Motion);
-}
-
-TEST_CASE("no preset asks for more than reduced effects allow when it sets the switch") {
-    for (PresetId id : kAllPresets) {
-        const LookSettings p = preset(id);
-        if (p.reduced_effects) {
-            CHECK(p.effective_background() != BackgroundStyle::Motion);
-            CHECK_FALSE(p.effective_sparks());
-        }
-    }
-}
-
-TEST_CASE("a built-in preset keeps the octave numbering, key size and typing letters") {
+TEST_CASE("a reset gives the default look and keeps the player's own preferences") {
     LookSettings mine;
     mine.octave_numbering = OctaveNumbering::Yamaha;
     mine.key_size = KeySize::Large;
     mine.show_typing_keys = true;
-    mine.note_style = NoteStyle::Filled;
-    for (const PresetId id : kAllPresets) {
-        const LookSettings out = apply_preset(mine, id);
-        CHECK(out.octave_numbering == OctaveNumbering::Yamaha);
-        CHECK(out.key_size == KeySize::Large);
-        CHECK(out.show_typing_keys);
-        CHECK(out.note_style == preset(id).note_style);
-        CHECK(out.color_scheme == preset(id).color_scheme);
-        CHECK(is_preset(out, id));
-    }
-    // Any other change makes it not the preset any more.
-    LookSettings changed = apply_preset(mine, PresetId::Default);
-    changed.sparks = !changed.sparks;
-    CHECK_FALSE(is_preset(changed, PresetId::Default));
-    CHECK(is_preset(LookSettings{}, PresetId::Default));
+    mine.grade_words = false;
+    mine.grade_position = GradePosition::Top;
+    mine.grade_opacity = 35;
+    mine.black_key_names = BlackKeyNames::Off;
+    mine.block_layout = BlockLayout::EvenLanes;
+    mine.beat_lines = BeatLines::Bars;
+    mine.rising_in_song = true;
+    mine.combo_number = false;
+    // Everything else is the player's look and goes back to the default.
+    mine.note_style = NoteStyle::Neon;
+    mine.hit_effect = HitEffect::Ripple;
+    mine.high_contrast = true;
+    const LookSettings out = reset_look(mine);
+    CHECK(out.octave_numbering == OctaveNumbering::Yamaha);
+    CHECK(out.key_size == KeySize::Large);
+    CHECK(out.show_typing_keys);
+    CHECK_FALSE(out.grade_words);
+    CHECK(out.grade_position == GradePosition::Top);
+    CHECK(out.grade_opacity == 35);
+    CHECK(out.black_key_names == BlackKeyNames::Off);
+    CHECK(out.block_layout == BlockLayout::EvenLanes);
+    CHECK(out.beat_lines == BeatLines::Bars);
+    CHECK(out.rising_in_song);
+    CHECK_FALSE(out.combo_number);
+    LookSettings expected;
+    expected.octave_numbering = out.octave_numbering;
+    expected.key_size = out.key_size;
+    expected.show_typing_keys = out.show_typing_keys;
+    expected.grade_words = out.grade_words;
+    expected.grade_position = out.grade_position;
+    expected.grade_opacity = out.grade_opacity;
+    expected.black_key_names = out.black_key_names;
+    expected.block_layout = out.block_layout;
+    expected.beat_lines = out.beat_lines;
+    expected.rising_in_song = out.rising_in_song;
+    expected.combo_number = out.combo_number;
+    CHECK(out == expected);
+    // Resetting a default look changes nothing.
+    CHECK(reset_look(LookSettings{}) == LookSettings{});
+}
+
+TEST_CASE("notes rising during a song and the combo number have their defaults") {
+    CHECK_FALSE(LookSettings{}.rising_in_song);
+    CHECK(LookSettings{}.combo_number);
+}
+
+TEST_CASE("a reset sends the Learn sections back to their own shades, and a stray shade is mended") {
+    LookSettings mine;
+    mine.learn_picks = {LearnShade::Lime, LearnShade::Lime, LearnShade::Lime, LearnShade::Lime};
+    CHECK(reset_look(mine).learn_picks == kLearnDefaultPicks);
+
+    mine.learn_picks[2] = static_cast<LearnShade>(40);
+    CHECK_FALSE(mine.is_valid());
+    const LookSettings mended = mine.clamped();
+    CHECK(mended.learn_picks[0] == LearnShade::Lime);
+    CHECK(mended.learn_picks[2] == kLearnDefaultPicks[2]);
 }

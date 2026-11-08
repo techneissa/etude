@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/midi_event.hpp"
+#include "etude/midi_event.hpp"
 
 #include <array>
 
 #include <doctest/doctest.h>
 
-using namespace toonval;
+using namespace etude;
 
 namespace {
 MidiEvent decode(std::initializer_list<std::uint8_t> bytes, std::int64_t t = 0) {

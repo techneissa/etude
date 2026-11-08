@@ -1,0 +1,70 @@
+# The Melodies of the Learn screen: the files bundled with the app, and the paths through them.
+# One line per record, fields separated by " | ". Blank lines and lines starting with # are ignored.
+#
+#   file | NAME.mid | title | composer | step | source | licence
+#       step: the grade, 1 (right hand, a few keys) to 5 (both hands, wide range)
+#       source: where the notes come from; licence: what lets us bundle the file. Both are required.
+#   path | id | title | icon
+#       icon: sprout, handshake or award
+#   goal | path id | NAME.mid | one-line goal
+#       the pieces of a path in the order they are played; a goal line is one piece's place in it
+#
+#   version | NAME.mid | tag
+#       a small tag the piece's tile wears beside its title ("Easy", "Original", at most 12 characters):
+#       which version a file is, for a piece listed twice under one title. Only those files have one.
+#
+# A simplified arrangement of a piece is a file of its own: its own file line, goal line and tag, listed
+# before the original in the path, both with the piece's title.
+#
+# Every file is public domain or dedicated CC0. The hands, the range and the difficulty shown on a
+# tile are read from the file when the screen opens; this file does not repeat them. The files are
+# made by scripts/make-melodies.py, in three kinds, which the source field says:
+#   "Own transcription ...": we wrote the notes of a public-domain tune (CC0-1.0); the source field
+#       names the printed score or public-domain MIDI file it was checked against, where there is one.
+#   "Derived from ...": the notes are a public-domain MIDI file's (Mutopia, HymnWiki), cut, split into
+#       hands or transposed as the field says; the licence is the one the piece's page gives.
+#   "Mutopia Project, piece N": the file as the project offers it, except fur-elise.mid, which stops
+#       where the piece's first section ends (the same script, --cut at tick 13536).
+#   An easy version: "Derived from ..." the file it simplifies (a piece already above); the notes of the
+#       right hand are that file's, the left hand is written for it.
+# Mutopia's pages said "Public Domain" on 2026-10-20, HymnWiki's page too.
+
+file | hot-cross-buns.mid | Hot Cross Buns | Traditional | 1 | Own transcription of the public-domain melody (a street cry of the 1700s); no printed score of the familiar three-note tune was found to check it against | CC0-1.0
+file | twinkle-twinkle-little-star.mid | Twinkle Twinkle Little Star | Traditional | 1 | Own transcription of the public-domain melody | CC0-1.0
+file | ode-to-joy.mid | Ode to Joy | Ludwig van Beethoven | 1 | Derived from Mutopia Project, piece 528 (https://www.mutopiaproject.org/cgibin/piece-info.cgi?id=528), the four-part hymn setting: its highest voice alone as the right hand, transposed a fifth down from G major to C major | Public Domain (Mutopia piece page)
+file | oh-susanna.mid | Oh! Susanna | Stephen Foster | 2 | Own transcription of the public-domain melody (1848) from the Baltimore print of about 1850 (Duke University scan, Wikimedia Commons files Oh! Susanna 2.jpg and 3.jpg), in its key of G major and with its rhythm, checked against the public-domain MIDI file Oh, Susannah rounded binary form on Commons | CC0-1.0
+file | jingle-bells.mid | Jingle Bells | James Lord Pierpont | 2 | Own transcription of the public-domain melody (1857): the familiar chorus, which the 1857 print (Library of Congress scan) does not have, after the public-domain refrain on Wikimedia Commons (Jingle Bells refrain vector, .svg and .mid), transposed a fifth down from G major to C major with every note twice as long | CC0-1.0
+file | amazing-grace.mid | Amazing Grace | Traditional | 2 | Derived from HymnWiki, Amazing Grace to the tune New Britain with parts by Edwin O. Excell, 1900 (https://www.hymnwiki.org/Amazing_Grace), its MIDI file: the soprano alone as the right hand, in G major, checked against the page's LilyPond file | Public Domain (HymnWiki page)
+file | greensleeves.mid | Greensleeves | Traditional | 3 | Derived from Mutopia Project, piece 109 (https://www.mutopiaproject.org/cgibin/piece-info.cgi?id=109), the lute arrangement: the verse (bars 1 to 16), the highest note of each beat as the right hand and the others as the left, in A minor | Public Domain (Mutopia piece page)
+file | brahms-lullaby.mid | Brahms' Lullaby | Johannes Brahms | 3 | Derived from Mutopia Project, piece 1037 (https://www.mutopiaproject.org/cgibin/piece-info.cgi?id=1037), Wiegenlied Op. 49 No. 4: the voice as the right hand and the piano's lower line as the left, from the voice's first note (the piano's two bars of introduction are left out), transposed a minor third down from E-flat major to C major | Public Domain (Mutopia piece page)
+file | brahms-lullaby-easy.mid | Brahms' Lullaby | Johannes Brahms | 3 | Derived from Mutopia Project, piece 1037 (https://www.mutopiaproject.org/cgibin/piece-info.cgi?id=1037), Wiegenlied Op. 49 No. 4, as brahms-lullaby.mid has it (transposed a minor third down from E-flat major to C major, the piano's introduction left out): a simplification with the same right hand note for note and a left hand of one note a bar, the root of the bar's chord (C, F or G) taken from the notes the original's left hand plays in that bar | Public Domain (Mutopia piece page)
+file | minuet-in-g.mid | Minuet in G | Christian Petzold | 4 | Derived from Mutopia Project, piece 75 (https://www.mutopiaproject.org/cgibin/piece-info.cgi?id=75), BWV Anh. 114 from the Bach-Gesellschaft edition (Notebook for Anna Magdalena Bach, 1725): both hands as the file has them, both strains each played twice, in G major; the grace note in bar 7 is left out | Public Domain (Mutopia piece page)
+file | minuet-in-a-minor.mid | Minuet in A minor | Johann Sebastian Bach | 4 | Mutopia Project, piece 1612 (https://www.mutopiaproject.org/cgibin/piece-info.cgi?id=1612), BWV Anh. 120, from the Bach-Gesellschaft edition of 1894 | Public Domain (Mutopia piece page)
+file | fur-elise.mid | Für Elise (opening) | Ludwig van Beethoven | 5 | Mutopia Project, piece 931 (https://www.mutopiaproject.org/cgibin/piece-info.cgi?id=931), WoO 59, from the Breitkopf & Härtel edition of 1888; only the first section | Public Domain (Mutopia piece page)
+file | von-fremden-laendern.mid | Von fremden Ländern | Robert Schumann | 5 | Mutopia Project, piece 354 (https://www.mutopiaproject.org/cgibin/piece-info.cgi?id=354), Kinderszenen Op. 15 No. 1 | Public Domain (Mutopia piece page)
+file | polonaise-in-f.mid | Polonaise in F | Johann Sebastian Bach | 5 | Mutopia Project, piece 1013 (https://www.mutopiaproject.org/cgibin/piece-info.cgi?id=1013), BWV Anh. 117a, from the Bach-Gesellschaft edition of 1894 | Public Domain (Mutopia piece page)
+file | sonatina-op36-1.mid | Sonatina Op. 36 No. 1 | Muzio Clementi | 5 | Mutopia Project, piece 804 (https://www.mutopiaproject.org/cgibin/piece-info.cgi?id=804), first movement | Public Domain (Mutopia piece page)
+
+path | first-tunes | First tunes | sprout
+goal | first-tunes | hot-cross-buns.mid | Three notes, right hand
+goal | first-tunes | twinkle-twinkle-little-star.mid | The hand shifts up once
+goal | first-tunes | ode-to-joy.mid | Steps up and down
+goal | first-tunes | oh-susanna.mid | Small leaps
+goal | first-tunes | jingle-bells.mid | Repeated notes, one leap
+goal | first-tunes | amazing-grace.mid | The hand moves an octave
+
+path | both-hands | Both hands | handshake
+goal | both-hands | greensleeves.mid | Add a left-hand bass
+goal | both-hands | brahms-lullaby-easy.mid | Left hand: one note a bar
+goal | both-hands | brahms-lullaby.mid | Left hand: the waltz beat
+goal | both-hands | minuet-in-g.mid | Both hands moving
+goal | both-hands | minuet-in-a-minor.mid | The same, in a minor key
+
+path | first-repertoire | First repertoire | award
+goal | first-repertoire | fur-elise.mid | A trill, then arpeggios
+goal | first-repertoire | von-fremden-laendern.mid | Melody over chords
+goal | first-repertoire | polonaise-in-f.mid | Dance rhythm, both hands
+goal | first-repertoire | sonatina-op36-1.mid | A whole movement
+
+version | brahms-lullaby-easy.mid | Easy
+version | brahms-lullaby.mid | Original

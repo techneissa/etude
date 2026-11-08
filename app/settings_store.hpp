@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // The settings file on disk: where it lives, how it is written so a power cut cannot lose it, and
 // how it is read back when it is missing or damaged. Only text goes through here; what the text
-// means is core's job (toonval::load_settings and the look serializer). The folder is a
+// means is core's job (etude::load_settings and the look serializer). The folder is a
 // constructor argument, so the tests point it at a temporary directory.
 #pragma once
 
@@ -10,7 +10,7 @@
 #include <string>
 #include <string_view>
 
-namespace toonval::app {
+namespace etude::app {
 
 inline constexpr std::string_view kSettingsFileName = "settings.conf";
 inline constexpr std::string_view kSettingsTempName = "settings.conf.tmp";
@@ -74,4 +74,4 @@ class SettingsStore {
     bool have_last_ = false;
 };
 
-} // namespace toonval::app
+} // namespace etude::app

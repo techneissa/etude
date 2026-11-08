@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/octave_shift.hpp"
+#include "etude/octave_shift.hpp"
 
 #include <algorithm>
 #include <cstddef>
 
-namespace toonval {
+namespace etude {
 
 void OctaveShiftDetector::set_range(KeyRange range) {
     range_ = range;
@@ -149,4 +149,4 @@ ShiftResult OctaveShiftDetector::range_result() const {
     return out;
 }
 
-} // namespace toonval
+} // namespace etude

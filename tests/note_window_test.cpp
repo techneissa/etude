@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/note_window.hpp"
+#include "etude/note_window.hpp"
 
-#include "toonval/keyboard.hpp"
-#include "toonval/transpose.hpp"
+#include "etude/keyboard.hpp"
+#include "etude/transpose.hpp"
 
 #include <doctest/doctest.h>
 
@@ -10,7 +10,7 @@
 #include <random>
 #include <vector>
 
-using namespace toonval;
+using namespace etude;
 
 namespace {
 
@@ -319,4 +319,56 @@ TEST_CASE("note window: drum notes keep their instrument number whatever the tra
     REQUIRE(out.size() == 1);
     CHECK(out[0].pitch == 38);
     CHECK_FALSE(out[0].folded);
+}
+
+TEST_CASE("densest window: the most notes in view at once, drums left out") {
+    CHECK(densest_window(Song{}, 4.0) == 0);
+    CHECK(densest_window(song_of({make_note(1.0, 0.5)}), 0.0) == 0);
+    CHECK(densest_window(song_of({make_note(1.0, 0.5)}), 4.0) == 1);
+    // Three notes a second apart: a 4 s view holds all three, a 1.5 s view two.
+    const Song line = song_of({make_note(0.0, 0.1), make_note(1.0, 0.1), make_note(2.0, 0.1)});
+    CHECK(densest_window(line, 4.0, 0.0) == 3);
+    CHECK(densest_window(line, 1.5, 0.0) == 2);
+    // A view shorter than the gap between notes (and than their length) shows one at a time.
+    CHECK(densest_window(line, 0.5, 0.0) == 1);
+    // A note still sounding when the next one comes into view counts with it.
+    CHECK(densest_window(line, 1.0, 0.0) == 2);
+    // A long note stays in view while later ones come.
+    const Song held = song_of({make_note(0.0, 10.0), make_note(5.0, 0.1), make_note(9.0, 0.1)});
+    CHECK(densest_window(held, 1.0, 0.0) == 2);
+    // Drums are not shown.
+    CHECK(densest_window(song_of({make_note(0.0, 1.0, Hand::Unknown, true),
+                                  make_note(0.0, 1.0, Hand::Unknown, true)}),
+                         4.0) == 0);
+    // The notes just past the hit line stay in view for `behind_s`.
+    // (A note that ends as the next one comes into view is out of the view by then.)
+    const Song pair = song_of({make_note(0.0, 0.5), make_note(4.5, 0.5)});
+    CHECK(densest_window(pair, 4.0, 0.0) == 1);
+    CHECK(densest_window(pair, 4.0, 0.25) == 2);
+}
+
+TEST_CASE("densest window: equals the most any song position shows, over random songs") {
+    std::mt19937 rng(11);
+    for (int round = 0; round < 40; ++round) {
+        std::uniform_real_distribution<double> start(0.0, 30.0);
+        std::uniform_real_distribution<double> length(0.0, 3.0);
+        std::vector<Note> notes;
+        const int count = 1 + static_cast<int>(rng() % 80);
+        for (int i = 0; i < count; ++i) {
+            notes.push_back(make_note(start(rng), length(rng), Hand::Right, rng() % 9 == 0));
+        }
+        const Song song = song_of(notes);
+        const double ahead = 0.5 + static_cast<double>(rng() % 50) / 10.0;
+        const double behind = static_cast<double>(rng() % 6) / 10.0;
+        NoteWindow w(song);
+        std::size_t most = 0;
+        std::vector<VisibleNote> out;
+        for (const Note& n : notes) {
+            // The song position where this note has just come into view.
+            w.query(n.start_s - ahead + 1e-7, window(ahead, behind), out);
+            most = std::max(most, out.size());
+        }
+        CAPTURE(round);
+        CHECK(densest_window(song, ahead, behind) == most);
+    }
 }

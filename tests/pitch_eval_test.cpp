@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/pitch_eval.hpp"
-#include "toonval/pitch_synth.hpp"
+#include "etude/pitch_eval.hpp"
+#include "etude/pitch_synth.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -9,7 +9,7 @@
 
 #include <doctest/doctest.h>
 
-using namespace toonval;
+using namespace etude;
 
 namespace {
 
@@ -56,6 +56,65 @@ TEST_CASE("pitch scoring: not sure, missed, and events of other notes") {
     // An onset more than 20 ms early belongs to something before; one at `end` to the next note.
     const PitchEvent other[] = {on(62, 1000 - kRate / 40, 2000), on(64, 20000, 21000)};
     CHECK(score_note(60, 1000, 20000, other, 2, kRate).outcome == NoteOutcome::Missed);
+}
+
+TEST_CASE("pitch scoring: a chord is correct when every note-on is one of its keys") {
+    const int chord[] = {60, 64, 67};
+    const PitchEvent one[] = {on(64, 1000, 2000)};
+    const PitchEvent two[] = {on(64, 1000, 2000), on(67, 9000, 9500)};
+    auto s = score_chord(chord, 3, 1000, 20000, one, 1, kRate);
+    CHECK(s.outcome == NoteOutcome::Correct);
+    CHECK(s.reported_note == 64);
+    CHECK(s.latency_samples == 1000);
+    CHECK(score_chord(chord, 3, 1000, 20000, two, 2, kRate).outcome == NoteOutcome::Correct);
+}
+
+TEST_CASE("pitch scoring: a key outside the chord makes it wrong, an octave of one of its keys an "
+          "octave error") {
+    const int chord[] = {60, 64, 67};
+    const PitchEvent subharmonic[] = {on(36, 1000, 2000)};
+    const PitchEvent other[] = {on(64, 1000, 2000), on(62, 3000, 4000)};
+    CHECK(score_chord(chord, 3, 1000, 20000, subharmonic, 1, kRate).outcome ==
+          NoteOutcome::OctaveError);
+    const auto s = score_chord(chord, 3, 1000, 20000, other, 2, kRate);
+    CHECK(s.outcome == NoteOutcome::Wrong);
+    CHECK(s.reported_note == 62);
+}
+
+TEST_CASE("pitch scoring: a chord with no note-on is not sure or missed") {
+    const int chord[] = {48, 55};
+    PitchEvent unsure;
+    unsure.type = PitchEventType::NotSure;
+    unsure.onset_sample = 1000;
+    CHECK(score_chord(chord, 2, 1000, 20000, &unsure, 1, kRate).outcome == NoteOutcome::NotSure);
+    CHECK(score_chord(chord, 2, 1000, 20000, nullptr, 0, kRate).outcome == NoteOutcome::Missed);
+    // A note-on for the chord before it (more than 20 ms early) is not this chord's.
+    const PitchEvent early[] = {on(40, 1000 - kRate / 40, 2000)};
+    CHECK(score_chord(chord, 2, 1000, 20000, early, 1, kRate).outcome == NoteOutcome::Missed);
+}
+
+TEST_CASE("pitch evaluation: open chords take the contexts and registers in turn") {
+    SynthEvalOptions o;
+    o.velocities = {0.75f};
+    std::vector<NoteRecord> records;
+    o.records = &records;
+    const OpenChordReport r = evaluate_open_chord_synthetic(o, kOpenChordContexts * 2);
+    REQUIRE(records.size() == static_cast<size_t>(kOpenChordContexts * 2));
+    CHECK(r.registers.total.notes == kOpenChordContexts * 2);
+    for (size_t i = 0; i < records.size(); ++i) {
+        CAPTURE(i);
+        CHECK(records[i].context == static_cast<int>(i) % kOpenChordContexts);
+        CHECK(records[i].chord.size() >= 2);
+        CHECK(records[i].chord.front() == records[i].note);
+        CHECK(std::is_sorted(records[i].chord.begin(), records[i].chord.end()));
+        CHECK(records[i].chord.back() <= kPianoHighNote);
+    }
+    // The first round is in the lowest register, the second in the next.
+    CHECK(register_of(records.front().note) == 0);
+    CHECK(register_of(records.back().note) == 1);
+    for (int i = 0; i < kOpenChordContexts; ++i) {
+        CHECK(r.contexts[static_cast<size_t>(i)].notes == 2);
+    }
 }
 
 TEST_CASE("pitch scoring: registers by octave, A0-B1 first and C7-C8 last") {

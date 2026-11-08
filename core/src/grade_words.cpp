@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/grade_words.hpp"
+#include "etude/grade_words.hpp"
 
 #include <algorithm>
 #include <array>
 #include <cmath>
 
-namespace toonval {
+namespace etude {
 namespace {
 
 bool finite_rect(const RectF& r) {
@@ -163,4 +163,4 @@ std::size_t place_grade_words(const GradeLayoutParams& params, std::span<const R
     return placed_count;
 }
 
-} // namespace toonval
+} // namespace etude

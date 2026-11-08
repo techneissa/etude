@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/pitch_synth.hpp"
+#include "etude/pitch_synth.hpp"
 
 #include <algorithm>
 #include <array>
 #include <cmath>
 #include <complex>
 
-namespace toonval {
+namespace etude {
 
 namespace {
 
@@ -272,4 +272,4 @@ SynthClip make_synth_chord_clip(const int* notes, int count, float velocity, std
     return clip;
 }
 
-} // namespace toonval
+} // namespace etude

@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/exercises.hpp"
+#include "etude/accidental_text.hpp"
+#include "etude/exercises.hpp"
 
 #include "song_compare.hpp"
-#include "toonval/chord.hpp"
-#include "toonval/keyboard.hpp"
-#include "toonval/midi_file.hpp"
-#include "toonval/midi_writer.hpp"
-#include "toonval/pitch.hpp"
-#include "toonval/scales.hpp"
+#include "etude/chord.hpp"
+#include "etude/keyboard.hpp"
+#include "etude/midi_file.hpp"
+#include "etude/midi_writer.hpp"
+#include "etude/pitch.hpp"
+#include "etude/scales.hpp"
 
 #include <doctest/doctest.h>
 
@@ -15,7 +16,7 @@
 #include <string>
 #include <vector>
 
-using namespace toonval;
+using namespace etude;
 
 namespace {
 
@@ -145,18 +146,21 @@ TEST_CASE("fingering: the fourth finger sits where the teaching charts put it (m
     }
 }
 
-TEST_CASE("fingering: defined for major, natural and harmonic minor in all 12 keys, both hands") {
-    for (ScaleType t : {ScaleType::Major, ScaleType::NaturalMinor, ScaleType::HarmonicMinor}) {
+TEST_CASE("fingering: defined for major and the three minors in all 12 keys, both hands") {
+    for (ScaleType t : {ScaleType::Major, ScaleType::NaturalMinor, ScaleType::HarmonicMinor,
+                        ScaleType::MelodicMinor}) {
         for (int root = 0; root < 12; ++root) {
             for (Hand h : {Hand::Right, Hand::Left}) {
                 for (int octaves : {1, 2}) {
                     CAPTURE(scale_type_name(t));
                     CAPTURE(root);
-                    const auto f = scale_fingers(root, t, h, octaves);
-                    REQUIRE(f.size() == static_cast<std::size_t>(7 * octaves + 1));
-                    for (int x : f) {
-                        CHECK(x >= 1);
-                        CHECK(x <= 5);
+                    for (const auto& f : {scale_fingers(root, t, h, octaves),
+                                          scale_fingers_descending(root, t, h, octaves)}) {
+                        REQUIRE(f.size() == static_cast<std::size_t>(7 * octaves + 1));
+                        for (int x : f) {
+                            CHECK(x >= 1);
+                            CHECK(x <= 5);
+                        }
                     }
                 }
             }
@@ -165,62 +169,145 @@ TEST_CASE("fingering: defined for major, natural and harmonic minor in all 12 ke
 }
 
 TEST_CASE("fingering: undefined for the other scales, an unknown hand and a bad octave count") {
-    for (ScaleType t : {ScaleType::MelodicMinor, ScaleType::Dorian, ScaleType::MajorPentatonic,
-                        ScaleType::Blues, ScaleType::Chromatic, ScaleType::WholeTone}) {
+    for (ScaleType t : {ScaleType::Dorian, ScaleType::MajorPentatonic, ScaleType::Blues,
+                        ScaleType::Chromatic, ScaleType::WholeTone}) {
         CHECK(scale_fingers(C, t, Hand::Right, 1).empty());
+        CHECK(scale_fingers_descending(C, t, Hand::Right, 1).empty());
     }
     CHECK(scale_fingers(C, ScaleType::Major, Hand::Unknown, 1).empty());
     CHECK(scale_fingers(C, ScaleType::Major, Hand::Right, 0).empty());
     CHECK(scale_fingers(C, ScaleType::Major, Hand::Right, 3).empty());
+    CHECK(scale_fingers_descending(C, ScaleType::MelodicMinor, Hand::Unknown, 1).empty());
+    CHECK(scale_fingers_descending(C, ScaleType::MelodicMinor, Hand::Right, 3).empty());
 }
 
 TEST_CASE("fingering: the thumb is on a white key and crossings are legal, in every table") {
-    for (ScaleType t : {ScaleType::Major, ScaleType::NaturalMinor, ScaleType::HarmonicMinor}) {
+    for (ScaleType t : {ScaleType::Major, ScaleType::NaturalMinor, ScaleType::HarmonicMinor,
+                        ScaleType::MelodicMinor}) {
         for (int root = 0; root < 12; ++root) {
             for (Hand h : {Hand::Right, Hand::Left}) {
-                CAPTURE(scale_type_name(t));
-                CAPTURE(root);
-                CAPTURE(h == Hand::Right);
-                const auto f = scale_fingers(root, t, h, 2);
-                const std::vector<int> steps = [&] {
-                    const auto s = scale_intervals(t);
-                    std::vector<int> out;
+                for (bool down : {false, true}) {
+                    CAPTURE(scale_type_name(t));
+                    CAPTURE(root);
+                    CAPTURE(h == Hand::Right);
+                    CAPTURE(down);
+                    auto f = down ? scale_fingers_descending(root, t, h, 2)
+                                  : scale_fingers(root, t, h, 2);
+                    const auto s = down ? scale_intervals_descending(t) : scale_intervals(t);
+                    std::vector<int> steps;
                     for (int o = 0; o < 2; ++o) {
                         for (int iv : s) {
-                            out.push_back(root + 12 * o + iv);
+                            steps.push_back(root + 12 * o + iv);
                         }
                     }
-                    out.push_back(root + 24);
-                    return out;
-                }();
-                REQUIRE(f.size() == steps.size());
-                for (std::size_t i = 0; i < f.size(); ++i) {
-                    // The thumb falls on a white key. The one exception is the natural G# minor in
-                    // the left hand, whose seventh (F#) is black where the harmonic's (F##) is
-                    // white.
-                    const bool exception =
-                        t == ScaleType::NaturalMinor && root == Ab && h == Hand::Left;
-                    if (f[i] == 1 && !exception) {
-                        CHECK_FALSE(is_black_key(steps[i]));
+                    steps.push_back(root + 24);
+                    REQUIRE(f.size() == steps.size());
+                    for (std::size_t i = 0; i < f.size(); ++i) {
+                        if (f[i] == 1) {
+                            CHECK_FALSE(is_black_key(steps[i]));
+                        }
+                        // The fifth finger only ends a right-hand scale or starts a left-hand one.
+                        if (f[i] == 5) {
+                            CHECK(i == (h == Hand::Right ? f.size() - 1 : 0));
+                        }
                     }
-                    // The fifth finger only ends a right-hand scale or starts a left-hand one.
-                    if (f[i] == 5) {
-                        CHECK(i == (h == Hand::Right ? f.size() - 1 : 0));
+                    // Played in order: up the keyboard, or from the top down.
+                    if (down) {
+                        std::reverse(f.begin(), f.end());
                     }
-                    if (i == 0) {
-                        continue;
-                    }
-                    const int prev = f[i - 1];
-                    const int next = f[i];
-                    if (h == Hand::Right) {
-                        // Up a finger, or the thumb passes under the 3rd or 4th.
-                        CHECK((next == prev + 1 || (next == 1 && (prev == 3 || prev == 4))));
-                    } else {
-                        // Down a finger, or the 3rd or 4th crosses over the thumb.
-                        CHECK((next == prev - 1 || (prev == 1 && (next == 3 || next == 4))));
+                    const bool ascending_hand = (h == Hand::Right) != down;
+                    for (std::size_t i = 1; i < f.size(); ++i) {
+                        const int prev = f[i - 1];
+                        const int next = f[i];
+                        if (ascending_hand) {
+                            // Up a finger, or the thumb passes under the 3rd or 4th.
+                            CHECK((next == prev + 1 || (next == 1 && (prev == 3 || prev == 4))));
+                        } else {
+                            // Down a finger, or the 3rd or 4th crosses over the thumb.
+                            CHECK((next == prev - 1 || (prev == 1 && (next == 3 || next == 4))));
+                        }
                     }
                 }
             }
+        }
+    }
+}
+
+TEST_CASE("fingering: melodic minor, every key, both hands, up and down (one octave)") {
+    // Index 0 is the tonic at the bottom, both ways. Sources: the chart of Prof. Escadon (4th
+    // finger per key, up and down apart) and the minor fingering table of
+    // composition.gregspero.com.
+    const std::vector<int> c_rh = v({1, 2, 3, 1, 2, 3, 4, 5});
+    const std::vector<int> c_lh = v({5, 4, 3, 2, 1, 3, 2, 1});
+    struct Key {
+        int root;
+        std::vector<int> rh_up, rh_down, lh_up, lh_down;
+    };
+    const std::vector<int> sharp_rh = v({3, 4, 1, 2, 3, 1, 2, 3});
+    const std::vector<int> sharp_lh = v({3, 2, 1, 4, 3, 2, 1, 3});
+    const Key keys[] = {
+        {C, c_rh, c_rh, c_lh, c_lh},
+        // C# minor: the 4th finger goes to the raised sixth (A#) going up, the thumb to B#.
+        {Db, v({3, 4, 1, 2, 3, 4, 1, 2}), sharp_rh, sharp_lh, sharp_lh},
+        {D, c_rh, c_rh, c_lh, c_lh},
+        {Eb, v({3, 1, 2, 3, 4, 1, 2, 3}), v({3, 1, 2, 3, 4, 1, 2, 3}), v({2, 1, 4, 3, 2, 1, 3, 2}),
+         v({2, 1, 4, 3, 2, 1, 3, 2})},
+        {E, c_rh, c_rh, c_lh, c_lh},
+        {F, v({1, 2, 3, 4, 1, 2, 3, 4}), v({1, 2, 3, 4, 1, 2, 3, 4}), c_lh, c_lh},
+        // F# minor: as C#, the 4th finger on D# going up and on G# coming down.
+        {Gb, v({2, 3, 1, 2, 3, 4, 1, 2}), sharp_rh, v({4, 3, 2, 1, 3, 2, 1, 4}),
+         v({4, 3, 2, 1, 3, 2, 1, 4})},
+        {G, c_rh, c_rh, c_lh, c_lh},
+        // G# minor: the left hand's 4th finger on C# going up and on F# coming down.
+        {Ab, sharp_rh, sharp_rh, sharp_lh, v({3, 2, 1, 3, 2, 1, 4, 3})},
+        {A, c_rh, c_rh, c_lh, c_lh},
+        {Bb, v({4, 1, 2, 3, 1, 2, 3, 4}), v({4, 1, 2, 3, 1, 2, 3, 4}), v({2, 1, 3, 2, 1, 4, 3, 2}),
+         v({2, 1, 3, 2, 1, 4, 3, 2})},
+        {B, c_rh, c_rh, v({4, 3, 2, 1, 4, 3, 2, 1}), v({4, 3, 2, 1, 4, 3, 2, 1})},
+    };
+    for (const Key& k : keys) {
+        CAPTURE(k.root);
+        CHECK(scale_fingers(k.root, ScaleType::MelodicMinor, Hand::Right, 1) == k.rh_up);
+        CHECK(scale_fingers_descending(k.root, ScaleType::MelodicMinor, Hand::Right, 1) ==
+              k.rh_down);
+        CHECK(scale_fingers(k.root, ScaleType::MelodicMinor, Hand::Left, 1) == k.lh_up);
+        CHECK(scale_fingers_descending(k.root, ScaleType::MelodicMinor, Hand::Left, 1) ==
+              k.lh_down);
+        // Two octaves repeat the cycle and end on the one-octave top finger.
+        for (Hand h : {Hand::Right, Hand::Left}) {
+            const auto one = scale_fingers(k.root, ScaleType::MelodicMinor, h, 1);
+            const auto two = scale_fingers(k.root, ScaleType::MelodicMinor, h, 2);
+            REQUIRE(two.size() == 15);
+            if (k.root == Db && h == Hand::Right) {
+                CHECK(two == v({3, 4, 1, 2, 3, 4, 1, 2, 3, 1, 2, 3, 4, 1, 2}));
+            }
+            CHECK(two.front() == one.front());
+            CHECK(two.back() == one.back());
+            for (std::size_t i = 1; i < 7; ++i) {
+                CHECK(two[i] == one[i]);
+                // The second octave repeats the cycle; C# minor's right hand starts 3 4 but
+                // repeats 2 3.
+                if (i != 1 || k.root != Db || h != Hand::Right) {
+                    CHECK(two[7 + i] == one[i]);
+                }
+            }
+        }
+    }
+}
+
+TEST_CASE("fingering: only the melodic minor has a descending table of its own") {
+    for (ScaleType t : {ScaleType::Major, ScaleType::NaturalMinor, ScaleType::HarmonicMinor}) {
+        for (int root = 0; root < 12; ++root) {
+            for (Hand h : {Hand::Right, Hand::Left}) {
+                CHECK(scale_fingers_descending(root, t, h, 2) == scale_fingers(root, t, h, 2));
+            }
+        }
+    }
+    // Coming down, the melodic minor is the natural minor finger for finger.
+    for (int root = 0; root < 12; ++root) {
+        for (Hand h : {Hand::Right, Hand::Left}) {
+            CHECK(scale_fingers_descending(root, ScaleType::MelodicMinor, h, 2) ==
+                  scale_fingers(root, ScaleType::NaturalMinor, h, 2));
         }
     }
 }
@@ -327,8 +414,43 @@ TEST_CASE("exercise: harmonic minor raises the seventh, and the melodic comes do
     REQUIRE(melodic.ok);
     CHECK(pitches(melodic.song, 1) ==
           v({69, 71, 72, 74, 76, 78, 80, 81, 79, 77, 76, 74, 72, 71, 69}));
-    // No fingering is defined for the melodic minor.
-    CHECK(fingers(melodic.song, 1) == std::vector<int>(15, 0));
+    // Up with the ascending fingering, down with the descending one (A minor: the same).
+    CHECK(fingers(melodic.song, 1) == v({1, 2, 3, 1, 2, 3, 4, 5, 4, 3, 2, 1, 3, 2, 1}));
+}
+
+TEST_CASE("exercise: melodic minor carries the up fingering up and the down fingering down") {
+    for (int root = 0; root < 12; ++root) {
+        for (Hand hand : {Hand::Right, Hand::Left}) {
+            for (int octaves : {1, 2}) {
+                CAPTURE(root);
+                CAPTURE(octaves);
+                const HandsChoice hc = hand == Hand::Right ? HandsChoice::Right : HandsChoice::Left;
+                auto up = scale_fingers(root, ScaleType::MelodicMinor, hand, octaves);
+                auto down = scale_fingers_descending(root, ScaleType::MelodicMinor, hand, octaves);
+                std::reverse(down.begin(), down.end());
+                std::vector<int> both = up;
+                both.insert(both.end(), down.begin() + 1, down.end());
+                // The turn at the top takes the descent's finger.
+                both[up.size() - 1] =
+                    scale_fingers_descending(root, ScaleType::MelodicMinor, hand, octaves).back();
+                const auto fingers_of = [&](Direction d) {
+                    const ExerciseResult r =
+                        make_scale_exercise(scale(root, ScaleType::MelodicMinor, octaves, d, hc));
+                    REQUIRE(r.ok);
+                    return fingers(r.song, 1);
+                };
+                CHECK(fingers_of(Direction::Up) == up);
+                CHECK(fingers_of(Direction::Down) == down);
+                CHECK(fingers_of(Direction::UpDown) == both);
+            }
+        }
+    }
+    // F# minor, right hand: 4th finger on D# going up and on G# coming down, and the turn at the
+    // top takes the descent's 3rd finger so that the next note (E) does not repeat a finger.
+    const ExerciseResult f = make_scale_exercise(
+        scale(Gb, ScaleType::MelodicMinor, 1, Direction::UpDown, HandsChoice::Right));
+    REQUIRE(f.ok);
+    CHECK(fingers(f.song, 1) == v({2, 3, 1, 2, 3, 4, 1, 3, 2, 1, 3, 2, 1, 4, 3}));
 }
 
 TEST_CASE("exercise: scales with no fingering table have finger 0") {
@@ -642,7 +764,7 @@ TEST_CASE("chord drill: the label is what detect_chord shows for the notes, ever
                         REQUIRE(c.found);
                         CHECK(c.root_pc == root);
                         CHECK(c.quality == q);
-                        CHECK(chord_name(c, flats) == r.steps[0].label);
+                        CHECK(accidental_display(chord_name(c, flats)) == r.steps[0].label);
                         CHECK(all_in_range(r.song, range));
                         // The first note is the bass of the inversion.
                         CHECK(pitch_class(notes.front()) == c.bass_pc);
@@ -734,11 +856,12 @@ TEST_CASE("chord drill: steps follow step_beats and notes last hold_beats, at th
 
 TEST_CASE("chord drill: flat names when asked") {
     ChordDrillSpec d = drill({{Bb, ChordQuality::Major, 0}, {Eb, ChordQuality::Minor7, 0}});
-    CHECK(make_chord_drill(d).steps[0].label == "A#");
+    CHECK(make_chord_drill(d).steps[0].label == "A\xE2\x99\xAF");
     d.prefer_flats = true;
     const ExerciseResult r = make_chord_drill(d);
-    CHECK(r.steps[0].label == "Bb");
-    CHECK(r.steps[1].label == "Ebm7");
+    CHECK(r.steps[0].label == "B\xE2\x99\xAD");
+    CHECK(r.steps[1].label == "E\xE2\x99\xAD"
+                              "m7");
 }
 
 TEST_CASE("chord drill: bad specs are errors") {

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/key_state.hpp"
-#include "toonval/midi_event.hpp"
+#include "etude/key_state.hpp"
+#include "etude/midi_event.hpp"
 
 #include <cstdint>
 #include <thread>
@@ -8,7 +8,7 @@
 
 #include <doctest/doctest.h>
 
-using namespace toonval;
+using namespace etude;
 
 namespace {
 MidiEvent note_on(std::int64_t t, std::uint8_t note) {
@@ -199,6 +199,16 @@ std::vector<MidiEvent> merged(VectorSources& src, std::size_t max_per_source = 1
     return out;
 }
 } // namespace
+
+TEST_CASE("a merge callback that takes the source index is told which port each event is from") {
+    VectorSources src;
+    src.sources = {{note_on(10, 60)}, {note_on(5, 62)}, {}, {note_on(20, 64)}};
+    std::vector<std::size_t> from;
+    merge_by_time<8>([&src](std::size_t i, MidiEvent& ev) { return src.pop(i, ev); },
+                     [&from](const MidiEvent&, std::size_t source) { from.push_back(source); },
+                     1000);
+    CHECK(from == std::vector<std::size_t>{1, 0, 3});
+}
 
 TEST_CASE("events from several ports come out in time order") {
     VectorSources src;

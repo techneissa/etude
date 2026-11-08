@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/section_suggestions.hpp"
+#include "etude/section_suggestions.hpp"
 
 #include "progress_fixtures.hpp"
 #include "section_fixtures.hpp"
@@ -9,8 +9,8 @@
 #include <random>
 #include <vector>
 
-using namespace toonval;
-using namespace toonval::testing;
+using namespace etude;
+using namespace etude::testing;
 
 namespace {
 

@@ -1,11 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/transpose.hpp"
+#include "etude/transpose.hpp"
 
-#include "toonval/keyboard.hpp"
+#include "etude/keyboard.hpp"
+
+#include <optional>
+#include <vector>
 
 #include <doctest/doctest.h>
 
-using namespace toonval;
+using namespace etude;
 
 TEST_CASE("transpose: the amount is clamped to -12..+12") {
     CHECK(Transposition(5, kRange61).semitones() == 5);
@@ -186,4 +189,47 @@ TEST_CASE("transpose: expected_pitch of a note is the mapped pitch; drums are ne
     CHECK(t.expected_pitch(drum).pitch == 38);
     CHECK_FALSE(t.expected_pitch(drum).folded);
     CHECK(Transposition(0, KeyRange{60, 64}).expected_pitch(drum).playable);
+}
+
+TEST_CASE("drawn key range: every note as drawn, folded ones where they land") {
+    // On a keyboard from C2 (36): A1 (33) folds up to A2 (45), above the D2 (38) and G2 (43) the
+    // song also has. The range is D2..A5, not A2..A5 as folding only the lowest pitch gives.
+    std::vector<Note> notes;
+    for (const int pitch : {33, 38, 43, 81}) {
+        Note n;
+        n.pitch = static_cast<std::uint8_t>(pitch);
+        notes.push_back(n);
+    }
+    const Transposition t(0, KeyRange{36, 96});
+    const std::optional<KeyRange> r = drawn_key_range(notes, t);
+    REQUIRE(r.has_value());
+    CHECK(r->lowest == 38);
+    CHECK(r->highest == 81);
+}
+
+TEST_CASE("drawn key range: the accompaniment and drums do not count; none without notes to play") {
+    std::vector<Note> notes(3);
+    notes[0].pitch = 60;
+    notes[1].pitch = 30;
+    notes[1].accompaniment = true;
+    notes[2].pitch = 100;
+    notes[2].drum = true;
+    const Transposition t(0, KeyRange{36, 96});
+    const std::optional<KeyRange> r = drawn_key_range(notes, t);
+    REQUIRE(r.has_value());
+    CHECK(r->lowest == 60);
+    CHECK(r->highest == 60);
+    notes[0].accompaniment = true;
+    CHECK_FALSE(drawn_key_range(notes, t).has_value());
+    CHECK_FALSE(drawn_key_range({}, t).has_value());
+}
+
+TEST_CASE("drawn key range follows the transposition") {
+    std::vector<Note> notes(2);
+    notes[0].pitch = 60;
+    notes[1].pitch = 64;
+    const std::optional<KeyRange> r = drawn_key_range(notes, Transposition(2, KeyRange{36, 96}));
+    REQUIRE(r.has_value());
+    CHECK(r->lowest == 62);
+    CHECK(r->highest == 66);
 }

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/chord.hpp"
+#include "etude/chord.hpp"
 
 #include <doctest/doctest.h>
 
@@ -7,7 +7,7 @@
 #include <string>
 #include <vector>
 
-using namespace toonval;
+using namespace etude;
 
 namespace {
 
@@ -144,7 +144,7 @@ TEST_CASE("an unclear set of notes is not named") {
     CHECK_FALSE(detect({60, 61, 62}).found); // cluster
     CHECK_FALSE(detect({60, 61, 62, 63, 64}).found);
     CHECK_FALSE(detect({60, 62, 64}).found);         // C D E: no template
-    CHECK_FALSE(detect({60, 64, 67, 70, 73}).found); // C7b9: unknown extension
+    CHECK_FALSE(detect({60, 64, 67, 70, 75}).found); // C7#9: unknown extension
     CHECK_FALSE(detect({60, 64, 67, 62, 65}).found);
     CHECK(name_of({60}).empty());
     CHECK(name_of({60, 61, 62}).empty());
@@ -169,4 +169,45 @@ TEST_CASE("invalid input is never named") {
 TEST_CASE("the span overload matches the pointer overload") {
     const std::vector<int> notes{60, 64, 67};
     CHECK(detect_chord(std::span<const int>(notes)).quality == ChordQuality::Major);
+}
+
+TEST_CASE("7sus4, 7b9, 6/9 and 13 are named") {
+    CHECK(name_of({60, 65, 67, 70}) == "C7sus4");
+    CHECK(name_of({60, 64, 67, 70, 73}) == "C7b9");
+    CHECK(name_of({60, 64, 70, 73}) == "C7b9"); // no fifth
+    CHECK(name_of({60, 64, 67, 69, 74}) == "C6/9");
+    CHECK(name_of({60, 64, 67, 70, 74, 81}) == "C13");
+    CHECK(name_of({60, 64, 67, 69, 70}) == "C13"); // no ninth
+    CHECK(name_of({61, 66, 68, 71}, true) == "Db7sus4");
+    CHECK(detect({60, 65, 67, 70}).quality == ChordQuality::Dominant7Sus4);
+    CHECK(detect({60, 64, 67, 70, 73}).quality == ChordQuality::Dominant7Flat9);
+    CHECK(detect({60, 64, 67, 69, 74}).quality == ChordQuality::Major69);
+    CHECK(detect({60, 64, 67, 70, 74, 81}).quality == ChordQuality::Dominant13);
+}
+
+TEST_CASE("the new qualities keep the old readings") {
+    CHECK(name_of({60, 64, 67, 69}) == "C6"); // still not 6/9 without the ninth
+    CHECK(name_of({57, 60, 64, 67}) == "Am7");
+    CHECK(name_of({60, 64, 67, 70, 74}) == "C9");   // 13 needs its sixth
+    CHECK(name_of({65, 67, 70, 72}) == "C7sus4/F"); // F as bass: no new reading outranks it
+}
+
+TEST_CASE("the shapes are listed with the tones a voicing may leave out") {
+    const std::span<const ChordShape> shapes = chord_shapes();
+    CHECK(shapes.size() > 20);
+    const auto find = [&](ChordQuality q) {
+        for (const ChordShape& s : shapes) {
+            if (s.quality == q) {
+                return s;
+            }
+        }
+        return ChordShape{};
+    };
+    CHECK(find(ChordQuality::Dominant7).mask == (1u | (1u << 4) | (1u << 7) | (1u << 10)));
+    CHECK((find(ChordQuality::Dominant7).optional & (1u << 7)) != 0); // the fifth may go
+    CHECK(find(ChordQuality::Major).optional == 0);
+    CHECK(find(ChordQuality::Major6).optional == 0); // a sixth chord keeps its fifth
+    CHECK(chord_quality_mask(ChordQuality::Minor) == (1u | (1u << 3) | (1u << 7)));
+    CHECK(chord_quality_mask(ChordQuality::None) == 0);
+    CHECK(std::string(chord_suffix(ChordQuality::Dominant13)) == "13");
 }

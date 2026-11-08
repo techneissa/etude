@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "mesh.hpp"
+#include "frame_picture.hpp"
 
 #include <algorithm>
 #include <array>
 #include <cmath>
 
-namespace toonval::app {
+namespace etude::app {
 
 namespace {
 
@@ -220,6 +221,47 @@ void Mesh::nine_slice(const SDL_FRect& r, float corner, SDL_FColor colour) {
     }
 }
 
+void Mesh::upper_arc(float cx, float cy, float rx, float ry, float width, float feather,
+                     SDL_FColor colour) {
+    if (rx <= 0.0f || ry <= 0.0f || width <= 0.0f || colour.a <= 0.0f) {
+        return;
+    }
+    constexpr int kArcSegments = 24;
+    constexpr int kArcPoints = kArcSegments + 1;
+    // Left to right over the top: 180 to 360 degrees, y down.
+    static const std::array<Direction, kArcPoints> dirs = [] {
+        std::array<Direction, kArcPoints> t{};
+        constexpr float kPi = 3.14159265359f;
+        for (int i = 0; i < kArcPoints; ++i) {
+            const float a = kPi + kPi * static_cast<float>(i) / static_cast<float>(kArcSegments);
+            t[static_cast<std::size_t>(i)] = {std::cos(a), std::sin(a)};
+        }
+        return t;
+    }();
+    // Four rings from the inside out: clear, the line's inner edge, its outer edge, clear.
+    const float half = 0.5f * width;
+    const float offsets[4] = {-half - feather, -half, half, half + feather};
+    const SDL_FColor clear = with_alpha(colour, 0.0f);
+    const SDL_FColor colours[4] = {clear, colour, colour, clear};
+    const int base = static_cast<int>(vertices_.size());
+    for (int ring = 0; ring < 4; ++ring) {
+        const float ox = std::max(0.0f, rx + offsets[ring]);
+        const float oy = std::max(0.0f, ry + offsets[ring]);
+        for (const Direction& d : dirs) {
+            vertices_.push_back(vertex(cx + d.x * ox, cy + d.y * oy, colours[ring]));
+        }
+    }
+    for (int ring = 0; ring < 3; ++ring) {
+        for (int i = 0; i < kArcSegments; ++i) {
+            const int a = base + ring * kArcPoints + i;
+            const int b = a + kArcPoints;
+            for (int idx : {a, b, b + 1, a, b + 1, a + 1}) {
+                indices_.push_back(idx);
+            }
+        }
+    }
+}
+
 void Mesh::quad(const SDL_FPoint (&p)[4], SDL_FColor colour) {
     const int base = static_cast<int>(vertices_.size());
     vertices_.push_back(vertex(p[0].x, p[0].y, colour, 0.0f, 0.0f));
@@ -239,9 +281,10 @@ void Mesh::draw(SDL_Renderer* renderer, SDL_BlendMode mode, SDL_Texture* texture
     if (texture != nullptr) {
         SDL_SetTextureBlendMode(texture, mode);
     }
-    SDL_RenderGeometry(renderer, texture, vertices_.data(), static_cast<int>(vertices_.size()),
-                       indices_.data(), static_cast<int>(indices_.size()));
+    picture::render_geometry(renderer, texture, vertices_.data(),
+                             static_cast<int>(vertices_.size()), indices_.data(),
+                             static_cast<int>(indices_.size()));
     SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
 }
 
-} // namespace toonval::app
+} // namespace etude::app

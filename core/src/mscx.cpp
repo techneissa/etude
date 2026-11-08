@@ -5,8 +5,8 @@
 // error that says to export MusicXML from MuseScore.
 #include "score_raw.hpp"
 
-#include "toonval/hand.hpp"
-#include "toonval/song_builder.hpp"
+#include "etude/hand.hpp"
+#include "etude/song_builder.hpp"
 
 #include "pugixml.hpp"
 
@@ -15,7 +15,7 @@
 #include <cstring>
 #include <map>
 
-namespace toonval::score_detail {
+namespace etude::score_detail {
 
 namespace {
 
@@ -92,6 +92,23 @@ int velocity_of_subtype(const char* name) {
     return 0;
 }
 
+// Jumps and markers seen while reading, resolved to bar marks once every staff is read: a jump
+// names its targets by label, and the markers that carry those labels may come later in the file.
+struct Signs {
+    struct Marker {
+        int bar = 0;
+        std::string label;
+    };
+    struct JumpTo {
+        int bar = 0;
+        std::string jump_to;     // "start" for D.C., else a segno's label
+        std::string play_until;  // "end", "fine", or the label of a To Coda marker
+        std::string continue_at; // the label of the coda marker to go on from, may be empty
+    };
+    std::vector<Marker> markers;
+    std::vector<JumpTo> jumps;
+};
+
 struct StaffInfo {
     int part = 0;
     int index_in_part = 0;
@@ -100,12 +117,11 @@ struct StaffInfo {
 
 class StaffReader {
   public:
-    StaffReader(RawScore& raw, int part, int ppq, bool& saw_music)
-        : raw_(raw), part_(part), ppq_(ppq), saw_music_(saw_music) {}
+    StaffReader(RawScore& raw, int part, int ppq, bool& saw_music, Signs& signs)
+        : raw_(raw), part_(part), ppq_(ppq), saw_music_(saw_music), signs_(signs) {}
 
     // False when the score is too large.
-    bool read(const pugi::xml_node& staff_node, int staff_id) {
-        staff_id_ = staff_id;
+    bool read(const pugi::xml_node& staff_node) {
         first_note_ = raw_.notes.size();
         int index = 0;
         for (const pugi::xml_node& m : staff_node.children("Measure")) {
@@ -143,25 +159,30 @@ class StaffReader {
         if (measure_has_len_) {
             measure_ticks_ = std::max<std::int64_t>(bar.extent, 1);
         }
-        if (m.child("startRepeat")) {
-            ++raw_.stats.repeats_ignored;
+        if (BarMarks* marks = marks_at(raw_, index)) {
+            if (m.child("startRepeat")) {
+                marks->forward_repeat = true;
+            }
+            if (m.child("endRepeat")) {
+                long long plays = 0;
+                parse_int(m.child_value("endRepeat"), plays);
+                marks->backward_repeat = true;
+                marks->times =
+                    std::max(marks->times, static_cast<int>(std::clamp<long long>(plays, 0, 1000)));
+            }
         }
-        if (m.child("endRepeat")) {
-            ++raw_.stats.repeats_ignored;
-        }
-        int voice = 0;
-        if (!read_voice(m, index, bar, voice++)) {
+        if (!read_voice(m, index, bar)) {
             return false;
         }
         for (const pugi::xml_node& v : m.children("voice")) {
-            if (!read_voice(v, index, bar, voice++)) {
+            if (!read_voice(v, index, bar)) {
                 return false;
             }
         }
         return true;
     }
 
-    bool read_voice(const pugi::xml_node& voice_node, int index, RawMeasure& bar, int voice) {
+    bool read_voice(const pugi::xml_node& voice_node, int index, RawMeasure& bar) {
         double pos = 0.0;
         std::vector<double> tuplets; // normal / actual, one per open tuplet
         double factor = 1.0;
@@ -188,6 +209,17 @@ class StaffReader {
                         measure_ticks_ = bar_ticks();
                     }
                 }
+            } else if (is(e, "KeySig")) {
+                // MuseScore 4 writes the sounding key as <concertKey>, MuseScore 3 <accidental>.
+                long long fifths = 0;
+                const bool found = parse_int(e.child_value("concertKey"), fifths) ||
+                                   parse_int(e.child_value("accidental"), fifths);
+                if (found) {
+                    KeyMode mode = KeyMode::Major;
+                    key_mode_from_name(e.child_value("mode"), mode);
+                    // Where it stands in the bar: a key named mid-bar changes the key mid-bar.
+                    add_key(raw_, index, std::llround(pos), fifths, mode);
+                }
             } else if (is(e, "Tempo")) {
                 double qn_per_second = 0.0;
                 if (parse_double(e.child_value("tempo"), qn_per_second) && qn_per_second > 0.0) {
@@ -205,6 +237,19 @@ class StaffReader {
                 if (v > 0) {
                     raw_.dynamics.push_back({part_, index, std::llround(pos), v});
                 }
+            } else if (is(e, "Marker")) {
+                std::string label = clean_name(e.child_value("label"));
+                if (label.empty()) {
+                    label = clean_name(e.child_value("subtype"));
+                }
+                signs_.markers.push_back({index, std::move(label)});
+            } else if (is(e, "Jump")) {
+                signs_.jumps.push_back({index, clean_name(e.child_value("jumpTo")),
+                                        clean_name(e.child_value("playUntil")),
+                                        clean_name(e.child_value("continueAt"))});
+            } else if (is(e, "Spanner") &&
+                       std::strcmp(e.attribute("type").as_string(), "Volta") == 0) {
+                read_volta(e, index);
             } else if (is(e, "Tuplet")) {
                 long long normal = 0;
                 long long actual = 0;
@@ -240,12 +285,31 @@ class StaffReader {
                 bar.extent = std::max<std::int64_t>(bar.extent, std::llround(pos));
             } else if (is(e, "Chord")) {
                 saw_music_ = true;
-                if (!read_chord(e, index, voice, pos, factor, bar)) {
+                if (!read_chord(e, index, pos, factor, bar)) {
                     return false;
                 }
             }
         }
         return true;
+    }
+
+    // The start of an ending bracket: its numbers, and how many bars it spans (the closing end of
+    // the spanner is not read).
+    void read_volta(const pugi::xml_node& spanner, int index) {
+        const pugi::xml_node volta = spanner.child("Volta");
+        if (!volta) {
+            return;
+        }
+        const std::uint64_t numbers = parse_ending_numbers(volta.child_value("endings"));
+        long long bars = 1;
+        parse_int(spanner.child("next").child("location").child_value("measures"), bars);
+        bars = std::clamp<long long>(bars, 1, static_cast<long long>(kMaxSongMeasures));
+        if (BarMarks* start = marks_at(raw_, index)) {
+            start->endings |= numbers;
+        }
+        if (BarMarks* stop = marks_at(raw_, index + bars - 1)) {
+            stop->ending_stops = true;
+        }
     }
 
     // Ticks of a Chord or Rest from durationType, dots and the tuplet factor; 0 when unreadable.
@@ -261,7 +325,7 @@ class StaffReader {
         return std::min(whole * dotted * factor * 4.0 * ppq_, static_cast<double>(kMaxEventTicks));
     }
 
-    bool read_chord(const pugi::xml_node& chord, int index, int voice, double& pos, double factor,
+    bool read_chord(const pugi::xml_node& chord, int index, double& pos, double factor,
                     RawMeasure& bar) {
         for (const pugi::xml_node& c : chord.children()) {
             if (std::strncmp(c.name(), "grace", 5) == 0 || is(c, "acciaccatura") ||
@@ -305,10 +369,6 @@ class StaffReader {
                     break;
                 }
             }
-            const TieJoiner::Key key{staff_id_, voice, static_cast<int>(pitch)};
-            if (ties_.join(raw_, key, index, start, length, tie_stop, tie_start)) {
-                continue;
-            }
             if (raw_.notes.size() >= kMaxScoreNotes) {
                 return false;
             }
@@ -318,10 +378,9 @@ class StaffReader {
             note.length = length;
             note.pitch = static_cast<std::uint8_t>(pitch);
             note.finger = static_cast<std::int8_t>(finger);
+            note.tie_start = tie_start;
+            note.tie_stop = tie_stop;
             raw_.notes.push_back(note);
-            if (tie_start) {
-                ties_.open(key, raw_.notes.size() - 1, index, end);
-            }
         }
         return true;
     }
@@ -330,14 +389,68 @@ class StaffReader {
     int part_;
     int ppq_;
     bool& saw_music_;
-    int staff_id_ = 0;
+    Signs& signs_;
     int sig_n_ = 4;
     int sig_d_ = 4;
     std::int64_t measure_ticks_ = 0;
     bool measure_has_len_ = false;
     std::size_t first_note_ = 0;
-    TieJoiner ties_;
 };
+
+bool contains(const std::vector<std::string>& list, const std::string& value) {
+    return !value.empty() && std::find(list.begin(), list.end(), value) != list.end();
+}
+
+// Turns jumps and markers into bar marks. A marker is what a jump calls it: the label a jump goes
+// to is a segno, the label it plays until (other than fine) is a To Coda, the label it continues
+// at is a coda, and the label "fine" ends the piece after a jump.
+void resolve_signs(const Signs& signs, RawScore& raw) {
+    std::vector<std::string> segnos;
+    std::vector<std::string> to_codas;
+    std::vector<std::string> codas;
+    for (const Signs::JumpTo& j : signs.jumps) {
+        BarMarks* m = marks_at(raw, j.bar);
+        if (m == nullptr) {
+            continue;
+        }
+        if (j.jump_to == "start" || j.jump_to.empty()) {
+            m->dacapo = true;
+        } else {
+            m->dalsegno = true;
+            m->dalsegno_label = j.jump_to;
+            segnos.push_back(j.jump_to);
+        }
+        if (!j.play_until.empty() && j.play_until != "fine" && j.play_until != "end") {
+            to_codas.push_back(j.play_until);
+        }
+        if (!j.continue_at.empty()) {
+            codas.push_back(j.continue_at);
+        }
+    }
+    for (const Signs::Marker& mk : signs.markers) {
+        BarMarks* m = marks_at(raw, mk.bar);
+        if (m == nullptr || mk.label.empty()) {
+            continue;
+        }
+        if (mk.label == "fine") {
+            m->fine = true;
+        } else if (contains(to_codas, mk.label)) {
+            m->tocoda = true;
+            for (const Signs::JumpTo& j : signs.jumps) {
+                if (j.play_until == mk.label && !j.continue_at.empty()) {
+                    m->tocoda_label = j.continue_at;
+                    break;
+                }
+            }
+        } else if (contains(codas, mk.label)) {
+            m->coda = true;
+            m->coda_label = mk.label;
+        } else if (contains(segnos, mk.label)) {
+            m->segno = true;
+            m->segno_label = mk.label;
+        }
+    }
+}
 
 } // namespace
 
@@ -367,10 +480,19 @@ ScoreLoadResult score_from_mscx(const pugi::xml_document& doc) {
 
     RawScore raw;
     raw.ppq = static_cast<int>(division);
+    std::string movement;
     for (const pugi::xml_node& tag : score.children("metaTag")) {
-        if (std::strcmp(tag.attribute("name").as_string(), "workTitle") == 0 && raw.title.empty()) {
+        const char* name = tag.attribute("name").as_string();
+        if (std::strcmp(name, "workTitle") == 0 && raw.title.empty()) {
             raw.title = clean_name(tag.child_value());
+        } else if (std::strcmp(name, "movementTitle") == 0 && movement.empty()) {
+            movement = clean_name(tag.child_value());
+        } else if (std::strcmp(name, "composer") == 0 && raw.composer.empty()) {
+            raw.composer = clean_name(tag.child_value());
         }
+    }
+    if (raw.title.empty()) {
+        raw.title = movement;
     }
 
     std::map<int, StaffInfo> staves;
@@ -386,6 +508,7 @@ ScoreLoadResult score_from_mscx(const pugi::xml_document& doc) {
             part.name = clean_name(instrument.child_value("longName"));
         }
         part.instrument_name = clean_name(instrument.child_value("trackName"));
+        part.instrument_id = clean_name(instrument.attribute("id").as_string());
         long long program = 0;
         const pugi::xml_node channel = instrument.child("Channel");
         if (parse_int(channel.child("program").attribute("value").as_string(), program) &&
@@ -408,6 +531,7 @@ ScoreLoadResult score_from_mscx(const pugi::xml_document& doc) {
 
     bool saw_staff = false;
     bool saw_music = false;
+    Signs signs;
     for (const pugi::xml_node& s : score.children("Staff")) {
         if (!s.child("Measure")) {
             continue; // a Staff definition inside a Part has no bars
@@ -428,8 +552,8 @@ ScoreLoadResult score_from_mscx(const pugi::xml_document& doc) {
         if (info.percussion) {
             continue;
         }
-        StaffReader reader(raw, info.part, raw.ppq, saw_music);
-        if (!reader.read(s, id)) {
+        StaffReader reader(raw, info.part, raw.ppq, saw_music, signs);
+        if (!reader.read(s)) {
             return make_error(ScoreFileError::TooLarge,
                               "the score has more notes or bars than any song needs");
         }
@@ -458,7 +582,8 @@ ScoreLoadResult score_from_mscx(const pugi::xml_document& doc) {
     if (!saw_staff || (!saw_music && raw.notes.empty())) {
         return unreadable("no staves with music in them");
     }
+    resolve_signs(signs, raw);
     return assemble_score(raw);
 }
 
-} // namespace toonval::score_detail
+} // namespace etude::score_detail

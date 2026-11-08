@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/transport.hpp"
+#include "etude/transport.hpp"
 
-#include "toonval/midi_file.hpp"
+#include "etude/midi_file.hpp"
 
 #include "smf_builder.hpp"
 
@@ -11,10 +11,11 @@
 #include <cstdint>
 #include <iterator>
 #include <limits>
+#include <optional>
 #include <vector>
 
-using namespace toonval;
-using namespace toonval::test;
+using namespace etude;
+using namespace etude::test;
 using Kind = TransportOp::Kind;
 
 namespace {
@@ -103,16 +104,18 @@ TEST_CASE("transport: speed scales the song clock") {
     CHECK(t.position_s() == 4.0);
 }
 
-TEST_CASE("transport: speed is clamped to 25..150 and kept to steps of 5") {
+TEST_CASE("transport: speed is clamped to 25..200 and kept a whole percent") {
     Transport t = ready(plain_song(100));
     CHECK(t.set_speed_percent(0, 10) == 25);
     CHECK(t.set_speed_percent(0, 0) == 25);
     CHECK(t.set_speed_percent(0, -40) == 25);
-    CHECK(t.set_speed_percent(0, 200) == 150);
-    CHECK(t.set_speed_percent(0, 62) == 60);
-    CHECK(t.set_speed_percent(0, 63) == 65);
+    CHECK(t.set_speed_percent(0, 200) == 200);
+    CHECK(t.set_speed_percent(0, 260) == 200);
+    CHECK(t.set_speed_percent(0, 62) == 62);
+    CHECK(t.set_speed_percent(0, 63) == 63);
     CHECK(t.set_speed_percent(0, 100) == 100);
-    CHECK(t.set_speed_percent(0, 148) == 150);
+    CHECK(t.set_speed_percent(0, 148) == 148);
+    CHECK(t.set_speed_percent(0, 198) == 198);
     CHECK(snap_speed_percent(27) == 25);
     CHECK(snap_speed_percent(28) == 30);
     for (int p = -20; p < 300; ++p) {
@@ -588,7 +591,7 @@ TEST_CASE("auto speed-up: a speed change from a pass keeps the position continuo
 
 // ---- Count-in -------------------------------------------------------------------------------
 
-TEST_CASE("count-in: the position waits N beats, and the beats are exposed as clicks") {
+TEST_CASE("count-in: the position waits N beats before it moves") {
     Transport t = ready(bars_song(4)); // 120 BPM: a beat is 0.5 s
     t.set_count_in_beats(4);
     t.play(sec(10));
@@ -602,39 +605,8 @@ TEST_CASE("count-in: the position waits N beats, and the beats are exposed as cl
     CHECK(t.position_s() == doctest::Approx(0.5));
     CHECK_FALSE(t.counting_in());
     CHECK(t.state() == TransportState::Playing);
-
-    std::vector<TransportOp> clicks = only(drain(t), Kind::Click);
-    REQUIRE(clicks.size() == 4);
-    for (int i = 0; i < 4; ++i) {
-        CAPTURE(i);
-        CHECK(clicks[static_cast<std::size_t>(i)].count_in);
-        CHECK(clicks[static_cast<std::size_t>(i)].beat == i + 1);
-        CHECK(clicks[static_cast<std::size_t>(i)].accent == (i == 0));
-        CHECK(clicks[static_cast<std::size_t>(i)].at_ns == sec(10 + 0.5 * i));
-        CHECK(clicks[static_cast<std::size_t>(i)].to_s == doctest::Approx(-0.5 * (4 - i)));
-    }
-}
-
-TEST_CASE("count-in: clicks come out the same whatever the update rate") {
-    for (std::int64_t step_ms : {1000, 16, 250, 7}) {
-        Transport t = ready(bars_song(4));
-        t.set_count_in_beats(4);
-        t.play(0);
-        for (std::int64_t ms = step_ms; ms <= 3500; ms += step_ms) {
-            t.update(ms * 1'000'000);
-        }
-        std::vector<TransportOp> clicks = only(drain(t), Kind::Click);
-        CAPTURE(step_ms);
-        REQUIRE(clicks.size() >= 4);
-        std::vector<TransportOp> count_in;
-        std::copy_if(clicks.begin(), clicks.end(), std::back_inserter(count_in),
-                     [](const TransportOp& c) { return c.count_in; });
-        REQUIRE(count_in.size() == 4);
-        for (int i = 0; i < 4; ++i) {
-            CHECK(count_in[static_cast<std::size_t>(i)].at_ns == sec(0.5 * i));
-        }
-        CHECK(t.position_s() > 0.0);
-    }
+    // The clicks are planned ahead of the clock (metronome.hpp), not ops of the clock.
+    CHECK(only(drain(t), Kind::Click).empty());
 }
 
 TEST_CASE("count-in: half speed doubles the wall time of each beat") {
@@ -648,9 +620,6 @@ TEST_CASE("count-in: half speed doubles the wall time of each beat") {
     CHECK(t.position_s() == 0.0);
     t.update(sec(3));
     CHECK(t.position_s() == doctest::Approx(0.5));
-    std::vector<TransportOp> clicks = only(drain(t), Kind::Click);
-    REQUIRE(clicks.size() == 2);
-    CHECK(clicks[1].at_ns == sec(1));
 }
 
 TEST_CASE("count-in: a speed change mid-count keeps the beats already counted") {
@@ -669,7 +638,7 @@ TEST_CASE("count-in: a speed change mid-count keeps the beats already counted") 
     CHECK(t.count_in_beats_left() == 0.0);
 }
 
-TEST_CASE("count-in: uses the tempo and time signature where the song starts") {
+TEST_CASE("count-in: uses the tempo where the song starts") {
     // 120 BPM in 4/4, then from tick 1920 (bar 2) 60 BPM in 3/4.
     Track t;
     t.bpm(0, 120).time_sig(0, 4, 4).on(0, 0, 60).bpm(1920, 60).time_sig(0, 3, 4);
@@ -684,17 +653,8 @@ TEST_CASE("count-in: uses the tempo and time signature where the song starts") {
     tr.set_count_in_beats(6);
     tr.seek(0, bar2);
     tr.play(0);
-    std::vector<TransportOp> clicks;
     tr.update(sec(10));
-    clicks = only(drain(tr), Kind::Click);
-    REQUIRE(clicks.size() >= 6);
-    // 60 BPM: one-second beats; accent on beats 1 and 4 of a 3/4 count (bar count: 1 2 3 1 2 3).
-    std::vector<bool> accents;
-    for (std::size_t i = 0; i < 6; ++i) {
-        CHECK(clicks[i].at_ns == sec(static_cast<double>(i)));
-        accents.push_back(clicks[i].accent);
-    }
-    CHECK(accents == std::vector<bool>{true, false, false, true, false, false});
+    // 60 BPM: one-second beats, so the six beats took 6 s and the song then moved for 4 s.
     CHECK(tr.position_s() == doctest::Approx(bar2 + 4.0));
 }
 
@@ -709,7 +669,6 @@ TEST_CASE("count-in: pause cancels it, and a new play counts in again") {
     drain(t);
     t.play(sec(5));
     CHECK(t.count_in_beats_left() == 4.0);
-    CHECK(only(drain(t), Kind::Click).size() == 1); // the first beat sounds at once
 }
 
 TEST_CASE("count-in: seeking while counting in cancels it") {
@@ -755,81 +714,6 @@ TEST_CASE("count-in: the song's end can't come before the count-in is over") {
     CHECK(t.ended());
 }
 
-// ---- Metronome ------------------------------------------------------------------------------
-
-TEST_CASE("metronome: clicks on every beat while the song moves, bar start accented") {
-    Transport t = ready(bars_song(4));
-    t.set_metronome(true);
-    t.play(0);
-    t.update(sec(2.25));
-    std::vector<TransportOp> clicks = only(drain(t), Kind::Click);
-    REQUIRE(clicks.size() == 5); // beats at 0, .5, 1, 1.5, 2
-    std::vector<int> beats;
-    for (const TransportOp& c : clicks) {
-        beats.push_back(c.beat);
-        CHECK_FALSE(c.count_in);
-        CHECK(c.accent == (c.beat == 1));
-    }
-    CHECK(beats == std::vector<int>{1, 2, 3, 4, 1});
-    CHECK(clicks[3].at_ns == sec(1.5));
-    CHECK(clicks[3].to_s == 1.5);
-}
-
-TEST_CASE("metronome: off by default, and clicks follow the speed") {
-    Transport t = ready(bars_song(4));
-    t.play(0);
-    t.update(sec(1));
-    CHECK(only(drain(t), Kind::Click).empty());
-
-    Transport u = ready(bars_song(4));
-    u.set_metronome(true);
-    u.set_speed_percent(0, 50);
-    u.play(0);
-    u.update(sec(2.5));
-    std::vector<TransportOp> clicks = only(drain(u), Kind::Click);
-    REQUIRE(clicks.size() == 3); // song beats at 0, .5, 1 are at 0, 1, 2 s
-    CHECK(clicks[2].at_ns == sec(2));
-}
-
-TEST_CASE("metronome: no click is lost or doubled across updates, seeks and loop wraps") {
-    Transport t = ready(bars_song(4));
-    t.set_metronome(true);
-    t.play(0);
-    for (int i = 1; i <= 8; ++i) {
-        t.update(sec(0.3 * i));
-    }
-    std::vector<TransportOp> clicks = only(drain(t), Kind::Click);
-    // 2.4 s of song: beats at 0, .5, 1, 1.5, 2
-    CHECK(clicks.size() == 5);
-
-    REQUIRE(t.set_loop(sec(2.4), 2, 3));
-    t.seek(sec(2.4), 2);
-    t.update(sec(2.4 + 1.25)); // one wrap
-    clicks = only(drain(t), Kind::Click);
-    std::vector<double> times;
-    for (const TransportOp& c : clicks) {
-        times.push_back(c.to_s);
-    }
-    // beats 2, 2.5 of the first pass, then 2, 2.5 again (3 is the loop end, not played)
-    CHECK(times == std::vector<double>{2.0, 2.5, 2.0});
-}
-
-TEST_CASE("metronome: a pickup bar counts its beats from the end of the bar") {
-    Transport t = ready(pickup_song());
-    t.set_metronome(true);
-    t.play(0);
-    t.update(sec(1.25));
-    std::vector<TransportOp> clicks = only(drain(t), Kind::Click);
-    REQUIRE(clicks.size() == 3);
-    CHECK(clicks[0].beat == 4); // the pickup is the last beat of a 4/4 bar, not an accented beat 1
-    CHECK_FALSE(clicks[0].accent);
-    CHECK(clicks[1].beat == 1); // bar 1 starts at 0.5 s
-    CHECK(clicks[1].accent);
-    CHECK(clicks[1].to_s == 0.5);
-    CHECK(clicks[2].beat == 2);
-    CHECK(clicks[2].to_s == 1.0);
-}
-
 // ---- Hold (Wait Mode) -----------------------------------------------------------------------
 
 TEST_CASE("hold: stops the clock without a pause, release resumes with no catch-up") {
@@ -867,6 +751,26 @@ TEST_CASE("hold: hold_at stops the clock exactly at the song time, not a frame l
     CHECK(t.position_s() == 2.5);
     t.update(sec(5)); // the hold point was used up
     CHECK(t.position_s() == 3.5);
+}
+
+TEST_CASE("hold: hold_point reports the armed time until the clock reaches it or a seek") {
+    Transport t = ready(plain_song(100));
+    t.play(0);
+    CHECK_FALSE(t.hold_point().has_value());
+    t.hold_at(0, 1.5);
+    REQUIRE(t.hold_point().has_value());
+    CHECK(*t.hold_point() == 1.5);
+    t.update(sec(1)); // not reached yet
+    CHECK(t.hold_point() == std::optional<double>(1.5));
+    t.update(sec(2)); // reached: the hold uses it up
+    CHECK_FALSE(t.hold_point().has_value());
+    t.release(sec(2));
+    t.hold_at(sec(2), 4.0);
+    CHECK(t.hold_point() == std::optional<double>(4.0));
+    t.seek(sec(2), 3.0); // a seek forgets it
+    CHECK_FALSE(t.hold_point().has_value());
+    t.hold_at(sec(2), 1.0); // not ahead of the position: ignored
+    CHECK_FALSE(t.hold_point().has_value());
 }
 
 TEST_CASE("hold: hold_at ignores a time that is not ahead of the position") {
@@ -915,4 +819,169 @@ TEST_CASE("hold: the hold point survives a speed change") {
     CHECK(t.position_s() == 2.0);
     std::vector<TransportOp> ops = drain(t);
     CHECK(only(ops, Kind::Hold)[0].at_ns == sec(3)); // 1 s at 100%, then 1 song second at 50%
+}
+
+// ---- Skips and scrubs with a loop
+
+TEST_CASE("transport loop: a skip past the loop end wraps to the loop start") {
+    Transport t = ready(plain_song(20));
+    REQUIRE(t.set_loop(0, 4, 8));
+    t.seek(0, 6);
+    t.skip(0, 5); // 11 s is past 8 s
+    CHECK(t.position_s() == 4.0);
+    CHECK(t.loop_enabled());
+}
+
+TEST_CASE("transport loop: a skip inside the loop lands there") {
+    Transport t = ready(plain_song(20));
+    REQUIRE(t.set_loop(0, 4, 8));
+    t.seek(0, 4);
+    t.skip(0, 3);
+    CHECK(t.position_s() == 7.0);
+    t.skip(0, -2);
+    CHECK(t.position_s() == 5.0);
+}
+
+TEST_CASE("transport loop: a skip before the loop start stops at the start") {
+    Transport t = ready(plain_song(20));
+    REQUIRE(t.set_loop(0, 4, 8));
+    t.seek(0, 5);
+    t.skip(0, -5);
+    CHECK(t.position_s() == 4.0);
+    CHECK(t.loop_enabled());
+}
+
+TEST_CASE("transport loop: a skip landing exactly on the loop end wraps to the start") {
+    Transport t = ready(plain_song(20));
+    REQUIRE(t.set_loop(0, 4, 8));
+    t.seek(0, 5);
+    t.skip(0, 3);
+    CHECK(t.position_s() == 4.0);
+}
+
+TEST_CASE("transport loop: skips follow the song when no loop is on") {
+    Transport t = ready(plain_song(20));
+    t.seek(0, 6);
+    t.skip(0, 5);
+    CHECK(t.position_s() == 11.0);
+    t.skip(0, -30);
+    CHECK(t.position_s() == 0.0);
+    t.skip(0, 100);
+    CHECK(t.position_s() == 20.0);
+    REQUIRE(t.set_loop(0, 4, 8));
+    t.set_loop_enabled(0, false);
+    t.seek(0, 6);
+    t.skip(0, 5);
+    CHECK(t.position_s() == 11.0);
+}
+
+TEST_CASE("transport loop: a skip from after the loop that lands outside it ends the loop") {
+    Transport t = ready(plain_song(20));
+    REQUIRE(t.set_loop(0, 4, 8));
+    t.seek(0, 12);
+    CHECK(t.skip(0, -2)); // 10 s is still after the loop
+    CHECK(t.position_s() == 10.0);
+    CHECK_FALSE(t.loop_enabled());
+    t.play(0);
+    t.update(sec(1));
+    CHECK(t.position_s() == 11.0);
+    CHECK(t.loop_count() == 0);
+}
+
+TEST_CASE("transport loop: a skip from before the loop that jumps over it ends the loop") {
+    Transport t = ready(plain_song(20));
+    REQUIRE(t.set_loop(0, 4, 8));
+    t.seek(0, 1);
+    CHECK(t.skip(0, 10)); // 11 s is past the loop end
+    CHECK(t.position_s() == 11.0);
+    CHECK_FALSE(t.loop_enabled());
+}
+
+TEST_CASE("transport loop: a skip from before the loop that lands in it keeps the loop") {
+    Transport t = ready(plain_song(20));
+    REQUIRE(t.set_loop(0, 4, 8));
+    t.seek(0, 1);
+    CHECK_FALSE(t.skip(0, 5)); // 6 s is inside
+    CHECK(t.position_s() == 6.0);
+    CHECK(t.loop_enabled());
+}
+
+TEST_CASE("transport loop: a skip from inside the loop never ends it") {
+    Transport t = ready(plain_song(20));
+    REQUIRE(t.set_loop(0, 4, 8));
+    t.seek(0, 6);
+    CHECK_FALSE(t.skip(0, 30));
+    CHECK(t.loop_enabled());
+    CHECK_FALSE(t.skip(0, -30));
+    CHECK(t.loop_enabled());
+    CHECK(t.position_s() == 4.0);
+}
+
+TEST_CASE("transport loop: the plain seek leaves the loop as it is") {
+    Transport t = ready(plain_song(20));
+    REQUIRE(t.set_loop(0, 4, 8));
+    t.seek(0, 12);
+    CHECK(t.loop_enabled());
+    CHECK(t.position_s() == 12.0);
+}
+
+TEST_CASE("transport loop: a skip while playing keeps wrapping inside the loop") {
+    Transport t = ready(plain_song(20));
+    REQUIRE(t.set_loop(0, 4, 8));
+    t.seek(0, 6);
+    t.play(0);
+    t.skip(0, 5);
+    t.update(sec(5)); // from 4 s: one pass is 4 s, so 5 s later it is a second into the next
+    CHECK(t.position_s() == 5.0);
+    CHECK(t.loop_count() == 1);
+}
+
+TEST_CASE("transport loop: scrubbing outside the loop turns it off") {
+    SUBCASE("past the end") {
+        Transport t = ready(plain_song(20));
+        REQUIRE(t.set_loop(0, 4, 8));
+        t.seek(0, 6);
+        t.play(0);
+        CHECK(t.scrub(0, 12));
+        CHECK_FALSE(t.loop_enabled());
+        CHECK(t.position_s() == 12.0);
+        t.update(sec(2));
+        CHECK(t.position_s() == 14.0); // plays on, no wrap
+        CHECK(t.loop_count() == 0);
+    }
+    SUBCASE("before the start") {
+        Transport t = ready(plain_song(20));
+        REQUIRE(t.set_loop(0, 4, 8));
+        CHECK(t.scrub(0, 1));
+        CHECK_FALSE(t.loop_enabled());
+        CHECK(t.position_s() == 1.0);
+    }
+    SUBCASE("exactly at the loop end counts as outside") {
+        Transport t = ready(plain_song(20));
+        REQUIRE(t.set_loop(0, 4, 8));
+        CHECK(t.scrub(0, 8));
+        CHECK_FALSE(t.loop_enabled());
+    }
+}
+
+TEST_CASE("transport loop: scrubbing inside the loop keeps it") {
+    Transport t = ready(plain_song(20));
+    REQUIRE(t.set_loop(0, 4, 8));
+    CHECK_FALSE(t.scrub(0, 4));
+    CHECK(t.loop_enabled());
+    CHECK_FALSE(t.scrub(0, 7.5));
+    CHECK(t.loop_enabled());
+    CHECK(t.position_s() == 7.5);
+    CHECK(t.loop_start_s() == 4.0);
+    CHECK(t.loop_end_s() == 8.0);
+}
+
+TEST_CASE("transport loop: scrubbing with no loop on just seeks") {
+    Transport t = ready(plain_song(20));
+    CHECK_FALSE(t.scrub(0, 9));
+    CHECK(t.position_s() == 9.0);
+    REQUIRE(t.set_loop(0, 4, 8));
+    t.set_loop_enabled(0, false);
+    CHECK_FALSE(t.scrub(0, 12));
+    CHECK(t.position_s() == 12.0);
 }

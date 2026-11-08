@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/chord.hpp"
+#include "etude/chord.hpp"
 
-#include "toonval/pitch.hpp"
+#include "etude/pitch.hpp"
 
 #include <array>
 #include <initializer_list>
 
-namespace toonval {
+namespace etude {
 namespace {
 
 // A chord shape as a bit mask of semitones above the root (bit 0 is the root).
@@ -18,36 +18,41 @@ constexpr unsigned mask(std::initializer_list<int> semitones) {
     return m;
 }
 
-struct Template {
-    unsigned shape;
-    ChordQuality quality;
-};
+using Template = ChordShape;
+
+constexpr unsigned kFifth = 1u << 7;
 
 // List order is the priority when a note set fits several chords and none is rooted on the bass.
 constexpr std::array kTemplates{
-    Template{mask({0, 4, 7}), ChordQuality::Major},
-    Template{mask({0, 3, 7}), ChordQuality::Minor},
-    Template{mask({0, 3, 6}), ChordQuality::Diminished},
-    Template{mask({0, 4, 8}), ChordQuality::Augmented},
-    Template{mask({0, 2, 7}), ChordQuality::Sus2},
-    Template{mask({0, 5, 7}), ChordQuality::Sus4},
-    Template{mask({0, 4, 7, 10}), ChordQuality::Dominant7},
-    Template{mask({0, 4, 7, 11}), ChordQuality::Major7},
-    Template{mask({0, 3, 7, 10}), ChordQuality::Minor7},
-    Template{mask({0, 3, 6, 10}), ChordQuality::HalfDiminished7},
-    Template{mask({0, 3, 6, 9}), ChordQuality::Diminished7},
-    Template{mask({0, 3, 7, 11}), ChordQuality::MinorMajor7},
-    Template{mask({0, 4, 10}), ChordQuality::Dominant7}, // no fifth
-    Template{mask({0, 2, 4, 7}), ChordQuality::Add9},
-    Template{mask({0, 2, 4, 7, 10}), ChordQuality::Dominant9},
-    Template{mask({0, 2, 4, 7, 11}), ChordQuality::Major9},
-    Template{mask({0, 2, 3, 7, 10}), ChordQuality::Minor9},
-    Template{mask({0, 2, 4, 10}), ChordQuality::Dominant9}, // no fifth
-    Template{mask({0, 2, 4, 11}), ChordQuality::Major9},    // no fifth
-    Template{mask({0, 2, 3, 10}), ChordQuality::Minor9},    // no fifth
+    Template{mask({0, 4, 7}), ChordQuality::Major, 0},
+    Template{mask({0, 3, 7}), ChordQuality::Minor, 0},
+    Template{mask({0, 3, 6}), ChordQuality::Diminished, 0},
+    Template{mask({0, 4, 8}), ChordQuality::Augmented, 0},
+    Template{mask({0, 2, 7}), ChordQuality::Sus2, 0},
+    Template{mask({0, 5, 7}), ChordQuality::Sus4, 0},
+    Template{mask({0, 4, 7, 10}), ChordQuality::Dominant7, kFifth},
+    Template{mask({0, 4, 7, 11}), ChordQuality::Major7, kFifth},
+    Template{mask({0, 3, 7, 10}), ChordQuality::Minor7, kFifth},
+    Template{mask({0, 3, 6, 10}), ChordQuality::HalfDiminished7, 0},
+    Template{mask({0, 3, 6, 9}), ChordQuality::Diminished7, 0},
+    Template{mask({0, 3, 7, 11}), ChordQuality::MinorMajor7, kFifth},
+    Template{mask({0, 4, 10}), ChordQuality::Dominant7, 0}, // no fifth
+    Template{mask({0, 5, 7, 10}), ChordQuality::Dominant7Sus4, kFifth},
+    Template{mask({0, 2, 4, 7}), ChordQuality::Add9, 0},
+    Template{mask({0, 2, 4, 7, 10}), ChordQuality::Dominant9, kFifth},
+    Template{mask({0, 2, 4, 7, 11}), ChordQuality::Major9, kFifth},
+    Template{mask({0, 2, 3, 7, 10}), ChordQuality::Minor9, kFifth},
+    Template{mask({0, 2, 4, 10}), ChordQuality::Dominant9, 0}, // no fifth
+    Template{mask({0, 2, 4, 11}), ChordQuality::Major9, 0},    // no fifth
+    Template{mask({0, 2, 3, 10}), ChordQuality::Minor9, 0},    // no fifth
+    Template{mask({0, 1, 4, 7, 10}), ChordQuality::Dominant7Flat9, kFifth},
+    Template{mask({0, 1, 4, 10}), ChordQuality::Dominant7Flat9, 0}, // no fifth
+    Template{mask({0, 2, 4, 7, 9}), ChordQuality::Major69, kFifth},
+    Template{mask({0, 4, 7, 9, 10}), ChordQuality::Dominant13, kFifth},
+    Template{mask({0, 2, 4, 7, 9, 10}), ChordQuality::Dominant13, kFifth | (1u << 2)},
     // Last, so Am7 wins over C6 when the bass is neither root.
-    Template{mask({0, 4, 7, 9}), ChordQuality::Major6},
-    Template{mask({0, 3, 7, 9}), ChordQuality::Minor6},
+    Template{mask({0, 4, 7, 9}), ChordQuality::Major6, 0},
+    Template{mask({0, 3, 7, 9}), ChordQuality::Minor6, 0},
 };
 
 constexpr unsigned kPowerShape = mask({0, 7});
@@ -67,7 +72,7 @@ unsigned shape_from(unsigned pcs, int root) {
 int match(unsigned pcs, int root) {
     const unsigned shape = shape_from(pcs, root);
     for (std::size_t i = 0; i < kTemplates.size(); ++i) {
-        if (kTemplates[i].shape == shape) {
+        if (kTemplates[i].mask == shape) {
             return static_cast<int>(i);
         }
     }
@@ -122,9 +127,18 @@ Chord detect_chord(const int* notes, std::size_t count) {
     return Chord{true, best_root, kTemplates[static_cast<std::size_t>(best_index)].quality, bass};
 }
 
-namespace {
+std::span<const ChordShape> chord_shapes() { return kTemplates; }
 
-const char* suffix(ChordQuality quality) {
+unsigned chord_quality_mask(ChordQuality quality) {
+    for (const Template& t : kTemplates) {
+        if (t.quality == quality) {
+            return t.mask;
+        }
+    }
+    return 0;
+}
+
+const char* chord_suffix(ChordQuality quality) {
     switch (quality) {
     case ChordQuality::Major:
         return "";
@@ -164,11 +178,21 @@ const char* suffix(ChordQuality quality) {
         return "m9";
     case ChordQuality::Power:
         return "5";
+    case ChordQuality::Dominant7Sus4:
+        return "7sus4";
+    case ChordQuality::Dominant7Flat9:
+        return "7b9";
+    case ChordQuality::Major69:
+        return "6/9";
+    case ChordQuality::Dominant13:
+        return "13";
     case ChordQuality::None:
         break;
     }
     return "";
 }
+
+namespace {
 
 // "C", "C#" or "Db" for a pitch class, borrowing the spelling from note_name().
 std::string pitch_class_name(int pc, bool prefer_flats) {
@@ -184,7 +208,7 @@ std::string chord_name(const Chord& chord, bool prefer_flats) {
         return {};
     }
     std::string name = pitch_class_name(chord.root_pc, prefer_flats);
-    name += suffix(chord.quality);
+    name += chord_suffix(chord.quality);
     if (chord.bass_pc != chord.root_pc) {
         name += '/';
         name += pitch_class_name(chord.bass_pc, prefer_flats);
@@ -192,4 +216,4 @@ std::string chord_name(const Chord& chord, bool prefer_flats) {
     return name;
 }
 
-} // namespace toonval
+} // namespace etude

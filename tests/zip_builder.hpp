@@ -9,7 +9,7 @@
 #include <string_view>
 #include <vector>
 
-namespace toonval::test {
+namespace etude::test {
 
 struct ZipEntry {
     std::string name;
@@ -148,4 +148,4 @@ inline std::vector<std::uint8_t> zip_of(const std::vector<ZipEntry>& entries) {
     return out;
 }
 
-} // namespace toonval::test
+} // namespace etude::test

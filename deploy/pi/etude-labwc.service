@@ -1,0 +1,66 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# etude inside a labwc kiosk session: the fallback if KMSDRM cannot drive two screens.
+# UNTESTED on a Pi; see deploy/pi/CHECKLIST.md.
+# Installed to /etc/systemd/system/etude-labwc.service by deploy/pi/setup.sh.
+# Use this OR etude.service, not both (they conflict).
+[Unit]
+Description=etude (labwc kiosk)
+After=systemd-user-sessions.service systemd-logind.service
+After=getty@tty1.service sound.target
+Wants=systemd-logind.service
+Conflicts=getty@tty1.service etude.service
+ConditionPathExists=/dev/tty0
+
+# Nothing restarts the app by itself: a crash, or the watchdog's kill, fails the unit and OnFailure=
+# starts the crash screen (read the comment in etude.service). No start limit: the player's own starts
+# are never refused.
+StartLimitIntervalSec=0
+OnFailure=etude-labwc-crash-screen.service
+
+[Service]
+Type=simple
+User=etude
+SupplementaryGroups=video render input audio
+Environment=LIBSEAT_BACKEND=logind
+Environment=SDL_VIDEO_DRIVER=wayland
+# Counts this start for an app update on trial (etude-update-helper count): a new version that
+# is started twice without saying ready is rolled back, before the app starts, across reboots too.
+# `sandboxed` runs it as a transient service under the update service's sandbox (helper/sandbox.hpp), and its
+# status is the answer, unchanged.
+# The "+" runs it as root. No "-": status 75 (a going back whose data could not be put back) keeps
+# the app from starting on the new version's data (the unit fails, and the crash screen says why and
+# offers Try again); every other trouble of the helper ends with 0.
+ExecStartPre=+/usr/local/lib/etude/etude-update-helper sandboxed count
+TimeoutStartSec=600
+# The app runs as labwc's session (`labwc -S`: labwc exits when the app does), through
+# etude-labwc-session. labwc always exits 0, whatever the app's status (no option of any version passes
+# it on), which would end this unit "well" after a crash and no OnFailure= would start the crash screen:
+# the script writes the app's real exit status (a signal reads as 128 + its number) into the runtime
+# folder and ends with it, so the unit fails exactly when the app does, and the helper's watch of a
+# version on trial sees the failed unit too.
+RuntimeDirectory=etude-labwc
+ExecStart=/usr/local/lib/etude/etude-labwc-session @PREFIX@/current/bin/etude
+ExecStartPost=-+/usr/bin/chvt 1
+Restart=no
+
+# The watchdog of etude.service (read the comment there): the app answers it from its frame loop.
+# NotifyAccess=all, not main: the app is labwc's child, and labwc is the unit's main process, so the
+# pings come from a process that is not the main one. The unit holds only labwc and the app.
+WatchdogSec=60
+NotifyAccess=all
+# No NoNewPrivileges= here (etude.service has it): whether a labwc session needs a setuid program is
+# untested; see deploy/pi/CHECKLIST.md.
+
+PAMName=etude
+StandardInput=tty-fail
+StandardOutput=journal
+StandardError=journal
+TTYPath=/dev/tty1
+TTYReset=yes
+TTYVHangup=yes
+TTYVTDisallocate=yes
+UtmpIdentifier=tty1
+UtmpMode=user
+
+[Install]
+WantedBy=multi-user.target

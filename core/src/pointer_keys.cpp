@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/pointer_keys.hpp"
+#include "etude/pointer_keys.hpp"
 
-#include "toonval/pitch.hpp"
+#include "etude/pitch.hpp"
 
 #include <algorithm>
 #include <cmath>
 
-namespace toonval {
+namespace etude {
 namespace {
 
 int velocity_at(float t) {
@@ -14,6 +14,56 @@ int velocity_at(float t) {
     const float v = static_cast<float>(kPointerMinVelocity) +
                     static_cast<float>(kPointerMaxVelocity - kPointerMinVelocity) * t;
     return std::clamp(static_cast<int>(std::lround(v)), kPointerMinVelocity, kPointerMaxVelocity);
+}
+
+// The gap between the point and an axis-aligned box (0 inside it).
+float box_distance(float x0, float y0, float x1, float y1, float x, float y) {
+    const float dx = std::max({x0 - x, 0.0f, x - x1});
+    const float dy = std::max({y0 - y, 0.0f, y - y1});
+    return std::hypot(dx, dy);
+}
+
+// How far the point is from the key `note` as hit_test_key sees it, in window pixels: 0 on the key.
+// A black key is one box; a white key is its lower part (full width) plus its upper part, which is
+// the same width less the black keys beside it.
+float distance_to_key(const PointerGeometry& g, int note, float x, float y) {
+    const RectF& area = g.key_area;
+    const int whites = g.layout.white_key_count();
+    const float split = area.y + area.h * kBlackKeyLengthShare;
+    const auto span = [&](int n, float& x0, float& x1) {
+        const KeyRect r = g.view.to_window(g.layout.key(n), whites);
+        x0 = area.x + r.x * area.w;
+        x1 = area.x + (r.x + r.width) * area.w;
+    };
+    float x0 = 0.0f;
+    float x1 = 0.0f;
+    span(note, x0, x1);
+    if (is_black_key(note)) {
+        return box_distance(x0, area.y, x1, split, x, y);
+    }
+    float best = box_distance(x0, split, x1, area.bottom(), x, y);
+    // The upper part: [x0, x1] minus the neighbouring black keys, left to right.
+    float from = x0;
+    for (const int n : {note - 1, note + 1}) {
+        const KeyRange& range = g.layout.range();
+        if (n < range.lowest || n > range.highest || !is_black_key(n)) {
+            continue;
+        }
+        float b0 = 0.0f;
+        float b1 = 0.0f;
+        span(n, b0, b1);
+        if (b1 <= x0 || b0 >= x1) {
+            continue;
+        }
+        if (b0 > from) { // a free stretch ends where this black key begins
+            best = std::min(best, box_distance(from, area.y, b0, split, x, y));
+        }
+        from = std::max(from, b1);
+    }
+    if (from < x1) {
+        best = std::min(best, box_distance(from, area.y, x1, split, x, y));
+    }
+    return best;
 }
 
 } // namespace
@@ -46,6 +96,23 @@ std::optional<KeyHit> hit_test_key(const PointerGeometry& g, float x, float y) {
         }
     }
     return std::nullopt;
+}
+
+FingerAction finger_action(FingerPhase phase, bool direct_touch, bool ui_owns_touch,
+                           bool have_geometry) {
+    if (!direct_touch) {
+        return FingerAction::Ignore;
+    }
+    switch (phase) {
+    case FingerPhase::Up:
+    case FingerPhase::Cancelled:
+        return FingerAction::Release;
+    case FingerPhase::Down:
+        return have_geometry && !ui_owns_touch ? FingerAction::Press : FingerAction::Ignore;
+    case FingerPhase::Motion:
+        return have_geometry ? FingerAction::Move : FingerAction::Ignore;
+    }
+    return FingerAction::Ignore;
 }
 
 PointerKeys::Pointer* PointerKeys::find(PointerId id) {
@@ -117,6 +184,10 @@ void PointerKeys::move(PointerId id, float x, float y, const PointerGeometry& g,
     if (now == p->note) {
         return;
     }
+    if (p->note >= 0 && g.slide_margin_px > 0.0f &&
+        distance_to_key(g, p->note, x, y) <= g.slide_margin_px) {
+        return; // still within the margin of the key it is on
+    }
     const int old = p->note;
     p->note = now;
     release(old, time_ns, out);
@@ -169,4 +240,4 @@ int PointerKeys::held_notes() const {
     return n;
 }
 
-} // namespace toonval
+} // namespace etude

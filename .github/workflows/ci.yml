@@ -44,7 +44,7 @@ jobs:
         run: brew install ninja
 
       - name: Configure
-        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_COMPILE_WARNING_AS_ERROR=ON -DTOONVAL_PIANO_FROM_SOURCE=OFF
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_COMPILE_WARNING_AS_ERROR=ON -DETUDE_PIANO_FROM_SOURCE=OFF
 
       - name: Build
         run: cmake --build build -- -k 0

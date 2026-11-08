@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "pitch_tones.hpp"
-#include "toonval/pitch.hpp"
-#include "toonval/pitch_detect.hpp"
+#include "etude/pitch.hpp"
+#include "etude/pitch_detect.hpp"
 
 #include <cmath>
 #include <cstdint>
@@ -9,7 +9,7 @@
 
 #include <doctest/doctest.h>
 
-using namespace toonval;
+using namespace etude;
 
 namespace {
 
@@ -87,6 +87,33 @@ TEST_CASE("pitch detector: a bass note with a weak fundamental is not reported a
     CHECK(first_of(ev, PitchEventType::NoteOn)->note == 33);
 }
 
+TEST_CASE("pitch detector: a note needs its own fundamental, at most 20 dB under its partials") {
+    // A3 with partials 2-8 as a piano's: at -17 dB the fundamental is weak but there, and the
+    // note is A3. At -24 dB the tone is what several notes sharing A3's period sound like, and
+    // A3 is never named.
+    for (auto method : {PitchMethod::Mpm, PitchMethod::Yin}) {
+        CAPTURE(static_cast<int>(method));
+        for (double fundamental_db : {-17.0, -24.0}) {
+            CAPTURE(fundamental_db);
+            const std::vector<double> amps = {
+                0.3 * std::pow(10.0, fundamental_db / 20.0), 0.3, 0.2, 0.15, 0.1, 0.08, 0.05, 0.04};
+            PitchDetectorConfig cfg;
+            cfg.method = method;
+            PitchDetector d(cfg);
+            const auto ev = run(d, tone(220.0, amps, kRate / 2, 4800));
+            const auto* on = first_of(ev, PitchEventType::NoteOn);
+            if (fundamental_db > -20.0) {
+                REQUIRE(on != nullptr);
+                CHECK(on->note == 57);
+            } else {
+                for (const auto& e : ev) {
+                    CHECK(!(e.type == PitchEventType::NoteOn && e.note == 57));
+                }
+            }
+        }
+    }
+}
+
 TEST_CASE("pitch detector: a strong second partial does not make the note an octave higher") {
     PitchDetector d;
     const auto audio = tone(440.0, {0.08, 0.3, 0.05, 0.05, 0.04, 0.03, 0.02}, kRate / 2, 4800);
@@ -135,6 +162,53 @@ TEST_CASE("pitch detector: a pitch halfway between two keys is not sure, not a g
     const auto ev = run(d, tone(quarter_tone, rich(0.3), kRate / 2, 4800));
     CHECK(count_type(ev, PitchEventType::NoteOn) == 0);
     CHECK(count_type(ev, PitchEventType::NotSure) == 1);
+}
+
+TEST_CASE("pitch detector: a not-sure event names the likeliest note, as a register only") {
+    PitchDetector d;
+    const double quarter_tone = 440.0 * std::exp2(0.5 / 12.0);
+    const auto ev = run(d, tone(quarter_tone, rich(0.3), kRate / 2, 4800));
+    const PitchEvent* unsure = first_of(ev, PitchEventType::NotSure);
+    REQUIRE(unsure != nullptr);
+    CHECK(unsure->note == -1);
+    CHECK((unsure->guess_note == 69 || unsure->guess_note == 70));
+
+    // In expected-note mode it is the first expected note.
+    PitchDetector e;
+    const int expected[] = {69};
+    e.set_expected_notes(expected, 1);
+    const auto ev2 = run(e, tone(quarter_tone, rich(0.3), kRate / 2, 4800));
+    const PitchEvent* verdict = first_of(ev2, PitchEventType::Expected);
+    REQUIRE(verdict != nullptr);
+    CHECK(verdict->verdict == ExpectedVerdict::NotSure);
+    CHECK(verdict->guess_note == 69);
+    // A confirmed note carries no guess.
+    PitchDetector f;
+    const auto ev3 = run(f, tone(440.0, rich(0.3), kRate / 2, 4800));
+    REQUIRE(first_of(ev3, PitchEventType::NoteOn) != nullptr);
+    CHECK(first_of(ev3, PitchEventType::NoteOn)->guess_note == -1);
+}
+
+TEST_CASE("pitch detector: tuning learning can be switched on and off while running") {
+    PitchDetector d; // starts with learning off
+    const double sharp = std::exp2(20.0 / 1200.0);
+    std::vector<float> audio;
+    for (int note : {60, 64, 67, 72, 69, 65}) {
+        const auto t =
+            tone(440.0 * std::exp2((note - 69) / 12.0) * sharp, rich(0.3), kRate / 3, 1200);
+        audio.insert(audio.end(), t.begin(), t.end());
+    }
+    run(d, audio);
+    CHECK(d.a4_hz() == 440.0f); // learning off: the tuning does not move
+    d.set_learn_tuning(true);
+    run(d, audio);
+    CHECK(d.a4_hz() > 443.0f);
+    d.set_learn_tuning(false);
+    CHECK(d.a4_hz() == 440.0f); // back to the tuning that was set
+    d.set_a4_hz(442.0f);
+    d.set_learn_tuning(true);
+    d.set_learn_tuning(false);
+    CHECK(d.a4_hz() == 442.0f);
 }
 
 TEST_CASE("pitch detector: the A4 reference moves the note grid") {

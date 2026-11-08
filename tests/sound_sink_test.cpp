@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/sound_sink.hpp"
+#include "etude/sound_sink.hpp"
 
 #include <string>
 #include <vector>
 
 #include <doctest/doctest.h>
 
-using namespace toonval;
+using namespace etude;
 
 namespace {
 
@@ -93,8 +93,8 @@ TEST_CASE("an output with the name of an open input is the same device") {
 }
 
 TEST_CASE("software and nameless outputs are never the piano") {
-    const std::vector<std::string> inputs{"toonval virtual", "Midi Through Port-0", ""};
-    CHECK_FALSE(is_piano_output("toonval virtual", inputs));
+    const std::vector<std::string> inputs{"etude virtual", "Midi Through Port-0", ""};
+    CHECK_FALSE(is_piano_output("etude virtual", inputs));
     CHECK_FALSE(is_piano_output("Midi Through Port-0", inputs));
     CHECK_FALSE(is_piano_output("", inputs));
     CHECK_FALSE(is_piano_output("Midi Through:Midi Through Port-0 14:0", {}));

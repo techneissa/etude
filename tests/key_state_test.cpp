@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/key_state.hpp"
+#include "etude/key_state.hpp"
 
 #include <doctest/doctest.h>
 
-using namespace toonval;
+using namespace etude;
 
 namespace {
 MidiEvent note_on(int note, int velocity, std::int64_t t = 0, int channel = 0) {

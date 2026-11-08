@@ -1,0 +1,34 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# The root side of an app update: etude-update-helper apply (helper/main.cpp) takes the tarball and
+# the signature the app left in @PREFIX@/update/, verifies them itself against the key built into it,
+# unpacks them into @PREFIX@/versions/, backs up the app's data (as the app's user), points
+# @PREFIX@/current at the new version and starts the app, then waits for it to say ready; it goes back
+# to the old version when it does not. Started by etude-update.path only.
+# deploy/pi/setup.sh fills in @PREFIX@ and installs it as /etc/systemd/system/etude-update.service,
+# with the sandbox drop-in beside it (etude-update-sandbox.conf: @APP_HOME@, the app user's home, which
+# the backup and restore write in, is filled in there).
+[Unit]
+Description=etude: install an app update
+ConditionPathExists=/etc/etude-update.conf
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/lib/etude/etude-update-helper apply
+# Everything an update can wait for, with each wait at its limit (helper/context.hpp,
+# worst_case_update_seconds: the copy and unpack, stopping the app, the backup, the start, two tries of
+# 30 s, and the going back with a hard stop, its restore and a start tried twice, each call with the 5 s
+# run_program gives it to be reaped): 2401 s at the defaults, 3201 s at the largest values the settings
+# file may ask for (SERVICE_TIMEOUT 90, READY_TIMEOUT 120, MAX_STARTS 4). systemd ends the run with
+# SIGTERM at the limit, which the helper turns into the same way out as any failure.
+# tests/helper_apply_test.cpp reads this line and keeps it above both, with margin.
+TimeoutStartSec=3600
+# After SIGTERM the helper goes back short (a hard stop of the app if it must, the links back, the
+# start queued and tried twice, the data restore left to `count` before the app starts):
+# worst_case_stop_seconds, 996 s (the same at the largest settings). systemd's default of 90 s would kill
+# it in the middle of stopping an app that will not stop. tests/helper_apply_test.cpp reads this line.
+TimeoutStopSec=1200
+StandardOutput=journal
+StandardError=journal
+
+# The sandbox (ProtectSystem=strict and the rest) is a drop-in, etude-update-sandbox.conf, the one list
+# this unit, the boot one and the helper's `sandboxed count | crashed | idle` share.

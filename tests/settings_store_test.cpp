@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "settings_store.hpp"
 
-#include "toonval/settings_doc.hpp"
+#include "etude/settings_doc.hpp"
 
 #include <doctest/doctest.h>
 
@@ -11,8 +11,8 @@
 #include <random>
 #include <string>
 
-using toonval::app::LoadSource;
-using toonval::app::SettingsStore;
+using etude::app::LoadSource;
+using etude::app::SettingsStore;
 namespace fs = std::filesystem;
 
 namespace {
@@ -22,7 +22,7 @@ struct TempDir {
     fs::path path;
     TempDir() {
         std::random_device rd;
-        path = fs::temp_directory_path() / ("toonval-store-test-" + std::to_string(rd()));
+        path = fs::temp_directory_path() / ("etude-store-test-" + std::to_string(rd()));
         fs::create_directories(path);
     }
     ~TempDir() {
@@ -143,7 +143,7 @@ TEST_CASE("a main file over the size limit is damaged, not read") {
     SettingsStore store(dir.path);
     REQUIRE(store.save(kV1).ok);
     REQUIRE(store.save(kV2).ok);
-    write(store.main_path(), kV3 + std::string(toonval::kMaxSettingsBytes, '#'));
+    write(store.main_path(), kV3 + std::string(etude::kMaxSettingsBytes, '#'));
     const auto r = SettingsStore(dir.path).load();
     CHECK(r.source == LoadSource::Backup);
     CHECK(r.text == kV1);
@@ -247,12 +247,12 @@ TEST_CASE("a folder path that is a file cannot be saved to") {
 TEST_CASE("text that is too large is refused") {
     TempDir dir;
     SettingsStore store(dir.path);
-    CHECK_FALSE(store.save(std::string(toonval::kMaxSettingsBytes + 1, 'x')).ok);
+    CHECK_FALSE(store.save(std::string(etude::kMaxSettingsBytes + 1, 'x')).ok);
     CHECK_FALSE(fs::exists(store.main_path()));
 }
 
 TEST_CASE("settings_text_usable accepts real files and rejects junk") {
-    using toonval::app::settings_text_usable;
+    using etude::app::settings_text_usable;
     CHECK(settings_text_usable(kV1));
     CHECK(settings_text_usable("format = 1.0\n"));
     CHECK(settings_text_usable("[app]\nhit_window_ms = 80\n"));

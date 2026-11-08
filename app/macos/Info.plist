@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleIdentifier</key>
+    <string>io.github.techneissa.etude</string>
+    <key>CFBundleName</key>
+    <string>Etude</string>
+    <key>CFBundleExecutable</key>
+    <string>etude</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Etude listens to your piano through the microphone to show the notes you play. It only listens when the input source is set to Microphone or Both.</string>
+</dict>
+</plist>

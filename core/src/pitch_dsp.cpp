@@ -6,7 +6,7 @@
 #include <cmath>
 #include <cstdlib>
 
-namespace toonval::pitch_dsp {
+namespace etude::pitch_dsp {
 
 namespace {
 
@@ -526,6 +526,188 @@ bool partials_complete(const FrameAnalyzer& a, float f0, float b, float max_hz, 
     return missing <= 1;
 }
 
+// Own partials of a pitch next to a ringing note: partials 1..6 are checked, the frame must
+// separate partials f0 apart (Hann main lobe under half of f0), and each must stand within 26 dB
+// (5%) of the strongest peak.
+constexpr int kOwnPartials = 6;
+constexpr float kOwnLobe = 0.5f;
+constexpr float kOwnFloor = 0.05f;
+// The strongest peak is looked for from this fraction of f0 up; one own partial may be missing
+// when at least this many are checked.
+constexpr float kOwnPeakFrom = 0.7f;
+constexpr int kOwnOneMissingFrom = 4;
+// Growth at an onset is measured over partials 1..8; with fewer, a pitch and the octave above
+// share too little to tell apart.
+constexpr int kFreshPartials = 8;
+// Each partial is searched 1.5% to each side (its stretch varies), at least two bins, at most 30%
+// of f0 so its neighbours stay out.
+constexpr float kPartialTolerance = 0.015f;
+constexpr float kPartialMaxSearch = 0.3f;
+// The spectrum beside a fundamental is searched within this fraction of f0 around half a
+// fundamental below and above it.
+constexpr float kBesideWidth = 0.05f;
+
+bool own_partials_present(const FrameAnalyzer& a, float f0, float b, float max_hz,
+                          float ringing_hz) {
+    if (2.0f * a.resolution_hz() > kOwnLobe * f0) {
+        return false;
+    }
+    std::array<float, kOwnPartials> mag{};
+    int count = 0;
+    for (int n = 1; n <= kOwnPartials; ++n) {
+        const float f = partial_hz(f0, n, b);
+        if (f > max_hz) {
+            break;
+        }
+        if (in_notch(f, ringing_hz)) {
+            continue;
+        }
+        const float tol =
+            std::min(std::max(2.0f * a.bin_hz(), kPartialTolerance * f), kPartialMaxSearch * f0);
+        mag[static_cast<size_t>(count++)] = a.peak_magnitude(f, tol);
+    }
+    if (count == 0) {
+        return false;
+    }
+    float strongest = 0.0f;
+    const int first = std::max(1, static_cast<int>(kOwnPeakFrom * f0 / a.bin_hz()));
+    const int last = std::min(a.bins() - 1, static_cast<int>(max_hz / a.bin_hz()));
+    for (int k = first; k <= last; ++k) {
+        strongest = std::max(strongest, a.magnitude()[k]);
+    }
+    const float floor = kOwnFloor * strongest;
+    int missing = 0;
+    for (int i = 0; i < count; ++i) {
+        missing += mag[static_cast<size_t>(i)] < floor ? 1 : 0;
+    }
+    return strongest > 0.0f && missing <= (count >= kOwnOneMissingFrom ? 1 : 0);
+}
+
+float fundamental_share(const FrameAnalyzer& a, float f0, float b, float max_hz) {
+    float fundamental = 0.0f;
+    float strongest = 0.0f;
+    for (int n = 1; n <= kFreshPartials; ++n) {
+        const float f = partial_hz(f0, n, b);
+        if (f > max_hz) {
+            break;
+        }
+        float tol =
+            std::min(std::max(2.0f * a.bin_hz(), kPartialTolerance * f), kPartialMaxSearch * f0);
+        if (n == 1) {
+            // The second partial's main lobe reaches this far below it.
+            tol = std::max(a.bin_hz(),
+                           std::min(tol, partial_hz(f0, 2, b) - f - 2.0f * a.resolution_hz()));
+        }
+        const float m = a.peak_magnitude(f, tol);
+        fundamental = n == 1 ? m * m : fundamental;
+        strongest = std::max(strongest, m * m);
+    }
+    return strongest > 0.0f ? fundamental / strongest : 0.0f;
+}
+
+bool fundamental_stands_out(const FrameAnalyzer& a, float f0, float b, float ratio) {
+    // The fundamental's main lobe must end before the windows beside it begin.
+    if (2.0f * a.resolution_hz() > kBesideLobe * f0) {
+        return true;
+    }
+    const float tol = std::max(2.0f * a.bin_hz(), kPartialTolerance * f0);
+    const float own = a.peak_magnitude(partial_hz(f0, 1, b), tol);
+    const float below = a.peak_magnitude(0.5f * f0, kBesideWidth * f0);
+    const float above = a.peak_magnitude(1.5f * f0, kBesideWidth * f0);
+    return own * own >= ratio * std::min(below, above) * std::min(below, above);
+}
+
+FreshEvidence fresh_evidence(const FrameAnalyzer& before, const FrameAnalyzer& after, float f0,
+                             float b, float max_hz) {
+    FreshEvidence e;
+    e.resolved = 2.0f * after.resolution_hz() <= kOwnLobe * f0;
+    std::array<float, kFreshPartials + 1> growth{};
+    int partials = 0;
+    for (int n = 1; n <= kFreshPartials; ++n) {
+        const float f = partial_hz(f0, n, b);
+        if (f > max_hz) {
+            break;
+        }
+        const float tol_after = std::min(std::max(2.0f * after.bin_hz(), kPartialTolerance * f),
+                                         kPartialMaxSearch * f0);
+        const float tol_before = std::min(std::max(2.0f * before.bin_hz(), kPartialTolerance * f),
+                                          kPartialMaxSearch * f0);
+        const float post = after.peak_magnitude(f, tol_after);
+        const float pre = before.peak_magnitude(f, tol_before);
+        const float grown = std::max(0.0f, post - pre);
+        e.after += post * post;
+        e.before += pre * pre;
+        e.grown += grown * grown;
+        (n % 2 == 1 ? e.grown_odd : e.grown_even) += grown * grown;
+        growth[static_cast<size_t>(n)] = grown * grown;
+        e.grown_strongest = std::max(e.grown_strongest, grown * grown);
+        partials = n;
+        if (n % 2 == 1) {
+            e.before_odd += pre * pre;
+            e.after_odd += post * post;
+        }
+        if (n == 1) {
+            e.before_fundamental = pre * pre;
+            e.after_fundamental = post * post;
+        }
+    }
+    e.grown_fundamental = growth[1];
+    // k = 2 is the odd partials against the even ones, kept apart above.
+    for (int k = 3; k <= partials; ++k) {
+        float on = 0.0f;
+        float off = 0.0f;
+        for (int n = 1; n <= partials; ++n) {
+            (n % k == 0 ? on : off) += growth[static_cast<size_t>(n)];
+        }
+        if (on > 0.0f && off < e.off_series * on) {
+            e.off_series = off / on;
+        }
+    }
+    return e;
+}
+
+NeighbourGrowth neighbour_growth(const FrameAnalyzer& before, const FrameAnalyzer& after, float f0,
+                                 float b, float max_hz) {
+    NeighbourGrowth g;
+    constexpr float kSemitone = 1.0594631f;
+    constexpr float kTone = kSemitone * kSemitone;
+    constexpr int kToneNeighbourPartials = 6;
+    std::array<float, 4> near{}; // a semitone and a tone, above and below
+    const auto growth = [&](float f) {
+        const float tol = std::max(2.0f * after.bin_hz(), kPartialTolerance * f);
+        return std::max(0.0f, after.peak_magnitude(f, tol) -
+                                  before.peak_magnitude(
+                                      f, std::max(2.0f * before.bin_hz(), kPartialTolerance * f)));
+    };
+    for (int n = 1; n <= kFreshPartials; ++n) {
+        const float f = partial_hz(f0, n, b);
+        if (f * kSemitone > max_hz) {
+            break;
+        }
+        // The neighbour's Hann main lobe must end before the window searched around this
+        // partial begins.
+        if (2.0f * after.resolution_hz() + kPartialTolerance * f > (1.0f - 1.0f / kSemitone) * f) {
+            continue;
+        }
+        ++g.separable;
+        const float own = growth(f);
+        // From the seventh partial on, the next partial lies about a tone away (8/7, 9/8).
+        const bool tone = n <= kToneNeighbourPartials;
+        const std::array<float, 4> grown{growth(f * kSemitone), growth(f / kSemitone),
+                                         tone ? growth(f * kTone) : 0.0f,
+                                         tone ? growth(f / kTone) : 0.0f};
+        g.own += own * own;
+        const float own_after =
+            after.peak_magnitude(f, std::max(2.0f * after.bin_hz(), kPartialTolerance * f));
+        g.own_after += own_after * own_after;
+        for (size_t i = 0; i < near.size(); ++i) {
+            near[i] += grown[i] * grown[i];
+        }
+    }
+    g.neighbours = *std::max_element(near.begin(), near.end());
+    return g;
+}
+
 float stretch_bias(const FrameAnalyzer& a, float f0, float b, float max_hz) {
     const float bin = a.bin_hz();
     const int first = std::max(1, static_cast<int>(0.5f * f0 / bin));
@@ -572,4 +754,4 @@ float refine_f0(const FrameAnalyzer& a, float f0, float b, float max_hz, float s
     return wsum > 0.0f ? sum / wsum : f0;
 }
 
-} // namespace toonval::pitch_dsp
+} // namespace etude::pitch_dsp

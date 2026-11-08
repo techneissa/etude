@@ -1,0 +1,16 @@
+%abc-2.1
+% CC0 1.0: written for this repo, no rights reserved. Two hands in 4/4 at a quarter = 120, then
+% from bar 3 a quarter = 60, then from bar 5 in 3/4: the beat lines spread out with the tempo and
+% follow the meter.
+X:1
+T:Beat lines with a tempo change
+M:4/4
+L:1/4
+Q:1/4=120
+K:C
+V:1 clef=treble name="Right hand"
+V:2 clef=bass name="Left hand"
+V:1
+c4|e4|[Q:1/4=60]g4|e4|[M:3/4]c3|e3|]
+V:2
+C,4|G,,4|[Q:1/4=60]C,4|G,,4|[M:3/4]C,3|G,,3|]

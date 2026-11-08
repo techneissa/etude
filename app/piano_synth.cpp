@@ -15,7 +15,7 @@
 #include <xmmintrin.h>
 #endif
 
-namespace toonval::app {
+namespace etude::app {
 namespace {
 
 // TinySoundFont's output gain. With it a single note of the grand peaks at about -7 dBFS at
@@ -49,6 +49,14 @@ void enable_flush_to_zero() {
 }
 
 std::uint8_t clamp_note(int note) { return static_cast<std::uint8_t>(std::clamp(note, 0, 127)); }
+
+constexpr float kTwoPi = 6.28318530718F;
+// A click is mixed into the piano's output at this level before the limiter: a beat at the usual
+// velocity sits near -12 dBFS.
+constexpr float kClickGain = 0.42F;
+
+// How long a level takes to fall to -60 dB, as the per-sample factor.
+float decay_for(float seconds, float rate) { return std::pow(0.001F, 1.0F / (seconds * rate)); }
 
 } // namespace
 
@@ -110,6 +118,7 @@ bool PianoSynth::finish_load(tsf* font, int sample_rate) {
     font_ = font;
     preset_index_ = preset;
     sample_rate_ = static_cast<float>(sample_rate);
+    rate_ = sample_rate;
     volume_step_ = 1.0F - std::exp(-1.0F / (kVolumeRampSeconds * sample_rate_));
     limiter_release_ = std::exp(-1.0F / (kLimiterReleaseSeconds * sample_rate_));
     error_.clear();
@@ -163,12 +172,7 @@ void PianoSynth::set_volume(float volume) {
 void PianoSynth::apply(const SynthCommand& c) {
     switch (c.type) {
     case SynthCommand::Type::NoteOn: {
-        const float velocity = static_cast<float>(c.velocity) / 127.0F;
-        const int stolen = tsf_glue_make_room(font_, preset_index_, c.note, velocity);
-        if (stolen > 0) {
-            stolen_.fetch_add(static_cast<std::uint64_t>(stolen), std::memory_order_relaxed);
-        }
-        tsf_channel_note_on(font_, 0, c.note, velocity);
+        start_note(c.note, static_cast<float>(c.velocity) / 127.0F);
         if (c.event_ns != 0 && timed_count_ < static_cast<int>(std::size(timed_))) {
             timed_[timed_count_++] = c.event_ns;
         }
@@ -191,12 +195,221 @@ void PianoSynth::apply(const SynthCommand& c) {
     }
 }
 
+void PianoSynth::start_note(int note, float velocity) {
+    const int stolen = tsf_glue_make_room(font_, preset_index_, note, velocity);
+    if (stolen > 0) {
+        stolen_.fetch_add(static_cast<std::uint64_t>(stolen), std::memory_order_relaxed);
+    }
+    tsf_channel_note_on(font_, 0, note, velocity);
+}
+
+void PianoSynth::song_event(const SongSoundEvent& event) {
+    if (song_events_.push(event)) {
+        return;
+    }
+    if (event.kind == SongSoundEvent::Kind::Message && starts_note(event.message)) {
+        dropped_song_notes_.fetch_add(1, std::memory_order_relaxed);
+    } else {
+        song_lost_.store(true, std::memory_order_release);
+    }
+}
+
+// Audio thread. Moves the song's events into the pending queue, in the order they were sent.
+void PianoSynth::take_song_events() {
+    SongSoundEvent e;
+    while (song_events_.pop(e)) {
+        switch (e.kind) {
+        case SongSoundEvent::Kind::Message:
+            if (!song_pending_.push(e.message) && starts_note(e.message)) {
+                dropped_song_notes_.fetch_add(1, std::memory_order_relaxed);
+            }
+            break;
+        case SongSoundEvent::Kind::CancelUnstarted:
+            song_pending_.cancel_unstarted(e.message.at_ns);
+            break;
+        case SongSoundEvent::Kind::StopAll:
+            stop_song();
+            break;
+        }
+    }
+    if (song_lost_.exchange(false, std::memory_order_acq_rel) ||
+        song_pending_.lost_note_offs() != seen_lost_offs_) {
+        seen_lost_offs_ = song_pending_.lost_note_offs();
+        stop_song();
+    }
+}
+
+void PianoSynth::end_song_note(int note) {
+    if (song_sounding_.test(static_cast<std::size_t>(note))) {
+        tsf_channel_note_off(font_, 0, note);
+        song_sounding_.reset(static_cast<std::size_t>(note));
+    }
+}
+
+void PianoSynth::stop_song_notes() {
+    for (int n = 0; n < 128; ++n) {
+        end_song_note(n);
+    }
+}
+
+void PianoSynth::stop_song() {
+    stop_song_notes();
+    stop_clicks();
+    if (song_pedal_) {
+        tsf_channel_set_sustain(font_, 0, 0);
+        song_pedal_ = false;
+    }
+    song_pending_.clear();
+}
+
+// Audio thread. Applies one due song message; `frame` is the sample of this block it starts on.
+void PianoSynth::song_message(const PlaybackMessage& m, std::int64_t block_start_ns, int frame) {
+    if (m.click) {
+        // One-shot: the note-off means nothing to a click.
+        if (m.kind == PlaybackMessage::Kind::NoteOn && m.value > 0) {
+            start_click(m.data & 127, std::min<int>(m.value, 127));
+        }
+        return;
+    }
+    switch (m.kind) {
+    case PlaybackMessage::Kind::NoteOn:
+        if (m.value == 0) {
+            end_song_note(m.data & 127);
+            break;
+        }
+        start_note(m.data & 127, static_cast<float>(std::min<int>(m.value, 127)) / 127.0F);
+        song_sounding_.set(m.data & 127u);
+        if (block_start_ns != std::numeric_limits<std::int64_t>::max()) {
+            const std::int64_t offset_ns = static_cast<std::int64_t>(frame) * 1'000'000'000 / rate_;
+            song_starts_.push({m.at_ns, block_start_ns + offset_ns});
+        }
+        break;
+    case PlaybackMessage::Kind::NoteOff:
+        end_song_note(m.data & 127);
+        break;
+    case PlaybackMessage::Kind::ControlChange:
+        if (m.data == 64) {
+            song_pedal_ = m.value >= 64;
+            tsf_channel_set_sustain(font_, 0, song_pedal_ ? 1 : 0);
+        } else if (m.data == 123 || m.data == 120) {
+            stop_song_notes();
+        }
+        break;
+    case PlaybackMessage::Kind::ProgramChange:
+    case PlaybackMessage::Kind::PitchBend:
+        break;
+    }
+}
+
+// Starts a click: the General MIDI percussion notes the metronome is sent as pick the voice. Wood
+// block 76 (high) and 77 (low): a damped tone with a little knock; metronome bell 34 and click 33:
+// a short bright tick; triangle 81 and 80 stand for the beep: a plain tone. Anything else is a
+// short tick.
+void PianoSynth::start_click(int note, int velocity) {
+    ClickVoice& v = clicks_[static_cast<std::size_t>(next_click_)];
+    next_click_ = (next_click_ + 1) % kMaxClickVoices;
+    float hz = 1000.0F;
+    float tone_s = 0.030F;
+    float noise = 0.0F;
+    float noise_s = 0.004F;
+    switch (note) {
+    case 76:
+        hz = 1180.0F;
+        tone_s = 0.034F;
+        noise = 0.25F;
+        break;
+    case 77:
+        hz = 820.0F;
+        tone_s = 0.040F;
+        noise = 0.25F;
+        break;
+    case 34:
+        hz = 3200.0F;
+        tone_s = 0.020F;
+        noise = 0.45F;
+        break;
+    case 33:
+        hz = 2300.0F;
+        tone_s = 0.012F;
+        noise = 0.6F;
+        break;
+    case 81:
+        hz = 1320.0F;
+        tone_s = 0.075F;
+        break;
+    case 80:
+        hz = 880.0F;
+        tone_s = 0.075F;
+        break;
+    default:
+        hz = 1800.0F;
+        tone_s = 0.015F;
+        noise = 0.4F;
+        break;
+    }
+    const float level = kClickGain * static_cast<float>(velocity) / 127.0F;
+    v.active = true;
+    v.phase = 0.0F;
+    v.step = kTwoPi * hz / sample_rate_;
+    v.env = level;
+    v.decay = decay_for(tone_s, sample_rate_);
+    v.noise = level * noise;
+    v.noise_decay = decay_for(noise_s, sample_rate_);
+    v.seed = v.seed * 1664525U + 1013904223U + static_cast<std::uint32_t>(note);
+    v.lowpass = 0.0F;
+}
+
+// Adds the sounding clicks to `frames` stereo frames, as they are after the piano's own.
+void PianoSynth::mix_clicks(float* out, int frames) {
+    for (ClickVoice& v : clicks_) {
+        if (!v.active) {
+            continue;
+        }
+        for (int i = 0; i < frames; ++i) {
+            v.seed = v.seed * 1664525U + 1013904223U;
+            const float white = static_cast<float>(static_cast<std::int32_t>(v.seed)) * (1.0F / 2147483648.0F);
+            v.lowpass += 0.6F * (white - v.lowpass);
+            const float sample = std::sin(v.phase) * v.env + v.lowpass * v.noise;
+            out[2 * i] += sample;
+            out[2 * i + 1] += sample;
+            v.phase += v.step;
+            if (v.phase > kTwoPi) {
+                v.phase -= kTwoPi;
+            }
+            v.env *= v.decay;
+            v.noise *= v.noise_decay;
+        }
+        if (v.env < 1e-4F) {
+            v.active = false;
+        }
+    }
+}
+
+void PianoSynth::stop_clicks() {
+    for (ClickVoice& v : clicks_) {
+        v.active = false;
+    }
+}
+
+// The piano's samples, then the clicks, for one span of a block.
+void PianoSynth::render_span(float* out, int frames) {
+    tsf_render_float(font_, out, frames, 0);
+    mix_clicks(out, frames);
+}
+
 void PianoSynth::render(float* out, int frames) {
+    render(out, frames, std::numeric_limits<std::int64_t>::max());
+}
+
+void PianoSynth::render(float* out, int frames, std::int64_t block_start_ns) {
     enable_flush_to_zero();
     const std::size_t samples = static_cast<std::size_t>(frames) * 2;
     if (font_ == nullptr) {
         SynthCommand c;
         while (commands_.pop(c)) {
+        }
+        SongSoundEvent e;
+        while (song_events_.pop(e)) {
         }
         std::memset(out, 0, samples * sizeof(float));
         return;
@@ -206,7 +419,31 @@ void PianoSynth::render(float* out, int frames) {
     while (commands_.pop(c)) {
         apply(c);
     }
-    tsf_render_float(font_, out, frames, 0);
+    take_song_events();
+    // Render up to each song message that falls inside this block, start it, and go on. The ones
+    // due later wait for their block.
+    int done = 0;
+    while (!song_pending_.empty()) {
+        const PlaybackMessage m = song_pending_.front();
+        std::int64_t at = 0;
+        if (block_start_ns != std::numeric_limits<std::int64_t>::max() &&
+            m.at_ns > block_start_ns) {
+            at = ((m.at_ns - block_start_ns) * rate_ + 500'000'000) / 1'000'000'000;
+        }
+        if (at >= frames) {
+            break;
+        }
+        const int frame = std::max(done, static_cast<int>(at));
+        if (frame > done) {
+            render_span(out + 2 * static_cast<std::size_t>(done), frame - done);
+            done = frame;
+        }
+        song_message(m, block_start_ns, done);
+        song_pending_.pop_front();
+    }
+    if (done < frames) {
+        render_span(out + 2 * static_cast<std::size_t>(done), frames - done);
+    }
     limit(out, frames);
     active_voices_.store(tsf_active_voice_count(font_), std::memory_order_relaxed);
 
@@ -248,4 +485,4 @@ void PianoSynth::limit(float* out, int frames) {
     }
 }
 
-} // namespace toonval::app
+} // namespace etude::app

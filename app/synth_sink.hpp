@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
-namespace toonval::app {
+#include "etude/song_schedule.hpp"
+
+namespace etude::app {
 
 // Where notes played without a MIDI keyboard (taps, the computer keyboard) go to make a sound.
 // Called from the main thread only. Every call returns at once: it queues a small command for the
@@ -17,6 +19,10 @@ class SynthSink {
     virtual void sustain(bool down) = 0;
     // Silences everything within a few milliseconds and lifts the pedal (focus loss, quit).
     virtual void all_notes_off() = 0;
+    // The song's sound (etude/song_schedule.hpp): a message to start at its due time, a cancel
+    // of the notes not yet started, or a stop of everything the song started. The song never
+    // shares notes with the player's, so these leave the player's notes alone.
+    virtual void song_event(const etude::SongSoundEvent& event) = 0;
 };
 
 // A sink that makes no sound, for when no piano samples are installed.
@@ -26,6 +32,7 @@ class SilentSynthSink final : public SynthSink {
     void note_off(int) override {}
     void sustain(bool) override {}
     void all_notes_off() override {}
+    void song_event(const etude::SongSoundEvent&) override {}
 };
 
-} // namespace toonval::app
+} // namespace etude::app

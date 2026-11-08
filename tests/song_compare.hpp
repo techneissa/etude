@@ -2,11 +2,11 @@
 // Checks that two Songs match field by field, for the writer and recorder round-trip tests.
 #pragma once
 
-#include "toonval/song.hpp"
+#include "etude/song.hpp"
 
 #include <doctest/doctest.h>
 
-namespace toonval::test {
+namespace etude::test {
 
 // What a MIDI file keeps: notes (pitch, velocity, ticks, seconds, track, channel, hand, measure),
 // the tempo map, time signatures, bars, parts and channel events. Finger is not in a MIDI file.
@@ -81,4 +81,4 @@ inline void expect_same_song(const Song& a, const Song& b) {
     }
 }
 
-} // namespace toonval::test
+} // namespace etude::test

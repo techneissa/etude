@@ -1,12 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/look.hpp"
-#include "toonval/pitch.hpp"
+#include "etude/look.hpp"
+#include "etude/pitch.hpp"
 
 #include <string>
 
 #include <doctest/doctest.h>
 
-using namespace toonval;
+#include "sample_looks.hpp"
+
+using namespace etude;
+using namespace etude::test;
 
 namespace {
 
@@ -102,8 +105,8 @@ TEST_CASE("middle C is key 60 whatever the numbering") {
 }
 
 TEST_CASE("every preset keeps C markers on and scientific numbering") {
-    for (PresetId id : kAllPresets) {
-        CHECK(preset(id).c_markers);
-        CHECK(preset(id).octave_numbering == OctaveNumbering::Scientific);
+    for (Sample id : kAllSamples) {
+        CHECK(sample_look(id).c_markers);
+        CHECK(sample_look(id).octave_numbering == OctaveNumbering::Scientific);
     }
 }

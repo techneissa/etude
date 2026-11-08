@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/keyboard_identity.hpp"
+#include "etude/keyboard_identity.hpp"
 
 #include <array>
 
-namespace toonval {
+namespace etude {
 
 namespace {
 
@@ -261,4 +261,4 @@ std::optional<SysfsUsbDevice> usb_device_from_sysfs(
     return std::nullopt;
 }
 
-} // namespace toonval
+} // namespace etude

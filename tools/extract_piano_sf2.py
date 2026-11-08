@@ -7,7 +7,7 @@ is 148 MB. This keeps only the chosen presets (bank 0, GM programs 0 to 2 by def
 instruments and samples they use, and writes them to a new SF2 with the same generators and
 modulators. The output is byte-for-byte reproducible: same input and options, same SHA-256.
 
-    tools/extract_piano_sf2.py --out build/toonval-piano.sf2
+    tools/extract_piano_sf2.py --out build/etude-piano.sf2
     tools/extract_piano_sf2.py --source ~/Downloads/FluidR3_GM.sf2 --out piano.sf2 --presets 0
 
 Without --source the bank is downloaded from SOURCE_URL and checked against SOURCE_SHA256. The
@@ -305,11 +305,11 @@ def zstr(text):
 
 def write_sf2(ifil, smpl, sm24, pdta_tables):
     info = b"INFO" + chunk("ifil", ifil) + chunk("isng", zstr("EMU8000")) \
-        + chunk("INAM", zstr("toonval piano (from FluidR3_GM)")) \
+        + chunk("INAM", zstr("etude piano (from FluidR3_GM)")) \
         + chunk("ICOP", zstr("Copyright (c) 2000-2002, 2008 Frank Wen. MIT license.")) \
         + chunk("ICMT", zstr("Acoustic piano presets extracted from FluidR3_GM by "
-                             "toonval tools/extract_piano_sf2.py. " + MIT_NOTICE)) \
-        + chunk("ISFT", zstr("toonval extract_piano_sf2.py"))
+                             "etude tools/extract_piano_sf2.py. " + MIT_NOTICE)) \
+        + chunk("ISFT", zstr("etude extract_piano_sf2.py"))
     sdta = b"sdta" + chunk("smpl", bytes(smpl)) + (chunk("sm24", bytes(sm24)) if sm24 else b"")
     pdta = b"pdta"
     for name, fmt, rows in pdta_tables:

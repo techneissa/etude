@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/midi_file.hpp"
+#include "etude/midi_file.hpp"
 
 #include "smf_builder.hpp"
 
@@ -10,8 +10,8 @@
 #include <random>
 #include <string>
 
-using namespace toonval;
-using namespace toonval::test;
+using namespace etude;
+using namespace etude::test;
 
 namespace {
 MidiLoadResult load(const Bytes& bytes, const MidiLoadOptions& options = {}) {
@@ -207,32 +207,35 @@ TEST_CASE("overlapping notes of the same pitch split cleanly, never with zero or
     }
 }
 
-TEST_CASE("ghost notes under 30 ms are dropped, with a setting that keeps them") {
-    // 480 ticks per quarter at 120 BPM: 1 tick = 1/960 s. 28 ticks = 29.2 ms, 29 ticks = 30.2 ms.
-    Bytes file = smf({Track()
-                          .on(0, 0, 60)
-                          .off(28, 0, 60)
-                          .on(0, 0, 62)
-                          .off(29, 0, 62)
-                          .on(0, 9, 42) // drum hit, short on purpose
-                          .off(10, 9, 42)
-                          .end()});
+TEST_CASE("ghost notes under 30 ms and a 128th note are dropped, with a setting that keeps them") {
+    // 480 ticks per quarter at 120 BPM: 1 tick = 1/960 s, and a 128th note is 15 ticks (15.6 ms).
+    // Twenty real notes, then a 10-tick ghost (10.4 ms), a 28-tick note (29.2 ms: short, but
+    // longer than a 128th note, so real) and a drum hit that is short on purpose.
+    Track t;
+    for (int i = 0; i < 20; ++i) {
+        t.on(0, 0, 40 + i).off(480, 0, 40 + i);
+    }
+    t.on(0, 0, 60).off(10, 0, 60).on(0, 0, 62).off(28, 0, 62).on(0, 9, 42).off(10, 9, 42);
+    Bytes file = smf({t.end()});
     MidiLoadResult r = load(file);
     REQUIRE(r.ok);
-    REQUIRE(r.song.notes.size() == 2);
-    CHECK(r.song.notes[0].pitch == 62);
-    CHECK(r.song.notes[1].pitch == 42);
+    REQUIRE(r.song.notes.size() == 22);
     CHECK(r.stats.ghost_notes_dropped == 1);
+    CHECK_FALSE(r.stats.ghost_filter_skipped);
+    for (const Note& n : r.song.notes) {
+        CHECK(n.pitch != 60);
+    }
 
     MidiLoadResult kept = load(file, {.keep_ghost_notes = true});
     REQUIRE(kept.ok);
-    CHECK(kept.song.notes.size() == 3);
+    CHECK(kept.song.notes.size() == 23);
     CHECK(kept.stats.ghost_notes_dropped == 0);
 
-    MidiLoadResult strict = load(file, {.ghost_threshold_s = 0.05});
-    REQUIRE(strict.ok);
-    CHECK(strict.song.notes.size() == 1);
-    CHECK(strict.stats.ghost_notes_dropped == 2);
+    // A threshold under the ghost's 10.4 ms leaves it alone.
+    MidiLoadResult lenient = load(file, {.ghost_threshold_s = 0.005});
+    REQUIRE(lenient.ok);
+    CHECK(lenient.song.notes.size() == 23);
+    CHECK(lenient.stats.ghost_notes_dropped == 0);
 }
 
 TEST_CASE("program changes, controllers and pitch bends are kept for playback") {
@@ -291,7 +294,7 @@ TEST_CASE("channel events from several tracks are merged by time, then by track"
     a.cc(100, 0, 7, 1).cc(100, 0, 7, 3).end();
     Track b;
     b.cc(100, 1, 7, 2).cc(200, 1, 7, 4).end();
-    MidiLoadResult r = load(smf({a, b}));
+    MidiLoadResult r = load(smf({a, b, Track().on(0, 2, 60).off(480, 2, 60).end()}));
     REQUIRE(r.ok);
     REQUIRE(r.song.events.size() == 4);
     std::vector<int> values;
@@ -372,7 +375,7 @@ TEST_CASE("a note-on with no note-off ends at the end of its track") {
 TEST_CASE("a track with no End-of-Track event ends at its last event") {
     Track t;
     t.on(0, 0, 60).off(480, 0, 60).on(0, 0, 62).cc(240, 0, 7, 100);
-    MidiLoadResult r = load(smf({t, Track().on(0, 0, 50).off(10, 0, 50).end()}));
+    MidiLoadResult r = load(smf({t, Track().bpm(0, 120).end()}));
     REQUIRE(r.ok);
     REQUIRE(r.song.notes.size() == 2);
     CHECK(r.song.notes[1].pitch == 62);
@@ -469,7 +472,19 @@ TEST_CASE("measures come from time signatures") {
         CHECK(r.song.notes[2].measure == 2);
         CHECK(r.song.measures[0].number == 0);
     }
-    SUBCASE("a first bar cut short by a time signature is a pickup") {
+    SUBCASE("a first bar cut short by a time signature of the same meter is a pickup") {
+        MidiLoadResult r = load(smf({Track()
+                                         .on(0, 0, 67)
+                                         .off(960, 0, 67)
+                                         .time_sig(0, 4, 4) // tick 960, half a 4/4 bar
+                                         .on(0, 0, 60)
+                                         .off(480, 0, 60)
+                                         .end()}));
+        REQUIRE(r.ok);
+        CHECK(r.song.notes[0].measure == 0);
+        CHECK(r.song.notes[1].measure == 1);
+    }
+    SUBCASE("a first bar cut short by another meter is a pickup too") {
         MidiLoadResult r = load(smf({Track()
                                          .on(0, 0, 67)
                                          .off(960, 0, 67)
@@ -480,6 +495,7 @@ TEST_CASE("measures come from time signatures") {
         REQUIRE(r.ok);
         CHECK(r.song.notes[0].measure == 0);
         CHECK(r.song.notes[1].measure == 1);
+        CHECK(r.song.measures[0].number == 0);
     }
 }
 
@@ -627,8 +643,11 @@ TEST_CASE("truncated or corrupt files return an error, never crash") {
                 CHECK_FALSE(r.ok);
                 CHECK(r.error != MidiFileError::None);
                 CHECK_FALSE(r.message.empty());
+            } else if (!r.ok) {
+                // Cut before the first note ended: nothing left to play.
+                CHECK(r.error == MidiFileError::NoNotes);
+                CHECK(r.stats.tracks_truncated == 1);
             } else {
-                CHECK(r.ok);
                 CHECK(r.stats.tracks_truncated == 1);
                 check_well_formed(r);
             }
@@ -729,13 +748,13 @@ TEST_CASE("a track chunk longer than the file is read up to the end of the data"
         file.insert(file.end(), body.begin(), body.end());
         CHECK(load(file).error == MidiFileError::Corrupt);
     }
-    SUBCASE("a track chunk with a whole header and no data is an empty track") {
+    SUBCASE("a track chunk with a whole header and no data is an empty track, so no song") {
         Bytes file = header(0, 1, 480);
         file.insert(file.end(), {'M', 'T', 'r', 'k', 0, 0, 0, 20});
         MidiLoadResult r = load(file);
-        REQUIRE(r.ok);
+        CHECK_FALSE(r.ok);
+        CHECK(r.error == MidiFileError::NoNotes);
         CHECK(r.stats.tracks_truncated == 1);
-        CHECK(r.song.notes.empty());
     }
     SUBCASE("a missing track is still an error") {
         Bytes file = header(1, 2, 480);
@@ -763,7 +782,7 @@ TEST_CASE("a song absurdly many bars long is refused, not allocated") {
 
 namespace {
 Bytes read_test_file(const std::string& name) {
-    std::ifstream in(std::string(TOONVAL_TEST_DATA_DIR) + "/" + name, std::ios::binary);
+    std::ifstream in(std::string(ETUDE_TEST_DATA_DIR) + "/" + name, std::ios::binary);
     REQUIRE(in.good());
     return Bytes(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
 }

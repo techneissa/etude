@@ -3,7 +3,7 @@
 #define TSF_IMPLEMENTATION
 #include "tsf_glue.hpp"
 
-namespace toonval::app {
+namespace etude::app {
 namespace {
 
 // The voice that the steal order picks, or null when no voice is playing.
@@ -73,4 +73,4 @@ int tsf_glue_voices_for_key(const tsf* f, int key) {
     return count;
 }
 
-} // namespace toonval::app
+} // namespace etude::app

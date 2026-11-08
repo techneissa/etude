@@ -1,18 +1,20 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/sections_store.hpp"
+#include "etude/sections_store.hpp"
 
-#include "toonval/content_hash.hpp"
-#include "toonval/session_state.hpp"
+#include "etude/content_hash.hpp"
+#include "etude/session_state.hpp"
 
 #include "section_fixtures.hpp"
 
 #include <doctest/doctest.h>
 
+#include <chrono>
+#include <cstdio>
 #include <string>
 #include <vector>
 
-using namespace toonval;
-using namespace toonval::testing;
+using namespace etude;
+using namespace etude::testing;
 
 namespace {
 
@@ -435,7 +437,7 @@ TEST_CASE("sections store: a speed-up step near INT_MAX reads clamped") {
     REQUIRE(s.plan.size() == 2);
     CHECK(s.plan[0].speed_up.step_percent == 25);
     CHECK(s.plan[1].repeats == kMaxPlanRepeats);
-    CHECK(s.plan[1].speed_up.start_percent == 150);
+    CHECK(s.plan[1].speed_up.start_percent == 200);
     CHECK(s.well_formed());
 }
 
@@ -509,4 +511,44 @@ TEST_CASE("sections store: values near INT_MAX and UINT_MAX read and write stabl
             CHECK(again.songs()[i] == lib.songs()[i]);
         }
     }
+}
+
+// ---- A file with far more entries than the cap
+
+namespace {
+std::string huge_text(int n) {
+    std::string t = "format = 1.0\n\n";
+    for (int i = 0; i < n; ++i) {
+        char name[40];
+        std::snprintf(name, sizeof name, "sections.%016llx",
+                      0x9e3779b97f4a7c15ULL * static_cast<unsigned long long>(i + 1));
+        t += std::string("[") + name + "]\nversion = 1\nnext_id = 3\nused = " + std::to_string(i) +
+             "\nsection.1 = 0 8\nsection.2 = 8 16 Verse\n\n";
+    }
+    return t;
+}
+} // namespace
+
+TEST_CASE("sections store: a file of 16000 entries parses, drops the stale ones and saves") {
+    // In a Debug build this took 2.3 s to parse and 17.8 s to write before the document indexed
+    // its sections by name; now it is tens of milliseconds. The bound is only there to catch a
+    // return to the quadratic scan, so it is far over what a loaded machine needs.
+    const std::string text = huge_text(16000);
+    using Clock = std::chrono::steady_clock;
+    const auto parse_start = Clock::now();
+    SettingsDocument doc = SettingsDocument::parse(text);
+    const double parse_s = std::chrono::duration<double>(Clock::now() - parse_start).count();
+    // read_sections' own per-entry work is linear and not what this checks, so it is not timed.
+    const SectionLibrary lib = read_sections(doc, nullptr);
+    const auto write_start = Clock::now();
+    write_sections(doc, lib);
+    const std::string out = doc.serialize();
+    const double write_s = std::chrono::duration<double>(Clock::now() - write_start).count();
+    const double seconds = parse_s + write_s;
+    CHECK(seconds < 8.0);
+    CHECK(lib.songs().size() == kMaxSongsWithSections);
+    CHECK(lib.stale_names().size() == 16000 - kMaxSongsWithSections);
+    const SettingsDocument saved = SettingsDocument::parse(out);
+    CHECK(saved.section_names().size() == kMaxSongsWithSections);
+    CHECK(read_sections(saved, nullptr).songs().size() == kMaxSongsWithSections);
 }

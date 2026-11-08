@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/hand_path.hpp"
+#include "etude/hand_path.hpp"
 
-#include "toonval/progress.hpp"
-#include "toonval/transport.hpp"
+#include "etude/progress.hpp"
+#include "etude/transport.hpp"
+#include "etude/unit_format.hpp"
 
 #include <algorithm>
 #include <cmath>
 
-namespace toonval {
+namespace etude {
 
 namespace {
 
@@ -109,7 +110,7 @@ HandPathScope scope_of_section(const Song& song, const Section* section) {
     const double from = section != nullptr ? section->start_s : 0.0;
     const double to = section != nullptr ? section->end_s : length_of(song);
     for (const Note& n : song.notes) {
-        if (n.drum || n.start_s < from || n.start_s >= to) {
+        if (n.drum || n.accompaniment || n.start_s < from || n.start_s >= to) {
             continue;
         }
         right = right || n.hand == Hand::Right;
@@ -180,9 +181,9 @@ PathSuggestion next_practice(const HandPathStatus& status, const HandPathOptions
     int start = clamp_speed(options.start_speed_percent);
     if (status.stage == PathStage::BothHands) {
         // Both hands begin where the weaker hand got to.
-        int hands_best = std::min(status.right.skipped ? 150 : status.right.best_speed_percent,
-                                  status.left.skipped ? 150 : status.left.best_speed_percent);
-        if (hands_best < 150) {
+        int hands_best = std::min(status.right.skipped ? kMaxSpeedPercent : status.right.best_speed_percent,
+                                  status.left.skipped ? kMaxSpeedPercent : status.left.best_speed_percent);
+        if (hands_best < kMaxSpeedPercent) {
             start = std::max(start, clamp_speed(hands_best));
         }
     }
@@ -210,7 +211,7 @@ PathSuggestion next_practice(const HandPathStatus& status, const HandPathOptions
 }
 
 std::string path_hint(const HandPathStatus& status, const PathSuggestion& suggestion) {
-    auto percent = [](int v) { return std::to_string(v) + "%"; };
+    auto percent = [](int v) { return format_unit_string(v, Unit::Percent); };
     switch (suggestion.advice) {
     case PathAdvice::AllDone:
         return "Everything on this path is done.";
@@ -241,4 +242,4 @@ std::string path_hint(const HandPathStatus& status, const PathSuggestion& sugges
     return {};
 }
 
-} // namespace toonval
+} // namespace etude

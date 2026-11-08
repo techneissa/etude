@@ -7,7 +7,7 @@
 #include <cstdint>
 #include <vector>
 
-#include "toonval/pitch_synth.hpp"
+#include "etude/pitch_synth.hpp"
 
 namespace pitch_test {
 
@@ -54,7 +54,7 @@ inline std::vector<float> stretched_tone(int note, double cents, int length, int
                                          double a4_hz = 440.0) {
     std::vector<float> out(static_cast<size_t>(length), 0.0f);
     const double f0 = a4_hz * std::exp2((note - 69) / 12.0 + cents / 1200.0);
-    const double b = toonval::synth_inharmonicity(note);
+    const double b = etude::synth_inharmonicity(note);
     for (int i = start; i < length; ++i) {
         const double t = static_cast<double>(i - start) / kRate;
         double v = 0.0;

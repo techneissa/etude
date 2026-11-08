@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "audio_out.hpp"
+#include "log_ring.hpp"
 
 #include <algorithm>
 #include <chrono>
@@ -13,7 +14,7 @@
 #include <CoreAudio/CoreAudio.h>
 #endif
 
-namespace toonval::app {
+namespace etude::app {
 namespace {
 
 constexpr std::int64_t kReportNs = 5'000'000'000;
@@ -24,7 +25,7 @@ constexpr std::int64_t kReportNs = 5'000'000'000;
 constexpr std::int64_t kLatePeriods = 3;
 constexpr std::int64_t kWarmupNs = 2'000'000'000;
 constexpr std::uint64_t kLateLimit = 3;
-constexpr const char* kSoundFontName = "toonval-piano.sf2";
+constexpr const char* kSoundFontName = "etude-piano.sf2";
 
 std::int64_t steady_ns() {
     using namespace std::chrono;
@@ -43,7 +44,7 @@ std::vector<std::string> sound_font_candidates(const std::string& option) {
     if (const char* base = SDL_GetBasePath(); base != nullptr) {
         const std::filesystem::path dir(base);
         out.push_back((dir / kSoundFontName).string());
-        out.push_back((dir / ".." / "share" / "toonval" / kSoundFontName).string());
+        out.push_back((dir / ".." / "share" / "etude" / kSoundFontName).string());
     }
     return out;
 }
@@ -115,8 +116,8 @@ AudioOut::~AudioOut() { stop(); }
 bool AudioOut::start(const AudioOptions& options) {
     options_ = options;
     bool loaded = false;
-    std::string why = "no toonval-piano.sf2 found (build with TOONVAL_PIANO_SF2_FILE or "
-                      "TOONVAL_PIANO_SF2_URL, or pass --sound-font PATH)";
+    std::string why = "no etude-piano.sf2 found (build with ETUDE_PIANO_SF2_FILE or "
+                      "ETUDE_PIANO_SF2_URL, or pass --sound-font PATH)";
     for (const std::string& path : sound_font_candidates(options.sound_font)) {
         if (!options.sound_font.empty() || std::filesystem::exists(path)) {
             loaded = synth_.load_file(path, kSampleRate);
@@ -127,11 +128,11 @@ bool AudioOut::start(const AudioOptions& options) {
         }
     }
     if (!loaded) {
-        std::fprintf(stderr, "built-in piano off: %s\n", why.c_str());
+        log_printf( "built-in piano off: %s\n", why.c_str());
         return false;
     }
     if (!SDL_InitSubSystem(SDL_INIT_AUDIO)) {
-        std::fprintf(stderr, "built-in piano off: SDL audio failed: %s\n", SDL_GetError());
+        log_printf( "built-in piano off: SDL audio failed: %s\n", SDL_GetError());
         return false;
     }
     subsystem_ = true;
@@ -151,7 +152,7 @@ bool AudioOut::open_device(int frames) {
     // corrected below, before the stream is resumed and the callback first runs.
     stream_ = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, &callback, this);
     if (stream_ == nullptr) {
-        std::fprintf(stderr, "built-in piano off: no audio output: %s\n", SDL_GetError());
+        log_printf( "built-in piano off: no audio output: %s\n", SDL_GetError());
         return false;
     }
     SDL_AudioSpec device_spec{};
@@ -167,10 +168,12 @@ bool AudioOut::open_device(int frames) {
     late_ns_ = std::max(kLatePeriods * period_ns_,
                         static_cast<std::int64_t>(device_latency().sdl_queue_ms * 1e6));
     last_callback_ns_ = 0;
+    clock_.reset(kSampleRate);
+    frames_written_ = 0;
     opened_ns_ = steady_ns();
     late_seen_ = late_callbacks_.load(std::memory_order_relaxed);
     if (!SDL_ResumeAudioStreamDevice(stream_)) {
-        std::fprintf(stderr, "built-in piano off: cannot start audio: %s\n", SDL_GetError());
+        log_printf( "built-in piano off: cannot start audio: %s\n", SDL_GetError());
         close_device();
         return false;
     }
@@ -189,6 +192,7 @@ void AudioOut::stop() {
     if (stream_ != nullptr) {
         // Let the quick release play out before the device goes, so quitting does not click.
         synth_.all_notes_off();
+        synth_.song_event({SongSoundEvent::Kind::StopAll, {}});
         SDL_Delay(20);
     }
     close_device();
@@ -249,13 +253,18 @@ void AudioOut::callback(void* userdata, SDL_AudioStream* stream, int additional_
         self->late_callbacks_.fetch_add(1, std::memory_order_relaxed);
     }
     self->last_callback_ns_ = start;
+    const std::int64_t residual = self->clock_.observe(start, self->frames_written_);
+    if (self->record_residuals_.load(std::memory_order_relaxed)) {
+        self->clock_residuals_.push(residual);
+    }
 
     constexpr int kFrameBytes = 2 * static_cast<int>(sizeof(float));
     const int chunk_frames = static_cast<int>(self->buffer_.size() / 2);
     int frames = additional_amount / kFrameBytes;
     while (frames > 0) {
         const int n = std::min(frames, chunk_frames);
-        self->synth_.render(self->buffer_.data(), n);
+        self->synth_.render(self->buffer_.data(), n, self->clock_.time_of(self->frames_written_));
+        self->frames_written_ += n;
         SDL_PutAudioStreamData(stream, self->buffer_.data(), n * kFrameBytes);
         frames -= n;
     }
@@ -361,4 +370,4 @@ void AudioOut::print_device_line() const {
                 device.sdl_queue_ms, device.os_ms);
 }
 
-} // namespace toonval::app
+} // namespace etude::app

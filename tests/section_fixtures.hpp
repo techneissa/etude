@@ -2,15 +2,15 @@
 // Songs for the section tests: plain bars with no notes in them to read.
 #pragma once
 
-#include "toonval/song.hpp"
-#include "toonval/song_builder.hpp"
+#include "etude/song.hpp"
+#include "etude/song_builder.hpp"
 
 #include <doctest/doctest.h>
 
 #include <cstdint>
 #include <random>
 
-namespace toonval::testing {
+namespace etude::testing {
 
 // `bars` bars of numerator/denominator at `bpm`, one note across all of them. At 120 BPM in 4/4 a
 // bar lasts exactly 2 s, so bar n starts at 2 * (n - 1): whole numbers, comparable exactly.
@@ -78,4 +78,4 @@ inline Song random_song(std::mt19937_64& rng) {
     return song;
 }
 
-} // namespace toonval::testing
+} // namespace etude::testing

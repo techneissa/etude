@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/settings_doc.hpp"
+#include "etude/settings_doc.hpp"
 
 #include <doctest/doctest.h>
 
 #include <string>
 #include <vector>
 
-using namespace toonval;
+using namespace etude;
 using Kind = SettingsIssueKind;
 
 namespace {
@@ -39,7 +39,7 @@ TEST_CASE("an empty text is a valid document with the current format and no sect
 }
 
 TEST_CASE("a canonical document serializes back to the same text") {
-    const std::string text = "# toonval settings\n"
+    const std::string text = "# etude settings\n"
                              "format = 1.0\n"
                              "\n"
                              "[app]\n"
@@ -250,9 +250,9 @@ TEST_CASE("remove_section drops the header and body and nothing else") {
 TEST_CASE("ensure_format adds the format line once and leaves an existing one alone") {
     SettingsDocument fresh = parse("");
     fresh.ensure_format();
-    CHECK(fresh.serialize() == "# toonval settings\nformat = 1.0\n");
+    CHECK(fresh.serialize() == "# etude settings\nformat = 1.0\n");
     fresh.ensure_format();
-    CHECK(fresh.serialize() == "# toonval settings\nformat = 1.0\n");
+    CHECK(fresh.serialize() == "# etude settings\nformat = 1.0\n");
 
     SettingsDocument no_format = parse("[app]\na = 1\n");
     no_format.ensure_format();
@@ -327,7 +327,7 @@ TEST_CASE("a default-constructed document is an empty, fully usable document") {
     CHECK(doc.serialize() == "[app]\na = 1\n");
     SettingsDocument fresh;
     fresh.ensure_format();
-    CHECK(fresh.serialize() == "# toonval settings\nformat = 1.0\n");
+    CHECK(fresh.serialize() == "# etude settings\nformat = 1.0\n");
 }
 
 TEST_CASE("a header at the very end with no line ending still gets its keys on their own lines") {
@@ -343,4 +343,128 @@ TEST_CASE("a header at the very end with no line ending still gets its keys on t
     SettingsDocument added = parse("[a]\nk = 1\n[look]");
     added.set("other", "z", "1");
     CHECK(added.serialize() == "[a]\nk = 1\n[look]\n[other]\nz = 1\n");
+}
+
+TEST_CASE("remove drops the lines with a key from one section and nothing else") {
+    SettingsDocument doc = SettingsDocument::parse(
+        "# top\nformat = 1.0\n\n[a]\nx = 1\n# note\ny = 2\nx = 3\n\n[b]\nx = 9\n");
+    doc.remove("a", "x");
+    CHECK(doc.serialize() == "# top\nformat = 1.0\n\n[a]\n# note\ny = 2\n\n[b]\nx = 9\n");
+    doc.remove("a", "missing");
+    doc.remove("nope", "x");
+    CHECK(doc.serialize() == "# top\nformat = 1.0\n\n[a]\n# note\ny = 2\n\n[b]\nx = 9\n");
+    doc.remove("b", "x");
+    CHECK(doc.serialize() == "# top\nformat = 1.0\n\n[a]\n# note\ny = 2\n\n[b]\n");
+    // A last line with no line ending, and CRLF text.
+    SettingsDocument crlf = SettingsDocument::parse("[a]\r\nx = 1\r\ny = 2\r\nx = 3");
+    crlf.remove("a", "x");
+    CHECK(crlf.serialize() == "[a]\r\ny = 2\r\n");
+}
+
+// ---- Lookups by name
+
+namespace {
+std::string section_name(int i) { return "s" + std::to_string(i); }
+} // namespace
+
+TEST_CASE("settings doc: thousands of sections are found by name, in any state of removal") {
+    constexpr int kCount = 3000;
+    std::string text = "format = 1.0\n\n";
+    for (int i = 0; i < kCount; ++i) {
+        text += "[" + section_name(i) + "]\nv = " + std::to_string(i) + "\n\n";
+    }
+    SettingsDocument doc = parse(text);
+    CHECK(doc.serialize() == text);
+    CHECK(doc.section_names().size() == static_cast<std::size_t>(kCount));
+    for (int i = 0; i < kCount; ++i) {
+        const SettingsSection s = doc.section(section_name(i));
+        REQUIRE(s.present);
+        REQUIRE(s.entries.size() == 1);
+        CHECK(s.entries[0].value == std::to_string(i));
+        CHECK(s.header_line == 3 + 3 * i);
+    }
+    CHECK_FALSE(doc.has_section("missing"));
+    CHECK(doc.has_section(""));
+
+    // Remove two of every three: far past the point where the document compacts itself.
+    std::string kept = "format = 1.0\n\n";
+    std::vector<std::string> names;
+    for (int i = 0; i < kCount; ++i) {
+        if (i % 3 == 0) {
+            kept += "[" + section_name(i) + "]\nv = " + std::to_string(i) + "\n\n";
+            names.push_back(section_name(i));
+        } else {
+            doc.remove_section(section_name(i));
+        }
+    }
+    CHECK(doc.serialize() == kept);
+    // The removed parts were dropped for good along the way, not all held until the end.
+    CHECK(doc.held_parts() < static_cast<std::size_t>(kCount) / 2);
+    CHECK(doc.section_names() == names);
+    for (int i = 0; i < kCount; ++i) {
+        CHECK(doc.has_section(section_name(i)) == (i % 3 == 0));
+    }
+    // A section removed and added again lands at the end, and a new one after it.
+    doc.set(section_name(3), "v", "again");
+    doc.remove_section(section_name(3));
+    doc.set(section_name(3), "v", "back");
+    CHECK(doc.held_parts() < static_cast<std::size_t>(kCount) / 2 + 3);
+    doc.set("new", "k", "1");
+    CHECK(doc.section(section_name(3)).entries.at(0).value == "back");
+    CHECK(doc.section(section_name(6)).entries.at(0).value == "6");
+    CHECK(doc.section_names().back() == "new");
+    CHECK(doc.section_names().at(names.size() - 1) == section_name(3));
+    const SettingsDocument again = parse(doc.serialize());
+    CHECK(again.section_names() == doc.section_names());
+}
+
+TEST_CASE("settings doc: removing a section removes every copy of it") {
+    SettingsDocument doc = parse("[a]\nx = 1\n[b]\ny = 2\n[a]\nx = 3\n");
+    CHECK(doc.section("a").entries.at(0).value == "1"); // the first one counts
+    doc.remove_section("a");
+    CHECK_FALSE(doc.has_section("a"));
+    CHECK(doc.serialize() == "[b]\ny = 2\n");
+    CHECK(doc.section_names() == std::vector<std::string>{"b"});
+}
+
+TEST_CASE("settings doc: a section added after the last was removed follows the one before") {
+    SettingsDocument doc = parse("[a]\nx = 1\n\n[b]\ny = 2\n");
+    doc.remove_section("b");
+    doc.set("c", "z", "3");
+    CHECK(doc.serialize() == "[a]\nx = 1\n\n[c]\nz = 3\n");
+    doc.remove_section("c");
+    doc.remove_section("a");
+    CHECK(doc.serialize() == "");
+    doc.set("a", "x", "9");
+    CHECK(doc.serialize() == "[a]\nx = 9\n");
+}
+
+TEST_CASE("settings doc: removed sections stay held until half are removed, then are dropped") {
+    constexpr int kCount = 200;
+    std::string text;
+    for (int i = 0; i < kCount; ++i) {
+        text += "[" + section_name(i) + "]\nv = 1\n";
+    }
+    SettingsDocument doc = parse(text);
+    CHECK(doc.held_parts() == static_cast<std::size_t>(kCount) + 1);
+    // Taken from the front, so none is the last part and each stays held until a compaction.
+    for (int i = 0; i < 33; ++i) {
+        doc.remove_section(section_name(i));
+    }
+    CHECK(doc.held_parts() == static_cast<std::size_t>(kCount) + 1);
+    for (int i = 33; i < 150; ++i) {
+        doc.remove_section(section_name(i));
+    }
+    CHECK(doc.held_parts() <= static_cast<std::size_t>(kCount) / 2);
+    CHECK(doc.section_names().size() == static_cast<std::size_t>(kCount) - 150);
+    for (int i = 150; i < kCount; ++i) {
+        CHECK(doc.section(section_name(i)).present);
+    }
+}
+
+TEST_CASE("settings doc: remove_section accepts a name viewing the document's own text") {
+    SettingsDocument doc = parse("[a]\nx = 1\n[b]\ny = 2\n[a]\nx = 3\n[c]\nz = 4\n");
+    const std::string name = doc.section_names().front(); // a copy, as a caller holds one
+    doc.remove_section(name);
+    CHECK(doc.serialize() == "[b]\ny = 2\n[c]\nz = 4\n");
 }

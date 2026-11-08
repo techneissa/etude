@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/progress.hpp"
+#include "etude/progress.hpp"
 
 #include <algorithm>
 #include <cmath>
 #include <map>
 #include <tuple>
 
-namespace toonval {
+namespace etude {
 
 namespace {
 
@@ -160,6 +160,55 @@ Streak practice_streak(std::span<const RunRecord> runs, std::int32_t today,
     return s;
 }
 
+Streak streak_with_freezes(std::span<const RunRecord> runs, std::int32_t today, const StreakRule& rule) {
+    const std::int64_t need = std::max<std::int64_t>(1, rule.min_practised_ms);
+    Streak s;
+    int count = 0;
+    int freezes = 0;
+    int frozen = 0;
+    std::int64_t last = 0;
+    bool any = false;
+    for (const DayPractice& d : day_totals(runs, today)) {
+        if (d.practised_ms < need) {
+            continue;
+        }
+        if (any) {
+            const std::int64_t missed = d.day - last - 1;
+            if (missed > freezes) { // a missed day with no freeze left: the streak ends
+                count = 0;
+                freezes = 0;
+                frozen = 0;
+            } else {
+                freezes -= static_cast<int>(missed);
+                frozen += static_cast<int>(missed);
+            }
+        }
+        ++count;
+        freezes = std::min(kMaxStreakFreezes, freezes + 1);
+        last = d.day;
+        any = true;
+        s.longest = std::max(s.longest, count);
+    }
+    if (!any) {
+        return s;
+    }
+    // The days since the last counting one, up to yesterday (today is still to be played).
+    const std::int64_t missed = std::max<std::int64_t>(0, std::int64_t{today} - 1 - last);
+    if (missed > freezes) {
+        return s; // ended: current 0, nothing banked
+    }
+    s.current = count;
+    s.freezes = freezes - static_cast<int>(missed);
+    s.frozen_days = frozen + static_cast<int>(missed);
+    s.today_done = last == today;
+    s.at_risk = !s.today_done;
+    return s;
+}
+
+Streak profile_streak(std::span<const RunRecord> runs, std::int32_t today) {
+    return streak_with_freezes(runs, today, StreakRule::any_practice());
+}
+
 // ---- Per-song bests and history
 
 namespace {
@@ -193,6 +242,10 @@ std::vector<BestEntry> song_bests(std::span<const RunRecord> runs, std::uint64_t
         BestEntry entry;
         RunHand hand;
     };
+    // One best per mode, hands and exact speed percent. The speed is a whole percent (a typed tempo
+    // gives 83, the buttons 85), so a song can have more entries than it did at steps of 5; the
+    // library's best per song takes the highest accuracy over all of them (library.cpp), so the
+    // player sees one best either way.
     std::map<std::tuple<int, int, int>, Best> best;
     for (std::size_t i : song_runs(runs, song_hash)) {
         const RunRecord& r = runs[i];
@@ -211,7 +264,7 @@ std::vector<BestEntry> song_bests(std::span<const RunRecord> runs, std::uint64_t
             b.entry.mode = r.mode;
             b.entry.hands = r.hands;
             b.entry.speed_percent = r.speed_percent;
-            b.entry.accuracy = r.all.accuracy();
+            b.entry.accuracy = r.all.accuracy().value_or(0.0); // graded >= min_graded
             b.entry.graded_notes = r.all.graded;
             b.entry.longest_combo = r.longest_combo;
             b.entry.day = r.local_day;
@@ -272,7 +325,8 @@ std::vector<HistoryPoint> history_series(std::span<const RunRecord> runs, std::u
 
 AttemptChange compare_with_last_attempt(std::span<const RunRecord> runs, const RunRecord& current) {
     AttemptChange c;
-    c.accuracy = current.all.accuracy();
+    // Nothing graded returns below, before the accuracy is used.
+    c.accuracy = current.all.accuracy().value_or(0.0);
     c.longest_combo = current.longest_combo;
     if (current.song_hash == 0 || current.all.graded <= 0) {
         return c;
@@ -297,7 +351,7 @@ AttemptChange compare_with_last_attempt(std::span<const RunRecord> runs, const R
         return c;
     }
     c.has_previous = true;
-    c.previous_accuracy = previous->all.accuracy();
+    c.previous_accuracy = previous->all.accuracy().value_or(0.0); // graded > 0 here
     c.accuracy_delta = c.accuracy - c.previous_accuracy;
     c.previous_longest_combo = previous->longest_combo;
     c.combo_delta = c.longest_combo - c.previous_longest_combo;
@@ -361,7 +415,29 @@ TroublePlan trouble_plan(std::span<const RunRecord> runs, std::uint64_t song_has
     }
     plan.runs_read = static_cast<int>(picked.size());
 
-    std::map<int, BarAcc> acc;
+    // The bars the runs graded, by measure. A song's measures are consecutive numbers, so a flat
+    // table indexed by measure holds them (a map costs a node and a search for each bar of each
+    // run: over a long song, milliseconds on a frame); measures far apart (damaged data) use a map.
+    int lowest = 0;
+    int highest = -1;
+    std::int64_t graded_bars = 0;
+    for (const RunRecord* r : picked) {
+        for (const RunBar& b : r->measures) {
+            if (b.graded <= 0) {
+                continue;
+            }
+            if (graded_bars++ == 0) {
+                lowest = highest = b.measure;
+            } else {
+                lowest = std::min(lowest, b.measure);
+                highest = std::max(highest, b.measure);
+            }
+        }
+    }
+    const std::int64_t span = graded_bars > 0 ? std::int64_t{highest} - lowest + 1 : 0;
+    const bool flat = span > 0 && span <= 8 * graded_bars + 64;
+    std::vector<BarAcc> table(flat ? static_cast<std::size_t>(span) : 0);
+    std::map<int, BarAcc> sparse;
     for (std::size_t age = 0; age < picked.size(); ++age) {
         const double w = std::exp2(-static_cast<double>(age) / half_life);
         for (const RunBar& b : picked[age]->measures) {
@@ -372,12 +448,26 @@ TroublePlan trouble_plan(std::span<const RunRecord> runs, std::uint64_t song_has
             const double miss_part = b.missed / graded;
             const double wrong_part = kWrongPressWeight * b.wrong / graded;
             const double rate = std::min(1.0, miss_part + wrong_part);
-            BarAcc& a = acc[b.measure];
+            BarAcc& a = flat ? table[static_cast<std::size_t>(std::int64_t{b.measure} - lowest)]
+                             : sparse[b.measure];
             a.weight += w;
             a.weighted_rate += w * rate;
             a.weighted_missed += w * miss_part;
             a.weighted_wrong += w * wrong_part;
             a.attempts += b.graded;
+        }
+    }
+    // In measure order, the bars that were graded.
+    std::vector<std::pair<int, const BarAcc*>> acc;
+    if (flat) {
+        for (std::size_t i = 0; i < table.size(); ++i) {
+            if (table[i].attempts > 0) {
+                acc.emplace_back(static_cast<int>(lowest + static_cast<std::int64_t>(i)), &table[i]);
+            }
+        }
+    } else {
+        for (const auto& [measure, a] : sparse) {
+            acc.emplace_back(measure, &a);
         }
     }
 
@@ -387,11 +477,11 @@ TroublePlan trouble_plan(std::span<const RunRecord> runs, std::uint64_t song_has
     for (const auto& [measure, a] : acc) {
         BarHeat h;
         h.measure = measure;
-        h.attempts = static_cast<int>(std::min<std::int64_t>(a.attempts, INT32_MAX));
-        h.reliable = a.attempts >= min_attempts;
-        h.heat = h.reliable ? std::clamp(a.weighted_rate / a.weight, 0.0, 1.0) : 0.0;
+        h.attempts = static_cast<int>(std::min<std::int64_t>(a->attempts, INT32_MAX));
+        h.reliable = a->attempts >= min_attempts;
+        h.heat = h.reliable ? std::clamp(a->weighted_rate / a->weight, 0.0, 1.0) : 0.0;
         plan.bars.push_back(h);
-        detail.push_back(&a);
+        detail.push_back(a);
     }
 
     const std::size_t n = plan.bars.size();
@@ -478,4 +568,4 @@ TroublePlan trouble_plan(std::span<const RunRecord> runs, std::uint64_t song_has
     return plan;
 }
 
-} // namespace toonval
+} // namespace etude

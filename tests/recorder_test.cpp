@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/recorder.hpp"
+#include "etude/recorder.hpp"
 
-#include "toonval/midi_event.hpp"
-#include "toonval/midi_file.hpp"
-#include "toonval/midi_writer.hpp"
+#include "etude/midi_event.hpp"
+#include "etude/midi_file.hpp"
+#include "etude/midi_writer.hpp"
 
 #include <doctest/doctest.h>
 
 #include <cstdint>
 
-using namespace toonval;
+using namespace etude;
 
 namespace {
 

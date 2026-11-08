@@ -7,7 +7,7 @@
 #include <string>
 #include <vector>
 
-namespace toonval::test {
+namespace etude::test {
 
 // Builds a minimal SoundFont 2 in memory: one preset (bank 0, program 0) whose instrument plays a
 // looped sine at full scale, with a 0.3 s release. Lets the synth tests run without the piano
@@ -119,4 +119,4 @@ inline std::vector<std::uint8_t> tiny_sf2() {
     return chunk("RIFF", body);
 }
 
-} // namespace toonval::test
+} // namespace etude::test

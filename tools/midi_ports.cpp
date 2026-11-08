@@ -3,7 +3,7 @@
 // the device and the keyboard profile the app would pick, with the reason, so one run with a new
 // keyboard plugged in gives what its profile needs. The output is plain text, easy to paste.
 #include "../app/midi_port_identity.hpp"
-#include "toonval/keyboard_identity.hpp"
+#include "etude/keyboard_identity.hpp"
 
 #include <libremidi/libremidi.hpp>
 
@@ -54,9 +54,9 @@ int main() {
                 api.data());
     int index = 0;
     for (const auto& port : inputs) {
-        const auto pid = toonval::app::identify_port(port);
+        const auto pid = etude::app::identify_port(port);
         const auto& id = pid.identity;
-        const auto match = toonval::match_keyboard(id);
+        const auto match = etude::match_keyboard(id);
 
         std::printf("[%d] %s\n", ++index,
                     std::string(sv_or(port.display_name, port.port_name)).c_str());
@@ -78,7 +78,7 @@ int main() {
             std::printf("    %-14s %s\n", "USB bus-dev:", pid.instance.c_str());
         }
         std::printf("    %-14s %s\n", "transport:", transport(port.type).c_str());
-        const auto reason = toonval::describe(match.reason);
+        const auto reason = etude::describe(match.reason);
         if (match.profile != nullptr) {
             std::printf("    %-14s %.*s, %d keys, notes %d..%d (%.*s",
                         "profile:", static_cast<int>(match.profile->name.size()),

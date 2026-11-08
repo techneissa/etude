@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/latency_stats.hpp"
+#include "etude/latency_stats.hpp"
 
 #include <algorithm>
 
-namespace toonval {
+namespace etude {
 
 LatencyStats::LatencyStats(std::size_t capacity) : capacity_(std::max<std::size_t>(capacity, 1)) {
     samples_.reserve(capacity_);
@@ -34,4 +34,4 @@ LatencySummary LatencyStats::take_summary() {
     return s;
 }
 
-} // namespace toonval
+} // namespace etude

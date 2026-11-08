@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "settings_store.hpp"
 
-#include "toonval/settings_doc.hpp"
+#include "etude/settings_doc.hpp"
 
 #include <algorithm>
 #include <cstdio>
@@ -17,7 +17,7 @@
 #include <unistd.h>
 #endif
 
-namespace toonval::app {
+namespace etude::app {
 
 namespace fs = std::filesystem;
 
@@ -209,4 +209,4 @@ SaveResult SettingsStore::save(std::string_view text) {
     return result;
 }
 
-} // namespace toonval::app
+} // namespace etude::app

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/practice_plan.hpp"
+#include "etude/practice_plan.hpp"
 
 #include "section_fixtures.hpp"
 
@@ -11,8 +11,8 @@
 #include <random>
 #include <vector>
 
-using namespace toonval;
-using namespace toonval::testing;
+using namespace etude;
+using namespace etude::testing;
 using Kind = PlanStep::Kind;
 
 namespace {
@@ -697,9 +697,9 @@ TEST_CASE("plan: set_base_speed_percent snaps to the grid and clamps") {
     plan.set_base_speed_percent(1);
     CHECK(plan.base_speed_percent() == 25);
     plan.set_base_speed_percent(100000);
-    CHECK(plan.base_speed_percent() == 150);
+    CHECK(plan.base_speed_percent() == 200);
     plan.set_base_speed_percent(std::numeric_limits<int>::max());
-    CHECK(plan.base_speed_percent() == 150);
+    CHECK(plan.base_speed_percent() == 200);
     plan.set_base_speed_percent(std::numeric_limits<int>::min());
     CHECK(plan.base_speed_percent() == 25);
 }
@@ -713,9 +713,9 @@ TEST_CASE("plan: an item with a speed-up near INT_MAX starts on the grid") {
     PracticePlan plan;
     plan.start(f.sections, items, std::numeric_limits<int>::max());
     REQUIRE(plan.active());
-    CHECK(plan.base_speed_percent() == 150);
+    CHECK(plan.base_speed_percent() == 200);
     CHECK(plan.items()[0].speed_up.step_percent == 25);
-    CHECK(plan.items()[0].speed_up.start_percent == 150);
+    CHECK(plan.items()[0].speed_up.start_percent == 200);
 }
 
 TEST_CASE("apply_plan_step: each kind does the Transport calls it asks for") {
@@ -771,4 +771,22 @@ TEST_CASE("apply_plan_step: each kind does the Transport calls it asks for") {
     CHECK(apply_plan_step(t, now, finished));
     CHECK_FALSE(t.loop_enabled());
     CHECK_FALSE(t.playing());
+}
+
+TEST_CASE("plan: the position counts only items whose section still exists") {
+    Fixture f;
+    PracticePlan plan;
+    const std::array<PlanItem, 3> items{item(f.a), item(f.b), item(f.c)};
+    plan.start(f.sections, items, 100, 2); // running the third item
+    PracticePlan::LivePosition live = plan.live_position(f.sections);
+    CHECK(live.position == 2);
+    CHECK(live.count == 3);
+    // B is deleted while the list runs: the running copy keeps its three items, the count is two.
+    REQUIRE(f.sections.erase(f.song, f.b).ok);
+    CHECK(plan.items().size() == 3);
+    live = plan.live_position(f.sections);
+    CHECK(live.position == 1);
+    CHECK(live.count == 2); // "Section 2/2", not "3/3"
+    PracticePlan idle;
+    CHECK(idle.live_position(f.sections).count == 0);
 }

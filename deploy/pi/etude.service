@@ -1,0 +1,74 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# etude on the console with SDL3's KMSDRM backend: no compositor, the app owns the screens.
+# Adapted from the cage wiki's boot unit. UNTESTED on a Pi; see deploy/pi/CHECKLIST.md.
+# Installed to /etc/systemd/system/etude.service by deploy/pi/setup.sh.
+# Use this OR etude-labwc.service, not both (they conflict).
+[Unit]
+Description=etude (KMSDRM, no compositor)
+After=systemd-user-sessions.service systemd-logind.service
+After=getty@tty1.service sound.target
+Wants=systemd-logind.service
+# The app takes over tty1 from the login prompt.
+Conflicts=getty@tty1.service etude-labwc.service
+ConditionPathExists=/dev/tty0
+
+# Nothing restarts the app by itself: a crash, or the watchdog's kill, fails the unit and OnFailure=
+# starts the crash screen (`etude --crash-screen`), where the player chooses Restart. A version on
+# trial that crashed is gone back from before that screen is drawn (etude-update-helper crashed). The
+# player's own starts are never refused: no start limit.
+StartLimitIntervalSec=0
+OnFailure=etude-crash-screen.service
+
+[Service]
+Type=simple
+User=etude
+# setup.sh adds the user to these. A group missing on your image makes the unit fail to start:
+# remove it here.
+SupplementaryGroups=video render input audio
+Environment=SDL_VIDEO_DRIVER=kmsdrm
+# Hypothesis to test: the GLES renderer is picked on its own under KMSDRM. Force it if it is not.
+#Environment=SDL_RENDER_DRIVER=opengles2
+# Counts this start for an app update on trial (etude-update-helper count): a new version that
+# is started twice without saying ready is rolled back, before the app starts, across reboots too.
+# `sandboxed` runs it as a transient service under the update service's sandbox (helper/sandbox.hpp), and its
+# status is the answer, unchanged.
+# The "+" runs it as root. There is no "-": a going back whose data could not be put back ends
+# with status 75 and keeps the app from starting on the new version's data (the unit fails, and the crash
+# screen says why and offers Try again); with no update on trial, and for any other trouble of its
+# own, it ends with 0. TimeoutStartSec covers a restore (240 s) with room.
+ExecStartPre=+/usr/local/lib/etude/etude-update-helper sandboxed count
+TimeoutStartSec=600
+ExecStart=@PREFIX@/current/bin/etude
+# Switch to the VT the app runs on. The leading "-+" ignores a failure and runs as root.
+ExecStartPost=-+/usr/bin/chvt 1
+Restart=no
+
+# A hung app (not a crashed one) would stay up until a power cycle. The frame loop answers this watchdog
+# (app/watchdog.hpp: WATCHDOG=1 to $NOTIFY_SOCKET from the frame loop only, so a hung frame stops the
+# pings), and a service that misses it is ended with SIGABRT and fails like a crash: the crash screen
+# shows (and a version on trial is gone back from first). 60 s because a first start is slow (the
+# window, the piano samples, the history's migration) and the loop must not be taken for dead while it
+# does something long, such as a large song or score, and a hang is still gone within a minute.
+# The watchdog runs from the start (Type=simple). NotifyAccess=main: only the app's own process may
+# send, and nothing else in the unit.
+WatchdogSec=60
+NotifyAccess=main
+# The app needs no setuid program (it starts none), so it may not gain privileges: a setuid helper such
+# as fusermount3 could otherwise put a mount in the app user's home, which the helper's sandbox may
+# write (etude-update-sandbox.conf).
+NoNewPrivileges=yes
+
+# A logind session on tty1 is what grants DRM and input access without root (hypothesis).
+PAMName=etude
+StandardInput=tty-fail
+StandardOutput=journal
+StandardError=journal
+TTYPath=/dev/tty1
+TTYReset=yes
+TTYVHangup=yes
+TTYVTDisallocate=yes
+UtmpIdentifier=tty1
+UtmpMode=user
+
+[Install]
+WantedBy=multi-user.target

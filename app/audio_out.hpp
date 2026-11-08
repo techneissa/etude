@@ -2,10 +2,12 @@
 #pragma once
 
 #include "piano_synth.hpp"
+#include "sample_clock.hpp"
 #include "synth_sink.hpp"
 
-#include "toonval/latency_stats.hpp"
-#include "toonval/midi_event.hpp"
+#include "etude/latency_stats.hpp"
+#include "etude/midi_event.hpp"
+#include "etude/spsc_queue.hpp"
 
 #include <SDL3/SDL.h>
 
@@ -14,7 +16,7 @@
 #include <cstdint>
 #include <string>
 
-namespace toonval::app {
+namespace etude::app {
 
 struct AudioOptions {
     std::string sound_font;   // --sound-font PATH; empty searches beside the executable
@@ -25,7 +27,7 @@ struct AudioOptions {
 // The built-in piano on the default audio output: an SDL3 audio stream at 48 kHz, stereo float,
 // whose callback renders PianoSynth. Main thread only, apart from the callback.
 //
-// Without the piano samples (toonval-piano.sf2) or an audio device, start() returns false and
+// Without the piano samples (etude-piano.sf2) or an audio device, start() returns false and
 // sink() is a silent sink, so callers never need to check.
 class AudioOut {
   public:
@@ -60,6 +62,10 @@ class AudioOut {
     void report(std::int64_t now_ns);
 
     int device_frames() const { return device_frames_; }
+    // For measuring the song's timing: once recording is on, how far each callback ran from the
+    // sample clock's line, in ns (positive: late). False when none are waiting.
+    void record_clock_residuals(bool on) { record_residuals_.store(on, std::memory_order_relaxed); }
+    bool take_clock_residual(std::int64_t& ns) { return clock_residuals_.pop(ns); }
 
   private:
     static void SDLCALL callback(void* userdata, SDL_AudioStream* stream, int additional_amount,
@@ -96,10 +102,14 @@ class AudioOut {
     std::int64_t late_ns_ = 0; // a gap longer than this between callbacks counts as an underrun
     std::int64_t last_callback_ns_ = 0;
     std::array<float, 2 * 1024> buffer_{};
+    SampleClock clock_;
+    std::int64_t frames_written_ = 0;
+    SpscQueue<std::int64_t, 1024> clock_residuals_; // callback -> main
+    std::atomic<bool> record_residuals_{false};
 
     // --audio-latency-log
     LatencyStats latency_;
     std::int64_t next_report_ns_ = 0;
 };
 
-} // namespace toonval::app
+} // namespace etude::app

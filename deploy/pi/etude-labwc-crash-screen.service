@@ -1,0 +1,43 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# The crash screen inside the labwc kiosk session: what etude-crash-screen.service is for
+# etude.service (read the comment there). Started by OnFailure= of etude-labwc.service; Restart and
+# Try again exit 0 and OnSuccess= starts the labwc app unit.
+# Installed to /etc/systemd/system/etude-labwc-crash-screen.service by deploy/pi/setup.sh; never enabled.
+[Unit]
+Description=etude (labwc kiosk, crash screen)
+After=systemd-user-sessions.service systemd-logind.service
+After=getty@tty1.service sound.target
+Wants=systemd-logind.service
+Conflicts=getty@tty1.service etude.service etude-labwc.service
+ConditionPathExists=/dev/tty0
+OnSuccess=etude-labwc.service
+
+[Service]
+Type=simple
+User=etude
+SupplementaryGroups=video render input audio
+Environment=LIBSEAT_BACKEND=logind
+Environment=SDL_VIDEO_DRIVER=wayland
+ExecCondition=+/usr/local/lib/etude/etude-update-helper sandboxed idle
+ExecStartPre=+/usr/local/lib/etude/etude-update-helper sandboxed crashed
+TimeoutStartSec=600
+# Through etude-labwc-session (read the comment in etude-labwc.service): labwc exits 0 whatever the
+# screen did, and the script ends with the screen's own status, so only the screen's exit 0 (Restart,
+# Try again) starts the app through OnSuccess=, never a crash of the screen.
+RuntimeDirectory=etude-labwc-crash-screen
+ExecStart=/usr/local/lib/etude/etude-labwc-session @PREFIX@/current/bin/etude --crash-screen
+ExecStartPost=-+/usr/bin/chvt 1
+Restart=no
+# No NoNewPrivileges= here (etude.service has it): whether a labwc session needs a setuid program is
+# untested; see deploy/pi/CHECKLIST.md.
+
+PAMName=etude
+StandardInput=tty-fail
+StandardOutput=journal
+StandardError=journal
+TTYPath=/dev/tty1
+TTYReset=yes
+TTYVHangup=yes
+TTYVTDisallocate=yes
+UtmpIdentifier=tty1
+UtmpMode=user

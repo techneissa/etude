@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/pitch.hpp"
+#include "etude/pitch.hpp"
 
 #include <cmath>
 #include <limits>
 
 #include <doctest/doctest.h>
 
-using namespace toonval;
+using namespace etude;
 
 TEST_CASE("black keys follow the piano pattern") {
     // C C# D D# E F F# G G# A A# B

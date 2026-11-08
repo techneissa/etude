@@ -3,7 +3,7 @@
 // one implementation without another library target.
 #pragma once
 
-#include "toonval/keyboard_identity.hpp"
+#include "etude/keyboard_identity.hpp"
 
 #include <libremidi/libremidi.hpp>
 
@@ -13,7 +13,7 @@
 #include <string>
 #include <type_traits>
 
-namespace toonval::app {
+namespace etude::app {
 
 struct PortIdentity {
     KeyboardIdentity identity;
@@ -83,4 +83,4 @@ inline PortIdentity identify_port(const libremidi::port_information& port) {
     return out;
 }
 
-} // namespace toonval::app
+} // namespace etude::app

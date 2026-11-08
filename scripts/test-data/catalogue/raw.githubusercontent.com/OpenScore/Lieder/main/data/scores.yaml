@@ -1,0 +1,7 @@
+# A stand-in for the OpenScore Lieder listing (the audit and shots).
+9000001:
+  path: Schubert,_Franz/Winterreise,_D.911/01_Gute_Nacht
+  set_id: 1
+9000002:
+  path: Schumann,_Clara/_/Prelude_and_Song
+  set_id: 2

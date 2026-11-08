@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/note_trail.hpp"
+#include "etude/note_trail.hpp"
 
 #include <doctest/doctest.h>
 
-using namespace toonval;
+using namespace etude;
 
 namespace {
 constexpr std::int64_t kMs = 1'000'000;

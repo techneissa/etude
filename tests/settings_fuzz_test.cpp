@@ -2,9 +2,9 @@
 // Random and mutated documents: reading never crashes, always gives a valid (clamped) state, never
 // changes a byte it is not asked to change, and writing what was read is stable. The generators use
 // a fixed seed, so a failure repeats; the printed iteration number and input are the repro.
-#include "toonval/session_restore.hpp"
-#include "toonval/session_state.hpp"
-#include "toonval/settings_doc.hpp"
+#include "etude/session_restore.hpp"
+#include "etude/session_state.hpp"
+#include "etude/settings_doc.hpp"
 
 #include <doctest/doctest.h>
 
@@ -15,7 +15,7 @@
 #include <string>
 #include <vector>
 
-using namespace toonval;
+using namespace etude;
 
 namespace {
 
@@ -95,21 +95,20 @@ bool num_in(double v, double lo, double hi) { return std::isfinite(v) && v >= lo
 
 bool valid_session(const SessionState& s) {
     bool ok = path_ok(s.song_path);
-    ok = ok && num_in(s.position_s, 0, 86400) && s.speed_percent >= 25 && s.speed_percent <= 150 &&
-         s.speed_percent % 5 == 0;
+    ok = ok && num_in(s.position_s, 0, 86400) && s.speed_percent >= 25 && s.speed_percent <= 200;
     ok = ok && static_cast<int>(s.practice_hands) <= 2 && static_cast<int>(s.piano_plays) <= 4 &&
          static_cast<int>(s.mode) <= 2 && static_cast<int>(s.keyboard) <= 2;
     ok = ok && num_in(s.loop_start_s, 0, 86400) && num_in(s.loop_end_s, 0, 86400);
     bool no_loop = s.loop_start_s == 0.0 && s.loop_end_s == 0.0 && !s.loop_enabled;
     bool real_loop = s.loop_end_s - s.loop_start_s >= 0.1;
     ok = ok && (no_loop || real_loop);
-    ok = ok && s.auto_speed_start_percent >= 25 && s.auto_speed_start_percent <= 150 &&
+    ok = ok && s.auto_speed_start_percent >= 25 && s.auto_speed_start_percent <= 200 &&
          s.auto_speed_start_percent % 5 == 0;
     ok = ok && s.auto_speed_step_percent >= 5 && s.auto_speed_step_percent <= 25 &&
          s.auto_speed_step_percent % 5 == 0;
     ok = ok && s.auto_speed_max_percent >= s.auto_speed_start_percent &&
-         s.auto_speed_max_percent <= 150 && s.auto_speed_max_percent % 5 == 0;
-    ok = ok && s.count_in_beats >= 0 && s.count_in_beats <= 16;
+         s.auto_speed_max_percent <= 200 && s.auto_speed_max_percent % 5 == 0;
+    ok = ok && s.count_in_bars >= 0 && s.count_in_bars <= 2;
     ok = ok && s.transpose_semitones >= -12 && s.transpose_semitones <= 12;
     ok = ok && s.section_id >= 0 && s.section_id <= 2'000'000'000 && s.plan_item >= 0 &&
          s.plan_item <= 64;
@@ -129,7 +128,9 @@ bool valid_app(const AppSettings& a) {
     return a.hit_window_ms >= 20 && a.hit_window_ms <= 250 && a.latency_correction_ms >= -250 &&
            a.latency_correction_ms <= 250 && a.daily_goal_minutes >= 0 &&
            a.daily_goal_minutes <= 720 && text_ok(a.midi_in_port, 256) &&
-           text_ok(a.midi_out_port, 256);
+           text_ok(a.midi_out_port, 256) && static_cast<int>(a.input_mode) <= 2 &&
+           text_ok(a.mic_device, 256) && a.mic_a4_tenths >= 4150 && a.mic_a4_tenths <= 4650 &&
+           a.mic_noise_floor_ppm >= 0 && a.mic_noise_floor_ppm <= 500000;
 }
 
 // ---- Generators.
@@ -144,7 +145,7 @@ std::string random_bytes(Rng& rng, std::size_t max_len) {
     return s;
 }
 
-const std::array<const char*, 28> kKeys = {"song",
+const std::array<const char*, 32> kKeys = {"song",
                                            "song_hash",
                                            "position_s",
                                            "speed_percent",
@@ -157,8 +158,9 @@ const std::array<const char*, 28> kKeys = {"song",
                                            "auto_speed_start_percent",
                                            "auto_speed_step_percent",
                                            "auto_speed_max_percent",
-                                           "count_in_beats",
+                                           "count_in_bars",
                                            "metronome",
+                                           "metronome_volume",
                                            "mode",
                                            "transpose_semitones",
                                            "section_id",
@@ -171,7 +173,10 @@ const std::array<const char*, 28> kKeys = {"song",
                                            "latency_correction_ms",
                                            "midi_in_port",
                                            "midi_out_port",
-                                           "daily_goal_minutes"};
+                                           "daily_goal_minutes",
+                                           "input_source",
+                                           "mic_device",
+                                           "mic_a4_tenths"};
 
 const std::array<const char*, 40> kValues = {"0",
                                              "1",
@@ -252,13 +257,13 @@ std::string valid_document(Rng& rng) {
     s.song_path = "Songs/a.mid";
     s.song_hash = rng();
     s.position_s = static_cast<double>(rng() % 1000) / 8.0;
-    s.speed_percent = 25 + 5 * static_cast<int>(rng() % 26);
+    s.speed_percent = 25 + 5 * static_cast<int>(rng() % 36);
     s.practice_hands = static_cast<HandFilter>(rng() % 3);
     s.piano_plays = static_cast<PianoPlays>(rng() % 5);
     s.loop_start_s = 1.0;
     s.loop_end_s = 1.0 + static_cast<double>(rng() % 100 + 1) / 4.0;
     s.loop_enabled = rng() % 2;
-    s.count_in_beats = static_cast<int>(rng() % 17);
+    s.count_in_bars = static_cast<int>(rng() % 3);
     s.mode = static_cast<PracticeMode>(rng() % 3);
     s.transpose_semitones = static_cast<int>(rng() % 25) - 12;
     s.keyboard = static_cast<KeyboardChoice>(rng() % 3);

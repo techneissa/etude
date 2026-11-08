@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/run_record.hpp"
+#include "etude/run_record.hpp"
 
-#include "toonval/transport.hpp"
-#include "toonval/transpose.hpp"
+#include "etude/transport.hpp"
+#include "etude/transpose.hpp"
 
 #include <algorithm>
 
-namespace toonval {
+namespace etude {
 
 namespace {
 
@@ -168,7 +168,7 @@ RunRecord sanitized(const RunRecord& in) {
     r.mode = in.mode == RunMode::Wait ? RunMode::Wait : RunMode::Flow;
     r.hands = (in.hands == HandFilter::Left || in.hands == HandFilter::Right) ? in.hands
                                                                               : HandFilter::Both;
-    r.speed_percent = snap_speed_percent(in.speed_percent);
+    r.speed_percent = clamp_speed_percent(in.speed_percent);
     r.transpose_semitones =
         std::clamp(in.transpose_semitones, -kMaxTransposeSemitones, kMaxTransposeSemitones);
     r.start_utc_s = std::clamp(in.start_utc_s, -kMaxRunUtcSeconds, kMaxRunUtcSeconds);
@@ -190,6 +190,8 @@ RunRecord sanitized(const RunRecord& in) {
     r.right = sanitized_hand(in.right);
     r.unknown = sanitized_hand(in.unknown);
     r.all = sanitized_hand(in.all);
+    r.score = std::clamp(in.score, 0, kMaxRunScore);
+    r.covered_percent = std::clamp(in.covered_percent, 0, 100);
 
     r.measures.clear();
     r.measures.reserve(std::min(in.measures.size(), kMaxRunMeasures));
@@ -218,6 +220,10 @@ RunRecord sanitized(const RunRecord& in) {
         bar.missed = std::min(bar.missed, bar.graded);
     }
     return r;
+}
+
+bool is_attempt(const EvaluationSummary& summary) {
+    return summary.all.graded > 0 && (summary.all.hit > 0 || summary.wrong > 0);
 }
 
 RunRecord make_run_record(const EvaluationSummary& summary, const RunContext& context,
@@ -449,4 +455,4 @@ RunParseStatus parse_run_record(std::string_view bytes, RunRecord& out) {
     return RunParseStatus::Ok;
 }
 
-} // namespace toonval
+} // namespace etude

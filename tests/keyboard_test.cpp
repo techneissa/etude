@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/keyboard.hpp"
-#include "toonval/pitch.hpp"
+#include "etude/keyboard.hpp"
+#include "etude/pitch.hpp"
 
 #include <doctest/doctest.h>
 
-using namespace toonval;
+using namespace etude;
 
 TEST_CASE("standard ranges have the right key counts") {
     CHECK(kRange88.key_count() == 88);
@@ -53,7 +53,7 @@ TEST_CASE("white keys tile the full width with no gaps") {
     CHECK(expected_x == doctest::Approx(1.0f));
 }
 
-TEST_CASE("black keys sit centred between their white neighbours") {
+TEST_CASE("key width: black keys sit centred between their white neighbours") {
     const KeyboardLayout layout(kRange61);
     const KeyRect c = layout.key(60);
     const KeyRect c_sharp = layout.key(61);
@@ -146,7 +146,7 @@ TEST_CASE("key() outside the range is a zero-width rect at every distance") {
     CHECK(full.key(128).width == 0.0f);
 }
 
-TEST_CASE("every black key in every octave is centred on a white-key boundary") {
+TEST_CASE("key width: every black key in every octave is centred on a white-key boundary") {
     const KeyboardLayout layout(KeyRange{0, 127});
     for (int n = 0; n <= 127; ++n) {
         if (!is_black_key(n)) {
@@ -159,5 +159,58 @@ TEST_CASE("every black key in every octave is centred on a white-key boundary") 
         CHECK(k.width == doctest::Approx(layout.white_width() * KeyboardLayout::kBlackWidthRatio));
         CHECK(k.x + k.width / 2.0f == doctest::Approx(below.x + below.width));
         CHECK(k.x + k.width / 2.0f == doctest::Approx(above.x));
+    }
+}
+
+TEST_CASE("key width is the default layout") {
+    CHECK(KeyboardLayout(kRange61).blocks() == BlockLayout::KeyWidth);
+    CHECK(KeyboardLayout(kRange61, static_cast<BlockLayout>(9)).blocks() == BlockLayout::KeyWidth);
+    CHECK(KeyboardLayout(kRange61, BlockLayout::EvenLanes).blocks() == BlockLayout::EvenLanes);
+}
+
+TEST_CASE("even lanes: black keys sit in their slots, as on a real piano") {
+    const KeyboardLayout layout(kRange61, BlockLayout::EvenLanes); // starts on C2
+    const float ww = layout.white_width();
+    const float c = layout.key(60).x; // C4
+    // C-E: five slots of 3/5 of a white key; F-B: seven of 4/7.
+    CHECK(layout.key(61).x == doctest::Approx(c + 0.6f * ww));
+    CHECK(layout.key(61).width == doctest::Approx(0.6f * ww));
+    CHECK(layout.key(63).x == doctest::Approx(c + 1.8f * ww));
+    const float f = layout.key(65).x;
+    CHECK(f == doctest::Approx(c + 3.0f * ww));
+    for (int i : {1, 3, 5}) { // F#, G#, A#
+        const KeyRect k = layout.key(65 + i);
+        CHECK(k.black);
+        CHECK(k.x == doctest::Approx(f + static_cast<float>(4 * i) / 7.0f * ww));
+        CHECK(k.width == doctest::Approx(4.0f / 7.0f * ww));
+    }
+    // So C# leans left of the C-D edge and D# right of the D-E edge.
+    CHECK(layout.key(61).x + 0.5f * layout.key(61).width < layout.key(62).x);
+    CHECK(layout.key(63).x + 0.5f * layout.key(63).width > layout.key(64).x);
+    // White keys are the same in both layouts.
+    const KeyboardLayout key_width(kRange61);
+    for (int n = 36; n <= 96; ++n) {
+        if (!is_black_key(n)) {
+            CHECK(layout.key(n).x == key_width.key(n).x);
+            CHECK(layout.key(n).width == key_width.key(n).width);
+        }
+    }
+}
+
+TEST_CASE("even lanes: every black key lies over the edge of its two white neighbours") {
+    const KeyboardLayout layout(KeyRange{0, 127}, BlockLayout::EvenLanes);
+    for (int n = 0; n <= 127; ++n) {
+        if (!is_black_key(n)) {
+            continue;
+        }
+        const KeyRect k = layout.key(n);
+        const KeyRect below = layout.key(n - 1);
+        const KeyRect above = layout.key(n + 1);
+        INFO("note " << n);
+        CHECK(k.black);
+        CHECK(k.x > below.x);
+        CHECK(k.x < above.x);
+        CHECK(k.x + k.width > above.x);
+        CHECK(k.x + k.width < above.x + above.width);
     }
 }

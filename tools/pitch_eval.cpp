@@ -6,10 +6,16 @@
 // Labelled WAV folder: every NAME.wav needs a NAME.txt next to it with one note per line,
 // "onset_seconds offset_seconds midi_note" (the MAPS format; a non-numeric header line is
 // skipped). Open detection is monophonic, so use isolated notes (e.g. MAPS ISOL/NO).
-#include "toonval/pitch_eval.hpp"
-#include "toonval/pitch.hpp"
-#include "toonval/pitch_detect.hpp"
-#include "toonval/pitch_synth.hpp"
+//
+// --write-wav DIR writes three short synthetic piano pieces (a scale, a melody and four chords)
+// as NAME.wav (48 kHz, 16-bit mono), NAME.txt (labels) and NAME.mid (the same notes as a song),
+// for `etude --mic-wav`.
+#include "etude/pitch_eval.hpp"
+#include "etude/midi_writer.hpp"
+#include "etude/pitch.hpp"
+#include "etude/pitch_detect.hpp"
+#include "etude/pitch_synth.hpp"
+#include "etude/song_builder.hpp"
 
 #include <algorithm>
 #include <chrono>
@@ -24,7 +30,7 @@
 #include <string>
 #include <vector>
 
-using namespace toonval;
+using namespace etude;
 
 namespace {
 
@@ -45,8 +51,19 @@ void usage() {
               "  --expected              also evaluate expected-note mode\n"
               "  --melodies N            also evaluate N random 24-note melodies (legato, notes "
               "ringing)\n"
+              "  --repeats R             share of melody notes that strike the same key again "
+              "(default 0)\n"
+              "  --note-velocities       each melody note gets its own velocity (default one per "
+              "melody)\n"
+              "  --from-melody M         evaluate only melodies M.. of the N (0-based; the same "
+              "notes, but\n"
+              "                          the tuning is not learned from the melodies skipped), "
+              "and open chords M..\n"
               "  --chords N              also evaluate N random triads in expected-chord mode\n"
+              "  --open-chords N         also evaluate N dyads and triads in open detection (from\n"
+              "                          silence, over a ringing chord, notes 5-30 ms apart)\n"
               "  --wav DIR               evaluate labelled WAV files instead of the synthetic set\n"
+              "  --write-wav DIR         write synthetic piano pieces (WAV, labels, MIDI) to DIR\n"
               "  --failures              list every clip that was not correct, with its events\n"
               "  --bench                 measure CPU time per block (use a Release build)\n");
 }
@@ -318,6 +335,144 @@ void bench(PitchDetectorConfig cfg, int block) {
     }
 }
 
+// --- Synthetic pieces for `etude --mic-wav` ---
+
+struct PieceNote {
+    double onset_s;
+    double length_s;
+    int note;
+};
+
+struct Piece {
+    const char* name;
+    std::vector<PieceNote> notes;
+    float velocity;
+    // The song's notes come this much sooner than the recording's, so Wait Mode always has to
+    // wait for the player.
+    double song_time_scale = 1.0;
+};
+
+std::vector<Piece> make_pieces() {
+    std::vector<Piece> pieces;
+    Piece scale{"scale", {}, 0.7f};
+    int step = 0;
+    for (const int n : {48, 50, 52, 53, 55, 57, 59, 60, 62, 64, 65, 67, 69, 71, 72}) {
+        scale.notes.push_back({1.0 + 1.0 * step++, 0.8, n});
+    }
+    pieces.push_back(scale);
+
+    Piece melody{"melody", {}, 0.65f};
+    const int twinkle[] = {60, 60, 67, 67, 69, 69, 67, 65, 65, 64, 64, 62, 62, 60};
+    step = 0;
+    for (const int n : twinkle) {
+        melody.notes.push_back({1.0 + 0.9 * step++, 0.7, n});
+    }
+    pieces.push_back(melody);
+
+    Piece chords{"chords", {}, 0.7f, 0.5};
+    const int triads[4][3] = {{60, 64, 67}, {65, 69, 72}, {67, 71, 74}, {72, 76, 79}};
+    for (int c = 0; c < 4; ++c) {
+        for (const int n : triads[c]) {
+            chords.notes.push_back({1.0 + 2.0 * c, 1.5, n});
+        }
+    }
+    pieces.push_back(chords);
+    return pieces;
+}
+
+void write_wav16(const std::filesystem::path& path, const std::vector<float>& audio, int rate) {
+    std::vector<unsigned char> bytes;
+    const auto put32 = [&](std::uint32_t v) {
+        for (int i = 0; i < 4; ++i) {
+            bytes.push_back(static_cast<unsigned char>(v >> (8 * i)));
+        }
+    };
+    const auto put16 = [&](std::uint16_t v) {
+        bytes.push_back(static_cast<unsigned char>(v));
+        bytes.push_back(static_cast<unsigned char>(v >> 8));
+    };
+    const auto tag = [&](const char* t) { bytes.insert(bytes.end(), t, t + 4); };
+    const auto data_bytes = static_cast<std::uint32_t>(audio.size() * 2);
+    tag("RIFF");
+    put32(36 + data_bytes);
+    tag("WAVE");
+    tag("fmt ");
+    put32(16);
+    put16(1);
+    put16(1);
+    put32(static_cast<std::uint32_t>(rate));
+    put32(static_cast<std::uint32_t>(rate * 2));
+    put16(2);
+    put16(16);
+    tag("data");
+    put32(data_bytes);
+    for (const float v : audio) {
+        put16(static_cast<std::uint16_t>(
+            static_cast<std::int16_t>(std::lround(std::clamp(v, -1.0f, 1.0f) * 32767.0f))));
+    }
+    std::ofstream out(path, std::ios::binary);
+    out.write(reinterpret_cast<const char*>(bytes.data()),
+              static_cast<std::streamsize>(bytes.size()));
+}
+
+int write_pieces(const std::string& dir) {
+    constexpr int kRate = 48000;
+    std::filesystem::create_directories(dir);
+    for (const Piece& piece : make_pieces()) {
+        double end = 0.0;
+        for (const PieceNote& n : piece.notes) {
+            end = std::max(end, n.onset_s + n.length_s);
+        }
+        const int length = static_cast<int>((end + 1.0) * kRate);
+        std::vector<float> audio(static_cast<std::size_t>(length), 0.0f);
+        add_room_noise(audio.data(), length, 5e-4f, 11);
+        std::uint64_t seed = 1;
+        for (const PieceNote& n : piece.notes) {
+            PianoToneOptions tone;
+            tone.note = n.note;
+            tone.velocity = piece.velocity;
+            tone.seed = seed++;
+            add_piano_tone(audio.data(), length, static_cast<int>(n.onset_s * kRate), tone, kRate);
+        }
+        const std::filesystem::path base = std::filesystem::path(dir) / piece.name;
+        write_wav16(base.string() + ".wav", audio, kRate);
+        std::ofstream labels(base.string() + ".txt");
+        labels << "OnsetTime OffsetTime MidiPitch\n";
+        for (const PieceNote& n : piece.notes) {
+            labels << n.onset_s << " " << n.onset_s + n.length_s << " " << n.note << "\n";
+        }
+
+        // The same notes as a song (120 BPM, 480 ticks per quarter: 960 ticks a second), the left
+        // hand below middle C.
+        Song song;
+        song.tempo = make_tempo_map(480, 120.0);
+        for (const PieceNote& n : piece.notes) {
+            Note note;
+            note.pitch = static_cast<std::uint8_t>(n.note);
+            note.velocity = 80;
+            note.start_tick = std::llround(n.onset_s * piece.song_time_scale * 960.0);
+            note.end_tick = std::llround(
+                (n.onset_s * piece.song_time_scale + n.length_s * piece.song_time_scale) * 960.0);
+            note.hand = n.note < 60 ? Hand::Left : Hand::Right;
+            note.track = n.note < 60 ? 2 : 1;
+            note.channel = 0;
+            song.notes.push_back(note);
+        }
+        finish_song(song);
+        const MidiWriteResult mid = write_midi(song);
+        if (!mid.ok) {
+            std::fprintf(stderr, "%s: %s\n", piece.name, mid.message.c_str());
+            return 1;
+        }
+        std::ofstream out(base.string() + ".mid", std::ios::binary);
+        out.write(reinterpret_cast<const char*>(mid.bytes.data()),
+                  static_cast<std::streamsize>(mid.bytes.size()));
+        std::printf("%s: %zu notes, %.1f s\n", base.string().c_str(), piece.notes.size(),
+                    static_cast<double>(length) / kRate);
+    }
+    return 0;
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -327,10 +482,12 @@ int main(int argc, char** argv) {
     bool mpm = true;
     bool expected = false;
     int chords = 0;
+    int open_chords = 0;
     int melodies = 0;
     bool do_bench = false;
     bool failures = false;
     std::string wav_dir;
+    std::string write_dir;
     for (int i = 1; i < argc; ++i) {
         const std::string arg = argv[i];
         auto value = [&]() -> const char* {
@@ -368,12 +525,22 @@ int main(int argc, char** argv) {
             options.block = std::max(1, std::atoi(value()));
         } else if (arg == "--expected") {
             expected = true;
+        } else if (arg == "--note-velocities") {
+            options.melody_note_velocities = true;
+        } else if (arg == "--from-melody") {
+            options.melody_first = std::atoi(value());
+        } else if (arg == "--repeats") {
+            options.melody_repeats = static_cast<float>(std::atof(value()));
         } else if (arg == "--melodies") {
             melodies = std::atoi(value());
         } else if (arg == "--chords") {
             chords = std::atoi(value());
+        } else if (arg == "--open-chords") {
+            open_chords = std::atoi(value());
         } else if (arg == "--wav") {
             wav_dir = value();
+        } else if (arg == "--write-wav") {
+            write_dir = value();
         } else if (arg == "--failures") {
             failures = true;
         } else if (arg == "--bench") {
@@ -384,6 +551,9 @@ int main(int argc, char** argv) {
         }
     }
 
+    if (!write_dir.empty()) {
+        return write_pieces(write_dir);
+    }
     if (do_bench) {
         bench(options.detector, options.block);
         return 0;
@@ -459,6 +629,47 @@ int main(int argc, char** argv) {
                             e.note >= 0 ? note_name(e.note).c_str() : "-",
                             1000.0 * static_cast<double>(e.onset_sample - r.onset) / 48000.0,
                             1000.0 * static_cast<double>(e.sample - r.onset) / 48000.0);
+            }
+            std::printf("\n");
+        }
+    }
+    for (auto method : {PitchMethod::Mpm, PitchMethod::Yin}) {
+        if (open_chords <= 0 || (method == PitchMethod::Mpm && !mpm) ||
+            (method == PitchMethod::Yin && !yin)) {
+            continue;
+        }
+        options.detector.method = method;
+        std::vector<NoteRecord> records;
+        options.records = failures ? &records : nullptr;
+        const OpenChordReport r = evaluate_open_chord_synthetic(options, open_chords);
+        options.records = nullptr;
+        print_report(method == PitchMethod::Yin ? "YIN, open chords (by lowest note)"
+                                                : "MPM, open chords (by lowest note)",
+                     r.registers);
+        for (int i = 0; i < kOpenChordContexts; ++i) {
+            const RegisterStats& s = r.contexts[static_cast<size_t>(i)];
+            std::printf("%-9s %6d %7.2f%% %7.2f%% %7.2f%% %7.2f%% %7.2f%%\n",
+                        open_chord_context_name(i), s.notes, 100.0f * rate(s.correct, s.notes),
+                        100.0f * rate(s.wrong, s.notes), 100.0f * rate(s.octave, s.notes),
+                        100.0f * rate(s.not_sure, s.notes), 100.0f * rate(s.missed, s.notes));
+        }
+        static constexpr const char* kOutcome[] = {"ok", "WRONG", "OCTAVE", "notsure", "missed"};
+        for (const auto& rec : records) {
+            if (rec.score.outcome == NoteOutcome::Correct) {
+                continue;
+            }
+            std::printf("  chord %d %-9s", rec.variant, open_chord_context_name(rec.context));
+            for (const int k : rec.chord) {
+                std::printf(" %s", note_name(k).c_str());
+            }
+            std::printf(" v%.2f %-7s:", static_cast<double>(rec.velocity),
+                        kOutcome[static_cast<int>(rec.score.outcome)]);
+            for (const auto& e : rec.events) {
+                static constexpr const char* kType[] = {"on", "off", "unsure", "verdict"};
+                std::printf(" %s:%s@%+.1f/%+.1fms", kType[static_cast<int>(e.type)],
+                            e.note >= 0 ? note_name(e.note).c_str() : "-",
+                            1000.0 * static_cast<double>(e.onset_sample - rec.onset) / 48000.0,
+                            1000.0 * static_cast<double>(e.sample - rec.onset) / 48000.0);
             }
             std::printf("\n");
         }

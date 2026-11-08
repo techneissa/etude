@@ -7,7 +7,7 @@
 #include <string_view>
 #include <vector>
 
-namespace toonval::test {
+namespace etude::test {
 
 using Bytes = std::vector<std::uint8_t>;
 
@@ -74,6 +74,10 @@ class Track {
         }
         return meta(delta, 0x58, {u8(numerator), power, 24, 8});
     }
+    // Key signature meta (FF 59): `sharps` negative for flats, then major (false) or minor (true).
+    Track& key_sig(std::uint32_t delta, int sharps, bool minor) {
+        return meta(delta, 0x59, {u8(sharps), u8(minor ? 1 : 0)});
+    }
     Track& name(std::uint32_t delta, std::string_view text) {
         return meta(delta, 0x03, Bytes(text.begin(), text.end()));
     }
@@ -117,4 +121,4 @@ inline Bytes smf(std::initializer_list<Track> tracks, int ppq = 480) {
     return out;
 }
 
-} // namespace toonval::test
+} // namespace etude::test

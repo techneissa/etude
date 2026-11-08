@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/playback.hpp"
+#include "etude/playback.hpp"
 
 #include <algorithm>
 #include <cmath>
 #include <limits>
 #include <numeric>
 
-namespace toonval {
+namespace etude {
 namespace {
 
 constexpr int kBendCentre = 8192;
@@ -70,53 +70,113 @@ bool Playback::needs_silence() const {
                        [](const ChannelState& c) { return c.cc[kSustain] > 0; });
 }
 
-void Playback::load(const Song& song) {
-    notes_.clear();
-    notes_.reserve(song.notes.size());
+std::shared_ptr<const Playback::Tables> Playback::build_tables(const Song& song,
+                                                               std::uint64_t fingerprint) {
+    auto t = std::make_shared<Tables>();
+    t->fingerprint = fingerprint;
+    t->parts = std::min<std::size_t>(song.parts.size(), kNoPart);
+    std::vector<Item>& notes = t->notes;
+    notes.reserve(song.notes.size());
     for (const Note& n : song.notes) {
         if (!std::isfinite(n.start_s)) {
             continue; // nowhere to put it
+        }
+        std::uint16_t part = kNoPart;
+        if (n.accompaniment) {
+            for (std::size_t i = 0; i < song.parts.size() && i < kNoPart; ++i) {
+                if (song.parts[i].track == n.track && song.parts[i].channel == n.channel) {
+                    part = static_cast<std::uint16_t>(i);
+                    break;
+                }
+            }
         }
         double end_s = n.start_s + n.duration_s;
         if (!(end_s > n.start_s) || !std::isfinite(end_s)) {
             end_s = n.start_s + kMinNoteSeconds;
         }
-        notes_.push_back({n.start_s, end_s, static_cast<std::uint8_t>(n.channel & 0x0F),
-                          static_cast<std::uint8_t>(n.pitch & 0x7F),
-                          static_cast<std::uint8_t>(std::max<int>(1, n.velocity & 0x7F)), n.hand,
-                          n.drum});
+        notes.push_back({n.start_s, end_s, static_cast<std::uint8_t>(n.channel & 0x0F),
+                         static_cast<std::uint8_t>(n.pitch & 0x7F),
+                         static_cast<std::uint8_t>(std::max<int>(1, n.velocity & 0x7F)), n.hand,
+                         n.drum, n.accompaniment, part});
     }
-    std::stable_sort(notes_.begin(), notes_.end(),
+    std::stable_sort(notes.begin(), notes.end(),
                      [](const Item& a, const Item& b) { return a.start_s < b.start_s; });
-    by_end_.resize(notes_.size());
-    std::iota(by_end_.begin(), by_end_.end(), std::uint32_t{0});
-    std::stable_sort(by_end_.begin(), by_end_.end(), [this](std::uint32_t a, std::uint32_t b) {
-        return notes_[a].end_s < notes_[b].end_s;
-    });
-    events_ = song.events;
+    t->by_end.resize(notes.size());
+    std::iota(t->by_end.begin(), t->by_end.end(), std::uint32_t{0});
+    std::stable_sort(t->by_end.begin(), t->by_end.end(),
+                     [&notes](std::uint32_t a, std::uint32_t b) {
+                         return notes[a].end_s < notes[b].end_s;
+                     });
+    t->events = song.events;
     std::stable_sort(
-        events_.begin(), events_.end(),
+        t->events.begin(), t->events.end(),
         [](const ChannelEvent& a, const ChannelEvent& b) { return a.time_s < b.time_s; });
-    checkpoints_.clear();
     FileState state;
-    for (std::size_t i = 0; i <= events_.size(); ++i) {
+    for (std::size_t i = 0; i <= t->events.size(); ++i) {
         if (i % kCheckpointEvents == 0) {
-            checkpoints_.push_back(state);
+            t->checkpoints.push_back(state);
         }
-        if (i < events_.size()) {
-            apply_file_event(events_[i], state);
+        if (i < t->events.size()) {
+            apply_file_event(t->events[i], state);
         }
     }
+    return t;
+}
+
+const std::shared_ptr<const Playback::Tables>& Playback::empty_tables() {
+    static const std::shared_ptr<const Tables> empty = [] {
+        auto t = std::make_shared<Tables>();
+        t->checkpoints.emplace_back(); // a song with no events has the one, empty, checkpoint
+        t->fingerprint = song_fingerprint(Song{});
+        return std::shared_ptr<const Tables>(std::move(t));
+    }();
+    return empty;
+}
+
+void Playback::adopt(std::shared_ptr<const Tables> tables) {
+    t_ = std::move(tables);
     next_on_ = next_off_ = next_event_ = 0;
     active_.clear();
     running_ = false;
     position_s_ = 0.0;
     used_channels_ = 0;
+    part_muted_.clear(); // indices of the old song's parts
+}
+
+void Playback::load(const Song& song) { adopt(build_tables(song, song_fingerprint(song))); }
+
+std::size_t Playback::Prepared::note_count() const {
+    return tables_ ? tables_->notes.size() : 0;
+}
+
+Playback::Prepared Playback::prepare(const Song& song) {
+    return prepare(song, song_fingerprint(song));
+}
+
+Playback::Prepared Playback::prepare(const Song& song, std::uint64_t fingerprint) {
+    Prepared p;
+    p.tables_ = build_tables(song, fingerprint);
+    return p;
 }
 
 void Playback::set_song(const Song& song, std::int64_t now_ns, std::vector<PlaybackMessage>& out) {
     silence(now_ns, out);
     load(song);
+}
+
+void Playback::set_song(const Song& song, std::int64_t now_ns, std::vector<PlaybackMessage>& out,
+                        const Prepared& prepared, std::uint64_t fingerprint) {
+    silence(now_ns, out);
+    if (prepared.tables_ && prepared.tables_->fingerprint == fingerprint) {
+        adopt(prepared.tables_);
+    } else {
+        adopt(build_tables(song, fingerprint));
+    }
+}
+
+void Playback::drop_song(std::int64_t now_ns, std::vector<PlaybackMessage>& out) {
+    silence(now_ns, out);
+    adopt(empty_tables());
 }
 
 void Playback::send(PlaybackMessage::Kind kind, std::uint8_t channel, std::uint8_t data,
@@ -175,7 +235,10 @@ void Playback::send_event(const ChannelEvent& e, std::int64_t at_ns,
 }
 
 bool Playback::muted(const Item& n) const {
-    return n.drum ? drums_muted_ : hand_muted_[static_cast<std::size_t>(n.hand)];
+    return n.drum            ? drums_muted_
+           : n.accompaniment ? accompaniment_muted_ || accompaniment_volume_ <= 0 ||
+                                   part_muted(n.part)
+                             : hand_muted_[static_cast<std::size_t>(n.hand)];
 }
 
 int Playback::sounded_pitch(const Item& n) const {
@@ -184,11 +247,11 @@ int Playback::sounded_pitch(const Item& n) const {
 
 void Playback::release(std::size_t active_slot, std::int64_t at_ns, double song_s,
                        std::vector<PlaybackMessage>& out) {
-    const Item note = notes_[active_[active_slot]];
+    const Item note = t_->notes[active_[active_slot]];
     const int key = sounded_pitch(note); // only notes with a key are ever active
     active_.erase(active_.begin() + static_cast<std::ptrdiff_t>(active_slot));
     const bool still_sounding = std::any_of(active_.begin(), active_.end(), [&](std::uint32_t i) {
-        return notes_[i].channel == note.channel && sounded_pitch(notes_[i]) == key;
+        return t_->notes[i].channel == note.channel && sounded_pitch(t_->notes[i]) == key;
     });
     if (!still_sounding) {
         send(PlaybackMessage::Kind::NoteOff, note.channel, static_cast<std::uint8_t>(key), 64,
@@ -225,14 +288,15 @@ void Playback::restore_state(double position_s, std::int64_t at_ns,
                              std::vector<PlaybackMessage>& out) {
     // Events at or before the position: start from the checkpoint before them.
     const auto end = static_cast<std::size_t>(
-        std::upper_bound(events_.begin(), events_.end(), position_s,
+        std::upper_bound(t_->events.begin(), t_->events.end(), position_s,
                          [](double t, const ChannelEvent& e) { return t < e.time_s; }) -
-        events_.begin());
+        t_->events.begin());
     const std::size_t first = end / kCheckpointEvents * kCheckpointEvents;
-    FileState want = checkpoints_[end / kCheckpointEvents];
+    FileState want = t_->checkpoints[end / kCheckpointEvents];
     for (std::size_t i = first; i < end; ++i) {
-        apply_file_event(events_[i], want);
+        apply_file_event(t_->events[i], want);
     }
+    last_restore_replayed_ = end - first;
     // What to send: the file's value, or the default for a setting the piano has been given that
     // the file only sets later; nothing for a setting nobody has touched.
     auto goal = [](int wanted, int have, int fallback) {
@@ -277,18 +341,38 @@ void Playback::resync(double position_s, std::int64_t at_ns, std::vector<Playbac
     restore_state(position_s, at_ns, out);
     position_s_ = position_s;
     next_on_ = static_cast<std::size_t>(
-        std::lower_bound(notes_.begin(), notes_.end(), position_s,
+        std::lower_bound(t_->notes.begin(), t_->notes.end(), position_s,
                          [](const Item& n, double t) { return n.start_s < t; }) -
-        notes_.begin());
+        t_->notes.begin());
     next_off_ = static_cast<std::size_t>(
-        std::lower_bound(by_end_.begin(), by_end_.end(), position_s,
-                         [this](std::uint32_t i, double t) { return notes_[i].end_s < t; }) -
-        by_end_.begin());
+        std::lower_bound(t_->by_end.begin(), t_->by_end.end(), position_s,
+                         [this](std::uint32_t i, double t) { return t_->notes[i].end_s < t; }) -
+        t_->by_end.begin());
     // Events at the position were just restored.
     next_event_ = static_cast<std::size_t>(
-        std::upper_bound(events_.begin(), events_.end(), position_s,
+        std::upper_bound(t_->events.begin(), t_->events.end(), position_s,
                          [](double t, const ChannelEvent& e) { return t < e.time_s; }) -
-        events_.begin());
+        t_->events.begin());
+}
+
+void Playback::rewind(double position_s) {
+    active_.erase(std::remove_if(active_.begin(), active_.end(),
+                                 [&](std::uint32_t i) { return t_->notes[i].start_s >= position_s; }),
+                  active_.end());
+    position_s_ = position_s;
+    next_on_ = static_cast<std::size_t>(
+        std::lower_bound(t_->notes.begin(), t_->notes.end(), position_s,
+                         [](const Item& n, double t) { return n.start_s < t; }) -
+        t_->notes.begin());
+    next_off_ = static_cast<std::size_t>(
+        std::lower_bound(t_->by_end.begin(), t_->by_end.end(), position_s,
+                         [this](std::uint32_t i, double t) { return t_->notes[i].end_s < t; }) -
+        t_->by_end.begin());
+    // Events at the position are sent again: a pedal press among them was cancelled with the notes.
+    next_event_ = static_cast<std::size_t>(
+        std::lower_bound(t_->events.begin(), t_->events.end(), position_s,
+                         [](const ChannelEvent& e, double t) { return e.time_s < t; }) -
+        t_->events.begin());
 }
 
 void Playback::play_span(const TransportOp& move, std::vector<PlaybackMessage>& out) {
@@ -302,32 +386,37 @@ void Playback::play_span(const TransportOp& move, std::vector<PlaybackMessage>& 
         return move.at_ns + std::llround((t - from) / (to - from) * span_ns);
     };
     for (;;) {
-        const double t_off = next_off_ < by_end_.size() ? notes_[by_end_[next_off_]].end_s : kNever;
-        const double t_event = next_event_ < events_.size() ? events_[next_event_].time_s : kNever;
-        const double t_on = next_on_ < notes_.size() ? notes_[next_on_].start_s : kNever;
+        const double t_off = next_off_ < t_->by_end.size() ? t_->notes[t_->by_end[next_off_]].end_s : kNever;
+        const double t_event = next_event_ < t_->events.size() ? t_->events[next_event_].time_s : kNever;
+        const double t_on = next_on_ < t_->notes.size() ? t_->notes[next_on_].start_s : kNever;
         const double t = std::min({t_off, t_event, t_on});
         if (!(t < to)) {
             break;
         }
         if (t_off == t) {
-            const std::uint32_t index = by_end_[next_off_++];
+            const std::uint32_t index = t_->by_end[next_off_++];
             auto slot = std::find(active_.begin(), active_.end(), index);
             if (slot != active_.end()) {
                 release(static_cast<std::size_t>(slot - active_.begin()), ns_of(t), t, out);
             }
         } else if (t_event == t) {
-            send_event(events_[next_event_++], ns_of(t), out);
+            send_event(t_->events[next_event_++], ns_of(t), out);
         } else {
             const auto index = static_cast<std::uint32_t>(next_on_++);
-            const Item& n = notes_[index];
+            const Item& n = t_->notes[index];
             const int key = sounded_pitch(n);
             if (muted(n) || key < 0) {
                 continue;
             }
             active_.push_back(index);
             used_channels_ = static_cast<std::uint16_t>(used_channels_ | (1u << n.channel));
+            std::uint16_t velocity = n.velocity;
+            if (n.accompaniment && accompaniment_volume_ < 100) {
+                velocity = static_cast<std::uint16_t>(
+                    std::max(1, (static_cast<int>(velocity) * accompaniment_volume_ + 50) / 100));
+            }
             send(PlaybackMessage::Kind::NoteOn, n.channel, static_cast<std::uint8_t>(key),
-                 n.velocity, ns_of(t), t, out);
+                 velocity, ns_of(t), t, out);
         }
     }
     position_s_ = to;
@@ -338,10 +427,16 @@ void Playback::click(const TransportOp& op, std::vector<PlaybackMessage>& out) {
         return;
     }
     const std::uint8_t note = op.accent ? click_.accent_note : click_.note;
-    const std::uint8_t velocity = op.accent ? click_.accent_velocity : click_.velocity;
+    const std::uint8_t velocity = op.accent  ? click_.accent_velocity
+                                  : op.sub > 0 ? click_.sub_velocity
+                                               : click_.velocity;
+    const std::size_t first = out.size();
     send(PlaybackMessage::Kind::NoteOn, click_.channel, note, velocity, op.at_ns, op.to_s, out);
     send(PlaybackMessage::Kind::NoteOff, click_.channel, note, 64, op.at_ns + click_.length_ns,
          op.to_s, out);
+    for (std::size_t i = first; i < out.size(); ++i) {
+        out[i].click = true;
+    }
 }
 
 void Playback::follow(const TranspositionSource* source) {
@@ -419,8 +514,8 @@ void Playback::set_hand_muted(Hand hand, bool muted_now, std::int64_t now_ns,
         return;
     }
     for (std::size_t i = active_.size(); i-- > 0;) {
-        const Item& n = notes_[active_[i]];
-        if (!n.drum && n.hand == hand) {
+        const Item& n = t_->notes[active_[i]];
+        if (!n.drum && !n.accompaniment && n.hand == hand) {
             release(i, now_ns, position_s_, out);
         }
     }
@@ -433,10 +528,61 @@ void Playback::set_drums_muted(bool muted_now, std::int64_t now_ns,
         return;
     }
     for (std::size_t i = active_.size(); i-- > 0;) {
-        if (notes_[active_[i]].drum) {
+        if (t_->notes[active_[i]].drum) {
             release(i, now_ns, position_s_, out);
         }
     }
 }
 
-} // namespace toonval
+void Playback::set_accompaniment_muted(bool muted_now, std::int64_t now_ns,
+                                       std::vector<PlaybackMessage>& out) {
+    accompaniment_muted_ = muted_now;
+    if (!muted_now) {
+        return;
+    }
+    for (std::size_t i = active_.size(); i-- > 0;) {
+        const Item& n = t_->notes[active_[i]];
+        if (!n.drum && n.accompaniment) {
+            release(i, now_ns, position_s_, out);
+        }
+    }
+}
+
+void Playback::set_part_muted(std::size_t part, bool muted_now, std::int64_t now_ns,
+                              std::vector<PlaybackMessage>& out) {
+    if (part >= t_->parts) {
+        return; // the song has no such part
+    }
+    if (part >= part_muted_.size()) {
+        if (!muted_now) {
+            return; // never muted: nothing to undo
+        }
+        part_muted_.resize(part + 1, false);
+    }
+    part_muted_[part] = muted_now;
+    if (!muted_now) {
+        return;
+    }
+    for (std::size_t i = active_.size(); i-- > 0;) {
+        const Item& n = t_->notes[active_[i]];
+        if (n.part == part) {
+            release(i, now_ns, position_s_, out);
+        }
+    }
+}
+
+void Playback::set_accompaniment_volume(int percent, std::int64_t now_ns,
+                                        std::vector<PlaybackMessage>& out) {
+    accompaniment_volume_ = std::clamp(percent, 0, 100);
+    if (accompaniment_volume_ > 0) {
+        return;
+    }
+    for (std::size_t i = active_.size(); i-- > 0;) {
+        const Item& n = t_->notes[active_[i]];
+        if (!n.drum && n.accompaniment) {
+            release(i, now_ns, position_s_, out);
+        }
+    }
+}
+
+} // namespace etude

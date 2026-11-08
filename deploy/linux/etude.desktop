@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Etude
+Comment=Falling-note piano trainer
+Exec=/opt/etude/current/bin/etude
+Icon=etude
+Terminal=false
+Categories=AudioVideo;Audio;Music;Education;

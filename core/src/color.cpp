@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/color.hpp"
+#include "etude/color.hpp"
 
 #include <algorithm>
 #include <array>
 #include <cmath>
 
-namespace toonval {
+namespace etude {
 namespace {
 
 double clamp01(double v) {
@@ -122,12 +122,29 @@ RGBA from_hsv(double hue_deg, double saturation, double value, float alpha) {
     return {to_byte(r + m), to_byte(g + m), to_byte(b + m), to_byte(static_cast<double>(alpha))};
 }
 
-RGBA from_hsl(double hue_deg, double saturation, double lightness, float alpha) {
-    const double s = clamp01(saturation);
-    const double l = clamp01(lightness);
-    const double v = l + s * std::min(l, 1.0 - l);
-    const double sv = v == 0.0 ? 0.0 : 2.0 * (1.0 - l / v);
-    return from_hsv(hue_deg, sv, v, alpha);
+Hsv to_hsv(RGBA c) {
+    const double r = static_cast<double>(c.r) / 255.0;
+    const double g = static_cast<double>(c.g) / 255.0;
+    const double b = static_cast<double>(c.b) / 255.0;
+    const double hi = std::max({r, g, b});
+    const double lo = std::min({r, g, b});
+    const double d = hi - lo;
+    Hsv out;
+    out.value = hi;
+    if (d <= 0.0) {
+        return out;
+    }
+    out.saturation = clamp01(d / hi);
+    double h = 0.0;
+    if (hi == r) {
+        h = std::fmod((g - b) / d, 6.0);
+    } else if (hi == g) {
+        h = (b - r) / d + 2.0;
+    } else {
+        h = (r - g) / d + 4.0;
+    }
+    out.hue = wrap_hue(h * 60.0);
+    return out;
 }
 
 RGBA from_oklch(double lightness, double chroma, double hue_deg, float alpha) {
@@ -167,6 +184,45 @@ double perceptual_distance(RGBA a, RGBA b) {
     const Oklab y = to_oklab(b);
     return std::sqrt((x.L - y.L) * (x.L - y.L) + (x.a - y.a) * (x.a - y.a) +
                      (x.b - y.b) * (x.b - y.b));
+}
+
+RGBA simulate_vision(RGBA c, ColourVision vision) {
+    // Rows of the severity 1.0 matrices, linear RGB in, linear RGB out.
+    using Matrix = std::array<std::array<double, 3>, 3>;
+    static constexpr Matrix kProtanopia{{{0.152286, 1.052583, -0.204868},
+                                         {0.114503, 0.786281, 0.099216},
+                                         {-0.003882, -0.048116, 1.051998}}};
+    static constexpr Matrix kDeuteranopia{{{0.367322, 0.860646, -0.227968},
+                                           {0.280085, 0.672501, 0.047413},
+                                           {-0.011820, 0.042940, 0.968881}}};
+    static constexpr Matrix kTritanopia{{{1.255528, -0.076749, -0.178779},
+                                         {-0.078411, 0.930809, 0.147602},
+                                         {0.004733, 0.691367, 0.303900}}};
+    const Matrix* m = nullptr;
+    switch (vision) {
+    case ColourVision::Typical:
+        return c;
+    case ColourVision::Protanopia:
+        m = &kProtanopia;
+        break;
+    case ColourVision::Deuteranopia:
+        m = &kDeuteranopia;
+        break;
+    case ColourVision::Tritanopia:
+        m = &kTritanopia;
+        break;
+    }
+    if (m == nullptr) {
+        return c;
+    }
+    const std::array<double, 3> lin{srgb_to_linear(c.r), srgb_to_linear(c.g), srgb_to_linear(c.b)};
+    std::array<std::uint8_t, 3> out{};
+    for (std::size_t i = 0; i < 3; ++i) {
+        const auto& row = (*m)[i];
+        const double v = row[0] * lin[0] + row[1] * lin[1] + row[2] * lin[2];
+        out[i] = to_byte(linear_to_srgb(clamp01(v)));
+    }
+    return {out[0], out[1], out[2], c.a};
 }
 
 RGBA lerp(RGBA a, RGBA b, float t) {
@@ -216,6 +272,33 @@ RGBA ensure_contrast(RGBA fg, RGBA bg, double min_ratio) {
     return lerp(fg, target, hi);
 }
 
+RGBA lift_to_contrast(RGBA fg, RGBA bg, double min_ratio) {
+    if (contrast_ratio(fg, bg) >= min_ratio) {
+        return fg;
+    }
+    const Oklab lab = to_oklab(fg);
+    const double chroma = std::hypot(lab.a, lab.b);
+    const double hue = std::atan2(lab.b, lab.a) * 180.0 / 3.14159265358979323846;
+    const bool lighten_it = relative_luminance(bg) < 0.5;
+    const double end = lighten_it ? 1.0 : 0.0; // white or black: the most contrast there is
+    const auto at = [&](double L) {
+        RGBA c = from_oklch(L, chroma, hue, 1.0f);
+        c.a = fg.a;
+        return c;
+    };
+    if (contrast_ratio(at(end), bg) < min_ratio) {
+        return at(end);
+    }
+    // Smallest step toward the end that passes; the search works on the rounded colour.
+    double lo = lab.L; // fails
+    double hi = end;   // passes
+    for (int i = 0; i < 24; ++i) {
+        const double mid = 0.5 * (lo + hi);
+        (contrast_ratio(at(mid), bg) >= min_ratio ? hi : lo) = mid;
+    }
+    return at(hi);
+}
+
 std::string to_hex(RGBA c) {
     static constexpr char kDigits[] = "0123456789ABCDEF";
     std::string out = "#";
@@ -247,4 +330,4 @@ bool parse_hex(std::string_view text, RGBA* out) {
     return true;
 }
 
-} // namespace toonval
+} // namespace etude

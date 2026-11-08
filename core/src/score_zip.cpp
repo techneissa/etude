@@ -2,7 +2,8 @@
 // Score files in zips (.mxl, .mscz) and the content sniffing that picks a reader. The unzipper
 // works on memory only (miniz built without stdio) and enforces the limits of musicxml.hpp before
 // it unpacks anything.
-#include "toonval/musicxml.hpp"
+#include "etude/abc.hpp"
+#include "etude/musicxml.hpp"
 
 #include "score_raw.hpp"
 
@@ -13,7 +14,7 @@
 #include <cctype>
 #include <cstring>
 
-namespace toonval {
+namespace etude {
 
 using namespace score_detail;
 
@@ -261,7 +262,10 @@ SongFileFormat sniff_song_format(const std::uint8_t* data, std::size_t size) {
     while (i < size && (data[i] == ' ' || data[i] == '\t' || data[i] == '\n' || data[i] == '\r')) {
         ++i;
     }
-    return i < size && data[i] == '<' ? SongFileFormat::Xml : SongFileFormat::Unknown;
+    if (i < size && data[i] == '<') {
+        return SongFileFormat::Xml;
+    }
+    return looks_like_abc(data, size) ? SongFileFormat::Abc : SongFileFormat::Unknown;
 }
 
 ScoreLoadResult load_mxl(const std::uint8_t* data, std::size_t size) {
@@ -314,6 +318,32 @@ ScoreLoadResult load_mscx(const std::uint8_t* data, std::size_t size) {
     return score_from_mscx(doc);
 }
 
+namespace score_detail {
+
+bool score_xml_bytes(const std::uint8_t* data, std::size_t size, std::vector<std::uint8_t>& out,
+                     ScoreLoadResult& error) {
+    if (sniff_song_format(data, size) == SongFileFormat::Xml) {
+        out.assign(data, data + size);
+        return true;
+    }
+    Zip zip;
+    if (!zip.open(data, size, error)) {
+        return false;
+    }
+    int at = find_musicxml_entry(zip);
+    if (at < 0 || find_mscx_entry(zip) >= 0) {
+        at = find_mscx_entry(zip);
+    }
+    if (at < 0) {
+        error = make_error(ScoreFileError::NotScore,
+                           "the zip holds no score (no MusicXML or MuseScore file)");
+        return false;
+    }
+    return zip.extract(at, out, error);
+}
+
+} // namespace score_detail
+
 ScoreLoadResult load_score(const std::uint8_t* data, std::size_t size) {
     switch (sniff_song_format(data, size)) {
     case SongFileFormat::Xml: {
@@ -351,12 +381,14 @@ ScoreLoadResult load_score(const std::uint8_t* data, std::size_t size) {
         }
         return load_mscx(bytes.data(), bytes.size());
     }
+    case SongFileFormat::Abc:
+        return load_abc(data, size);
     case SongFileFormat::Midi:
         return make_error(ScoreFileError::NotScore, "this is a MIDI file, not a score file");
     case SongFileFormat::Unknown:
         break;
     }
-    return make_error(ScoreFileError::NotScore, "the file is not MusicXML, MuseScore or MIDI");
+    return make_error(ScoreFileError::NotScore, "the file is not MusicXML, MuseScore, ABC or MIDI");
 }
 
-} // namespace toonval
+} // namespace etude

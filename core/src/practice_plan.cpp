@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/practice_plan.hpp"
+#include "etude/practice_plan.hpp"
 
 #include <algorithm>
 #include <limits>
 
-namespace toonval {
+namespace etude {
 
 bool PracticePlan::resolves(const SongSections& sections, std::size_t index) const {
     if (index >= items_.size()) {
@@ -170,6 +170,23 @@ PlanStep PracticePlan::sections_merged(const SongSections& sections, SectionId s
 
 PlanStep PracticePlan::stop() { return active_ ? finish(PlanStep::Kind::Stopped) : PlanStep{}; }
 
+PracticePlan::LivePosition PracticePlan::live_position(const SongSections& sections) const {
+    LivePosition out;
+    if (!active_) {
+        return out;
+    }
+    for (std::size_t i = 0; i < items_.size(); ++i) {
+        if (sections.find(items_[i].section) == nullptr) {
+            continue;
+        }
+        if (i < index_) {
+            ++out.position;
+        }
+        ++out.count;
+    }
+    return out;
+}
+
 void PracticePlan::reset() {
     items_.clear();
     active_ = false;
@@ -209,4 +226,4 @@ bool apply_plan_step(Transport& transport, std::int64_t now_ns, const PlanStep& 
     return true;
 }
 
-} // namespace toonval
+} // namespace etude

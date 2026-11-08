@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/note_trail.hpp"
+#include "etude/note_trail.hpp"
 
 #include <algorithm>
 
-namespace toonval {
+namespace etude {
 
 namespace {
 double clamp01(double value) { return std::clamp(value, 0.0, 1.0); }
@@ -94,4 +94,4 @@ void NoteTrail::visible(std::int64_t now_ns, std::int64_t span_ns,
     }
 }
 
-} // namespace toonval
+} // namespace etude

@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/song.hpp"
+#include "etude/song.hpp"
 
 #include <doctest/doctest.h>
 
-using namespace toonval;
+using namespace etude;
 
 TEST_CASE("hand from a track or channel name") {
     for (const char* name : {"Right", "RH", "rh", "R.H.", "Piano R", "Piano RH", "Right Hand",
@@ -103,4 +103,60 @@ TEST_CASE("bar number at a tick") {
     CHECK(song.measure_at(480) == 1);
     CHECK(song.measure_at(2399) == 1);
     CHECK(song.measure_at(100000) == 2);
+}
+
+TEST_CASE("song_fingerprint: equal for copies, different when anything practice or playback reads differs") {
+    Song song;
+    for (int i = 0; i < 4; ++i) {
+        Note n;
+        n.start_s = 0.5 * i;
+        n.duration_s = 0.4;
+        n.pitch = static_cast<std::uint8_t>(60 + i);
+        n.velocity = 80;
+        n.channel = 1;
+        n.hand = Hand::Right;
+        n.measure = 1 + i / 2;
+        song.notes.push_back(n);
+    }
+    Measure m1;
+    Measure m2;
+    m2.number = 2;
+    m2.start_s = 1.0;
+    song.measures = {m1, m2};
+    ChannelEvent e;
+    e.time_s = 0.1;
+    e.channel = 1;
+    e.kind = ChannelEventKind::Control;
+    e.number = 64;
+    e.value = 127;
+    song.events.push_back(e);
+    const std::uint64_t base = song_fingerprint(song);
+    CHECK(song_fingerprint(Song{song}) == base);
+    CHECK(song_fingerprint(Song{}) != base);
+
+    const auto differs = [&](auto change) {
+        Song other = song;
+        change(other);
+        return song_fingerprint(other) != base;
+    };
+    CHECK(differs([](Song& s) { s.notes[2].start_s += 0.001; }));
+    CHECK(differs([](Song& s) { s.notes[2].duration_s += 0.001; }));
+    CHECK(differs([](Song& s) { s.notes[2].pitch += 1; }));
+    CHECK(differs([](Song& s) { s.notes[2].velocity += 1; }));
+    CHECK(differs([](Song& s) { s.notes[2].channel += 1; }));
+    CHECK(differs([](Song& s) { s.notes[2].hand = Hand::Left; }));
+    CHECK(differs([](Song& s) { s.notes[2].measure += 1; }));
+    CHECK(differs([](Song& s) { s.notes[2].drum = true; }));
+    CHECK(differs([](Song& s) { s.notes[2].accompaniment = true; }));
+    CHECK(differs([](Song& s) { s.measures[1].start_s += 0.5; }));
+    CHECK(differs([](Song& s) { s.measures[1].number = 7; }));
+    CHECK(differs([](Song& s) { s.events[0].value = 100; }));
+    CHECK(differs([](Song& s) { s.events[0].time_s = 0.2; }));
+    CHECK(differs([](Song& s) { s.events[0].channel = 2; }));
+    CHECK(differs([](Song& s) { s.events[0].number = 65; }));
+    CHECK(differs([](Song& s) { s.events[0].kind = ChannelEventKind::Program; }));
+    CHECK(differs([](Song& s) { s.events.push_back(s.events[0]); }));
+    CHECK(differs([](Song& s) { s.notes.pop_back(); }));
+    // Order matters: two songs with the same notes the other way round are two songs.
+    CHECK(differs([](Song& s) { std::swap(s.notes[0], s.notes[1]); }));
 }

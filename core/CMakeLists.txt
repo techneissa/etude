@@ -1,62 +1,223 @@
 # Music logic with no SDL, MIDI, or audio dependencies, so it builds and tests anywhere.
-add_library(toonval_core
+add_library(etude_core
+  src/abc.cpp
+  src/abc_fields.cpp
+  src/abc_parser_fields.cpp
+  src/abc_parser_finish.cpp
+  src/abc_parser_music.cpp
+  src/abc_parser_notes.cpp
+  src/abc_text.cpp
+  src/accidental_glyph.cpp
+  src/accidental_text.cpp
+  src/accompaniment.cpp
+  src/band_touch.cpp
+  src/bar_order.cpp
+  src/base64.cpp
+  src/beat_lines.cpp
+  src/block_column.cpp
+  src/block_names.cpp
   src/chord.cpp
-  src/chord_display.cpp
+  src/chord_diagram.cpp
+  src/chord_fingering.cpp
+  src/chord_label.cpp
+  src/chord_label_fade.cpp
+  src/chord_label_layout.cpp
+  src/chord_spelling.cpp
   src/color.cpp
+  src/combo_display.cpp
   src/computer_keyboard.cpp
   src/content_hash.cpp
+  src/count_band.cpp
+  src/crash_report.cpp
+  src/data_folder.cpp
+  src/device_check.cpp
+  src/device_check_offer.cpp
+  src/device_check_text.cpp
+  src/difficulty.cpp
+  src/drill.cpp
   src/ear_training.cpp
+  src/editor_layout.cpp
   src/effects_governor.cpp
   src/evaluator.cpp
-  src/expected_note.cpp
+  src/evaluator_flow.cpp
+  src/evaluator_wait.cpp
+  src/evaluator_wait_setup.cpp
+  src/exercise_sound.cpp
   src/exercises.cpp
+  src/expected_note.cpp
+  src/folder_watch.cpp
+  src/game_feel.cpp
+  src/ghost_run.cpp
+  src/grade_palette.cpp
   src/grade_words.cpp
+  src/gunzip.cpp
+  src/gunzip_stream.cpp
   src/hand_path.cpp
   src/hand_split.cpp
+  src/hands_present.cpp
+  src/harmony.cpp
+  src/harmony_fit.cpp
+  src/harmony_stats.cpp
+  src/hit_area.cpp
+  src/hit_effects.cpp
+  src/hit_line.cpp
+  src/icon_colour.cpp
+  src/icon_morph.cpp
+  src/icon_morph_parse.cpp
+  src/icon_morph_plan.cpp
+  src/icon_morph_resample.cpp
+  src/idle_gate.cpp
+  src/instrument.cpp
+  src/key_label.cpp
+  src/key_signature.cpp
   src/key_state.cpp
   src/keyboard.cpp
   src/keyboard_identity.cpp
   src/keyboard_view.cpp
   src/latency_stats.cpp
+  src/leaderboard.cpp
+  src/learn_colours.cpp
+  src/level_stars.cpp
   src/library.cpp
+  src/library_browse.cpp
+  src/library_collections.cpp
+  src/library_groups.cpp
+  src/library_search.cpp
+  src/library_state.cpp
+  src/library_text.cpp
+  src/library_titles.cpp
   src/look.cpp
+  src/look_ahead.cpp
   src/look_serialize.cpp
+  src/mac_install.cpp
+  src/machine_os.cpp
+  src/medal_art.cpp
+  src/medal_eval.cpp
+  src/medals.cpp
+  src/melody_added.cpp
+  src/melody_manifest.cpp
+  src/melody_progress.cpp
+  src/melody_shape.cpp
+  src/melody_steps.cpp
+  src/metronome.cpp
+  src/mic_input.cpp
   src/midi_event.cpp
   src/midi_file.cpp
   src/midi_writer.cpp
+  src/minisign.cpp
   src/mscx.cpp
   src/musicxml.cpp
+  src/musicxml_part_reader.cpp
+  src/musicxml_support.cpp
+  src/network_share.cpp
+  src/note_colours.cpp
   src/note_style.cpp
   src/note_trail.cpp
   src/note_window.cpp
   src/octave_shift.cpp
+  src/palette.cpp
+  src/panel_size.cpp
   src/pitch.cpp
   src/pitch_detect.cpp
+  src/pitch_detect_acquire.cpp
+  src/pitch_detect_hop.cpp
+  src/pitch_detect_judge.cpp
+  src/pitch_detect_note.cpp
   src/pitch_dsp.cpp
   src/pitch_eval.cpp
   src/pitch_synth.cpp
   src/playback.cpp
   src/pointer_keys.cpp
   src/practice_plan.cpp
+  src/profile.cpp
+  src/profile_settings.cpp
   src/progress.cpp
+  src/progress_view.cpp
   src/recorder.cpp
+  src/release_info.cpp
+  src/release_notes.cpp
+  src/repeat_order.cpp
+  src/replay_keys.cpp
+  src/replay_marks.cpp
+  src/replay_sound.cpp
+  src/resampler.cpp
+  src/results_card.cpp
+  src/resume_point.cpp
+  src/roll_view.cpp
+  src/run_columns.cpp
+  src/run_events.cpp
   src/run_record.cpp
+  src/run_replay.cpp
+  src/run_score.cpp
+  src/run_summary.cpp
+  src/runs_chart.cpp
+  src/sample_ring.cpp
+  src/saved_palettes.cpp
+  src/scale_diagram.cpp
+  src/scale_overlay.cpp
   src/scales.cpp
   src/score_raw.cpp
   src/score_zip.cpp
   src/screen_layout.cpp
+  src/scroll_drag.cpp
+  src/section_editing.cpp
+  src/section_overview.cpp
   src/section_suggestions.cpp
   src/sections.cpp
   src/sections_store.cpp
+  src/semver.cpp
   src/session_restore.cpp
   src/session_state.cpp
   src/settings_doc.cpp
+  src/sheet_map.cpp
+  src/sheet_names.cpp
+  src/sheet_source.cpp
+  src/sheet_source_notation.cpp
+  src/sheet_source_writer.cpp
+  src/sheet_target.cpp
+  src/sheet_view.cpp
+  src/shift_fit.cpp
+  src/shift_offer.cpp
+  src/slider_drag.cpp
   src/song.cpp
+  src/song_board.cpp
   src/song_builder.cpp
+  src/song_catalogue.cpp
+  src/song_key.cpp
+  src/song_opening.cpp
+  src/song_practice.cpp
+  src/song_prefs.cpp
+  src/song_schedule.cpp
+  src/song_versions.cpp
+  src/song_versions_melody.cpp
+  src/song_versions_title.cpp
   src/sound_sink.cpp
+  src/square_drag.cpp
+  src/staff_plan.cpp
+  src/tar_archive.cpp
+  src/tempo_control.cpp
+  src/toast.cpp
+  src/top_indicator.cpp
+  src/touch_gesture.cpp
   src/transport.cpp
-  src/transpose.cpp)
-add_library(toonval::core ALIAS toonval_core)
-target_include_directories(toonval_core PUBLIC include)
-target_link_libraries(toonval_core PRIVATE toonval_warnings toonval_pugixml toonval_miniz
-  toonval_kissfft)
+  src/transpose.cpp
+  src/trouble_run.cpp
+  src/unit_format.cpp
+  src/update_conf.cpp
+  src/update_feed.cpp
+  src/update_handoff.cpp
+  src/update_state.cpp
+  src/update_key.cpp
+  src/upload_auth.cpp
+  src/upload_network.cpp
+  src/upload_rules.cpp
+  src/version.cpp
+  src/weighted_score.cpp)
+add_library(etude::core ALIAS etude_core)
+target_include_directories(etude_core PUBLIC include)
+target_link_libraries(etude_core PRIVATE etude_warnings etude_pugixml etude_miniz
+  etude_kissfft etude_monocypher)
+# The app's version is the project's: the one place to change it for a release. Only version.cpp
+# sees it, so a new version recompiles that file alone.
+set_source_files_properties(src/version.cpp PROPERTIES
+  COMPILE_DEFINITIONS "ETUDE_VERSION_STRING=\"${PROJECT_VERSION}\"")

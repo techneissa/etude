@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/section_suggestions.hpp"
+#include "etude/section_suggestions.hpp"
 
 #include <algorithm>
 #include <cmath>
 
-namespace toonval {
+namespace etude {
 
 namespace {
 
@@ -219,4 +219,4 @@ int apply_suggestions(SongSections& sections, const Song& song,
     return placed;
 }
 
-} // namespace toonval
+} // namespace etude

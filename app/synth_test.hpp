@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
-namespace toonval::app {
+namespace etude::app {
 
 struct AudioOptions;
 
@@ -10,4 +10,4 @@ struct AudioOptions;
 // --audio-latency-log, the press-to-sound latency. Returns the process exit code.
 int run_synth_test(const AudioOptions& options);
 
-} // namespace toonval::app
+} // namespace etude::app

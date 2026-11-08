@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Starts etude-update.service when the app drops an update request. @PREFIX@/update is a folder
+# only the app's user can write to: anything in it, the request included, is hostile text to the
+# helper, which reads it by name without following links (helper/handoff_files.cpp). Starting the
+# service is all this unit does with it. deploy/pi/setup.sh fills in @PREFIX@ and installs it as
+# /etc/systemd/system/etude-update.path.
+[Unit]
+Description=etude: an update is waiting to be installed
+ConditionPathExists=/etc/etude-update.conf
+
+[Path]
+PathExists=@PREFIX@/update/request
+Unit=etude-update.service
+
+[Install]
+WantedBy=multi-user.target

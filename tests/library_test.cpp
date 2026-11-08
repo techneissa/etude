@@ -1,13 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/library.hpp"
+#include "etude/library.hpp"
 
 #include "progress_fixtures.hpp"
 #include "smf_builder.hpp"
 
-#include "toonval/content_hash.hpp"
-#include "toonval/midi_file.hpp"
+#include "etude/content_hash.hpp"
+#include "etude/midi_file.hpp"
 
 #include <doctest/doctest.h>
+
+#include <cmath>
 
 #include <algorithm>
 #include <fstream>
@@ -16,9 +18,9 @@
 #include <string>
 #include <vector>
 
-using namespace toonval;
-using toonval::test::Bytes;
-using toonval::test::Track;
+using namespace etude;
+using etude::test::Bytes;
+using etude::test::Track;
 
 namespace {
 
@@ -33,7 +35,7 @@ Bytes melody_file(const std::vector<int>& pitches, int gap = 480,
         t.on(0, 0, p).off(static_cast<std::uint32_t>(gap), 0, p);
     }
     t.end();
-    return toonval::test::smf({t});
+    return etude::test::smf({t});
 }
 
 SongEntry entry_of(const Bytes& bytes, std::string_view file_name = "song.mid") {
@@ -43,7 +45,7 @@ SongEntry entry_of(const Bytes& bytes, std::string_view file_name = "song.mid") 
 }
 
 Bytes read_test_file(const char* name) {
-    std::ifstream in(std::string(TOONVAL_TEST_DATA_DIR) + "/" + name, std::ios::binary);
+    std::ifstream in(std::string(ETUDE_TEST_DATA_DIR) + "/" + name, std::ios::binary);
     REQUIRE(in.good());
     return Bytes(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
 }
@@ -105,17 +107,17 @@ TEST_CASE("title from a file name: no folder, no extension, underscores become s
     CHECK(title_from_file_name("Fur_Elise.mid") == "Fur Elise");
     CHECK(title_from_file_name("/usb/Songs/Moonlight__Sonata.MIDI") == "Moonlight Sonata");
     CHECK(title_from_file_name("C:\\Music\\Gymnopedie 1.mid") == "Gymnopedie 1");
-    CHECK(title_from_file_name("  spaced   out .kar") == "spaced out");
+    CHECK(title_from_file_name("  spaced   out .kar") == "Spaced Out");
     CHECK(title_from_file_name("Op. 27 No.2") == "Op. 27 No.2"); // not an extension we know
-    CHECK(title_from_file_name("song.musicxml") == "song");
-    CHECK(title_from_file_name("song.mxl") == "song");
-    CHECK(title_from_file_name("no_extension") == "no extension");
+    CHECK(title_from_file_name("song.musicxml") == "Song");
+    CHECK(title_from_file_name("song.mxl") == "Song");
+    CHECK(title_from_file_name("no_extension") == "No Extension");
     CHECK(title_from_file_name(".mid") == "");
     CHECK(title_from_file_name("") == "");
 }
 
 TEST_CASE("title from a file name: control characters go and the length is capped") {
-    CHECK(title_from_file_name("a\tb\nc.mid") == "a b c");
+    CHECK(title_from_file_name("a\tb\nc.mid") == "A B C");
     std::string long_name(1000, 'x');
     std::string t = title_from_file_name(long_name + ".mid");
     CHECK(t.size() == kMaxRunTitleBytes);
@@ -130,9 +132,50 @@ TEST_CASE("title from a file name: control characters go and the length is cappe
     CHECK(cut.size() >= kMaxRunTitleBytes - 1);
 }
 
-TEST_CASE("title: the file name wins, the sequence name fills in for a generic file name") {
+TEST_CASE("title from a file name: dashes, track numbers, copy marks and capitals") {
+    // Dashes: all of them in a name with no space, only those beside a space otherwise.
+    CHECK(title_from_file_name("fur-elise.mid") == "Fur Elise");
+    CHECK(title_from_file_name("Jean-Philippe Rameau - Tambourin.mid") ==
+          "Jean-Philippe Rameau Tambourin");
+    // A leading track number goes when a separator follows it or it starts with a zero.
+    CHECK(title_from_file_name("01 - Für Elise.mid") == "Für Elise");
+    CHECK(title_from_file_name("1. Prelude.mid") == "Prelude");
+    CHECK(title_from_file_name("03_moonlight_sonata.mid") == "Moonlight Sonata");
+    CHECK(title_from_file_name("2) Waltz.mid") == "Waltz");
+    CHECK(title_from_file_name("07-gnossienne.mid") == "Gnossienne");
+    CHECK(title_from_file_name("01 Prelude.mid") == "Prelude");
+    CHECK(title_from_file_name("12 Variations.mid") == "12 Variations"); // part of the title
+    CHECK(title_from_file_name("1984.mid") == "1984");                   // nothing left after it
+    CHECK(title_from_file_name("2001 A Space Odyssey.mid") == "2001 A Space Odyssey");
+    // The copy marks a system adds.
+    CHECK(title_from_file_name("Clair de Lune (1).mid") == "Clair de Lune");
+    CHECK(title_from_file_name("Clair de Lune(2).mid") == "Clair de Lune");
+    CHECK(title_from_file_name("Clair de Lune copy.mid") == "Clair de Lune");
+    CHECK(title_from_file_name("Clair de Lune copy 2.mid") == "Clair de Lune");
+    CHECK(title_from_file_name("Clair de Lune - Copy.mid") == "Clair de Lune");
+    CHECK(title_from_file_name("Symphony 5.mid") == "Symphony 5");
+    CHECK(title_from_file_name("(1).mid") == "(1)");
+    // Capitals: an all-small or all-capital name is tidied; a mixed one is left alone.
+    CHECK(title_from_file_name("moonlight sonata ii.mid") == "Moonlight Sonata II");
+    CHECK(title_from_file_name("PRELUDE IN C.mid") == "Prelude in C");
+    CHECK(title_from_file_name("the_entertainer.mid") == "The Entertainer");
+    CHECK(title_from_file_name("clair_de_lune.mid") == "Clair de Lune");
+    CHECK(title_from_file_name("BWV 846 Prelude.mid") == "BWV 846 Prelude");
+    CHECK(title_from_file_name("für elise.mid") == "Für Elise");
+}
+
+TEST_CASE("title: the file's own title wins, the file name fills in for a placeholder") {
     CHECK(choose_title("Fur_Elise.mid", "control track") == "Fur Elise");
-    CHECK(choose_title("song1.mid", "Moonlight Sonata") == "song1"); // song1 is not generic
+    CHECK(choose_title("song1.mid", "Moonlight Sonata") == "Moonlight Sonata");
+    CHECK(choose_title("prelude.mid", "Piano") == "Prelude");
+    CHECK(choose_title("prelude.mid", "Acoustic Grand Piano") == "Prelude");
+    CHECK(choose_title("prelude.mid", "Right Hand") == "Prelude");
+    CHECK(choose_title("prelude.mid", "Copyright 1998 J. Smith") == "Prelude");
+    CHECK(choose_title("prelude.mid", "Created by Sibelius") == "Prelude");
+    CHECK(choose_title("prelude.mid", "www.example.com") == "Prelude");
+    CHECK(choose_title("prelude.mid", "PRELUDE.MID") == "Prelude");
+    CHECK(choose_title("prelude.mid", "Staff 2") == "Prelude");
+    CHECK(choose_title("prelude.mid", "Piano Sonata No. 14") == "Piano Sonata No. 14");
     CHECK(choose_title("untitled.mid", "Moonlight Sonata") == "Moonlight Sonata");
     CHECK(choose_title("0001.mid", "Moonlight Sonata") == "Moonlight Sonata");
     CHECK(choose_title("midi.mid", "Prelude in C") == "Prelude in C");
@@ -141,8 +184,8 @@ TEST_CASE("title: the file name wins, the sequence name fills in for a generic f
 
 TEST_CASE("title: when nothing is usable it is 'Untitled', and mojibake never wins") {
     CHECK(choose_title("", "") == "Untitled");
-    CHECK(choose_title("untitled.mid", "control track") == "untitled");
-    CHECK(choose_title("untitled.mid", "") == "untitled");
+    CHECK(choose_title("untitled.mid", "control track") == "Untitled");
+    CHECK(choose_title("untitled.mid", "") == "Untitled");
     // A name of only replacement characters is not a title.
     CHECK(choose_title("\xEF\xBF\xBD\xEF\xBF\xBD.mid", "Real Name") == "Real Name");
     // Shift-JIS file name (bytes), decoded to kana.
@@ -151,7 +194,7 @@ TEST_CASE("title: when nothing is usable it is 'Untitled', and mojibake never wi
 
 TEST_CASE("sequence name: the first track's name event") {
     Bytes file =
-        toonval::test::smf({Track().name(0, "Prelude in C").end(),
+        etude::test::smf({Track().name(0, "Prelude in C").end(),
                             Track().name(0, "Right Hand").on(0, 0, 60).off(480, 0, 60).end()});
     CHECK(midi_sequence_name(file) == "Prelude in C");
     // Format 0: the one track's name.
@@ -162,7 +205,7 @@ TEST_CASE("sequence name: the first track's name event") {
 }
 
 TEST_CASE("sequence name: never reads outside a truncated or hostile file") {
-    Bytes file = toonval::test::smf({Track().name(0, "Long Name Here").end()});
+    Bytes file = etude::test::smf({Track().name(0, "Long Name Here").end()});
     for (std::size_t cut = 0; cut <= file.size(); ++cut) {
         Bytes part(file.begin(), file.begin() + static_cast<std::ptrdiff_t>(cut));
         std::string name = midi_sequence_name(part);
@@ -172,9 +215,9 @@ TEST_CASE("sequence name: never reads outside a truncated or hostile file") {
     CHECK(midi_sequence_name(junk).empty());
     CHECK(midi_sequence_name(Bytes{}).empty());
     // A name event whose length runs past the end of the data.
-    Bytes bad = toonval::test::header(0, 1, 480);
+    Bytes bad = etude::test::header(0, 1, 480);
     Bytes body = {0x00, 0xFF, 0x03, 0x7F, 'a', 'b'};
-    toonval::test::put_chunk(bad, "MTrk", body);
+    etude::test::put_chunk(bad, "MTrk", body);
     CHECK(midi_sequence_name(bad).empty());
 }
 
@@ -212,7 +255,7 @@ TEST_CASE("entry: hash, duration, notes per hand and pitch range") {
     right.name(0, "Right Hand").on(0, 0, 72).off(480, 0, 72).on(0, 0, 76).off(480, 0, 76).end();
     Track left;
     left.name(0, "Left Hand").on(0, 1, 40).off(960, 1, 40).end();
-    Bytes file = toonval::test::smf({Track().bpm(0, 120).end(), right, left});
+    Bytes file = etude::test::smf({Track().bpm(0, 120).end(), right, left});
     SongEntry e = entry_of(file, "Two_Hands.mid");
     CHECK(e.hash == content_hash(file.data(), file.size()));
     CHECK(e.title == "Two Hands");
@@ -228,26 +271,27 @@ TEST_CASE("entry: hash, duration, notes per hand and pitch range") {
     CHECK(e.bar_count >= 1);
 }
 
-TEST_CASE("entry: a one-track song has unknown hands, drums are not counted") {
+TEST_CASE("entry: hands are counted after the split, drums are not counted") {
     Track t;
     t.on(0, 0, 60).off(240, 0, 60).on(0, 9, 36).off(240, 9, 36).on(0, 0, 62).off(240, 0, 62).end();
-    SongEntry e = entry_of(toonval::test::smf({t}));
+    SongEntry e = entry_of(etude::test::smf({t}));
     CHECK(e.note_count == 2);
-    CHECK(e.unknown_notes == 2);
-    CHECK_FALSE(e.hands_known());
+    // One unnamed line, both notes above G3: the split gives it to the right hand.
+    CHECK(e.unknown_notes == 0);
+    CHECK(e.right_notes == 2);
+    CHECK(e.left_notes == 0);
+    CHECK(e.hands_known());
     CHECK(e.lowest_pitch == 60);
     CHECK(e.highest_pitch == 62);
 }
 
-TEST_CASE("entry: a file with no playable notes has no pitch range") {
+TEST_CASE("entry: a MIDI file with no notes is refused with a message") {
     Track t;
     t.bpm(0, 120).end();
-    SongEntry e = entry_of(toonval::test::smf({t}));
-    CHECK(e.note_count == 0);
-    CHECK(e.lowest_pitch == -1);
-    CHECK(e.highest_pitch == -1);
-    CHECK(e.difficulty == 1);
-    CHECK(fit_to_keyboard(e, kRange61).fit == KeyFit::Fits);
+    LibraryLoad r = load_library_entry(etude::test::smf({t}), "empty.mid");
+    CHECK_FALSE(r.ok);
+    CHECK(r.error == MidiFileError::NoNotes);
+    CHECK(r.message.find("no notes") != std::string::npos);
 }
 
 TEST_CASE("entry: a file that is not MIDI is reported, never thrown") {
@@ -257,10 +301,13 @@ TEST_CASE("entry: a file that is not MIDI is reported, never thrown") {
     CHECK(r.error == MidiFileError::NotMidi);
 }
 
-TEST_CASE("entry: the title uses the file name, then the sequence name") {
-    Bytes named = toonval::test::smf(
+TEST_CASE("entry: the title uses the sequence name, then the file name") {
+    Bytes named = etude::test::smf(
         {Track().name(0, "Prelude in C").end(), Track().on(0, 0, 60).off(480, 0, 60).end()});
-    CHECK(entry_of(named, "bwv846.mid").title == "bwv846");
+    CHECK(entry_of(named, "bwv846.mid").title == "Prelude in C");
+    Bytes piano = etude::test::smf(
+        {Track().name(0, "Piano").end(), Track().on(0, 0, 60).off(480, 0, 60).end()});
+    CHECK(entry_of(piano, "bwv846.mid").title == "Bwv846");
     CHECK(entry_of(named, "untitled.mid").title == "Prelude in C");
     CHECK(entry_of(named, "").title == "Prelude in C");
 }
@@ -322,126 +369,31 @@ TEST_CASE("fit: the shift limit is exactly an octave") {
 
 // ---- Difficulty
 
-TEST_CASE("difficulty: levels are 1..5 and never fall when any factor rises") {
-    DifficultyFactors base;
-    base.onsets_per_second = 0.5;
-    base.notes_per_onset = 1.0;
-    base.mean_chord_span = 0.0;
-    base.pitch_range = 5;
-    int previous_level = difficulty_level(base);
-    CHECK(previous_level == 1);
-
-    auto check_monotonic = [&](auto setter, double from, double to, double step) {
-        int last = 0;
-        for (double v = from; v <= to; v += step) {
-            DifficultyFactors f = base;
-            setter(f, v);
-            int level = difficulty_level(f);
-            CAPTURE(v);
-            CHECK(level >= 1);
-            CHECK(level <= 5);
-            CHECK(level >= last);
-            last = level;
-        }
-        return last;
-    };
-    int a = check_monotonic([](DifficultyFactors& f, double v) { f.onsets_per_second = v; }, 0, 20,
-                            0.25);
-    int b =
-        check_monotonic([](DifficultyFactors& f, double v) { f.notes_per_onset = v; }, 1, 8, 0.25);
-    int c =
-        check_monotonic([](DifficultyFactors& f, double v) { f.mean_chord_span = v; }, 0, 40, 0.5);
-    int d = check_monotonic([](DifficultyFactors& f, double v) { f.pitch_range = v; }, 0, 100, 1);
-    CHECK(a >= 3); // speed alone can carry a song to the middle of the scale or beyond
-    CHECK(b >= 1);
-    CHECK(c >= 1);
-    CHECK(d >= 1);
-
-    DifficultyFactors hardest;
-    hardest.onsets_per_second = 12;
-    hardest.notes_per_onset = 4;
-    hardest.mean_chord_span = 16;
-    hardest.pitch_range = 80;
-    CHECK(difficulty_level(hardest) == 5);
-    DifficultyFactors silly;
-    silly.onsets_per_second = 1e9;
-    silly.notes_per_onset = 1e9;
-    silly.mean_chord_span = 1e9;
-    silly.pitch_range = 1e9;
-    CHECK(difficulty_level(silly) == 5);
-    DifficultyFactors negative;
-    negative.onsets_per_second = -3;
-    negative.notes_per_onset = -3;
-    negative.mean_chord_span = -3;
-    negative.pitch_range = -3;
-    CHECK(difficulty_level(negative) == 1);
-}
-
-TEST_CASE("difficulty factors: a slow single-note tune, a fast one, and one with chords") {
-    // 8 quarter notes at 120 BPM, one voice: 2 onsets a second, no chords.
+TEST_CASE(
+    "difficulty: an entry carries the song's rating in half stars and the level they round to") {
+    // 8 quarter notes at 120 BPM, one voice: the easiest kind of song.
     std::vector<int> pitches = {60, 62, 64, 65, 67, 69, 71, 72};
     SongEntry slow = entry_of(melody_file(pitches, 480));
-    CHECK(slow.factors.onsets_per_second == doctest::Approx(2.0).epsilon(0.1));
-    CHECK(slow.factors.notes_per_onset == doctest::Approx(1.0));
-    CHECK(slow.factors.mean_chord_span == doctest::Approx(0.0));
-    CHECK(slow.factors.pitch_range == doctest::Approx(12.0));
+    CHECK(slow.half_stars >= kMinHalfStars);
+    CHECK(slow.half_stars <= kMaxHalfStars);
+    CHECK(slow.difficulty == level_of_half_stars(slow.half_stars));
     CHECK(slow.difficulty <= 2);
-
-    // The same notes four times as fast.
+    // The same notes four times as fast are no easier.
     SongEntry fast = entry_of(melody_file(pitches, 120));
-    CHECK(fast.factors.onsets_per_second > 3.0 * slow.factors.onsets_per_second);
-    CHECK(fast.difficulty >= slow.difficulty);
-
-    // Triads in one hand: three notes per onset, spanning a fifth.
-    Track t;
-    for (int i = 0; i < 8; ++i) {
-        int root = 60 + i;
-        t.on(0, 0, root).on(0, 0, root + 4).on(0, 0, root + 7);
-        t.off(480, 0, root).off(0, 0, root + 4).off(0, 0, root + 7);
-    }
-    t.end();
-    SongEntry chords = entry_of(toonval::test::smf({t}));
-    CHECK(chords.factors.notes_per_onset == doctest::Approx(3.0));
-    CHECK(chords.factors.mean_chord_span == doctest::Approx(7.0));
-    CHECK(chords.difficulty >= slow.difficulty);
-}
-
-TEST_CASE("difficulty factors: two hands playing together count per hand, not as one chord") {
-    Track right;
-    right.name(0, "Right");
-    Track left;
-    left.name(0, "Left");
-    for (int i = 0; i < 8; ++i) {
-        right.on(0, 0, 72 + i).off(480, 0, 72 + i);
-        left.on(0, 1, 40 + i).off(480, 1, 40 + i);
-    }
-    SongEntry e =
-        entry_of(toonval::test::smf({Track().bpm(0, 120).end(), right.end(), left.end()}));
-    CHECK(e.hands_known());
-    CHECK(e.factors.notes_per_onset == doctest::Approx(1.0));
-    CHECK(e.factors.mean_chord_span == doctest::Approx(0.0));
-    CHECK(e.factors.pitch_range == doctest::Approx(39.0));
+    CHECK(fast.half_stars >= slow.half_stars);
 }
 
 TEST_CASE("difficulty: the real files, for the record") {
     SongEntry bach = entry_of(read_test_file("bach-bwv846-prelude.mid"), "bach-bwv846-prelude.mid");
     SongEntry satie = entry_of(read_test_file("satie-gymnopedie-1.mid"), "satie-gymnopedie-1.mid");
-    MESSAGE("bach: " << bach.difficulty << " (" << bach.factors.onsets_per_second << " onsets/s, "
-                     << bach.factors.notes_per_onset << " notes/onset, span "
-                     << bach.factors.mean_chord_span << ", range " << bach.factors.pitch_range
-                     << ")");
-    MESSAGE("satie: " << satie.difficulty << " (" << satie.factors.onsets_per_second
-                      << " onsets/s, " << satie.factors.notes_per_onset << " notes/onset, span "
-                      << satie.factors.mean_chord_span << ", range " << satie.factors.pitch_range
-                      << ")");
+    MESSAGE("bach: " << bach.half_stars / 2.0 << " stars, satie: " << satie.half_stars / 2.0);
     CHECK(bach.difficulty >= 1);
     CHECK(bach.difficulty <= 5);
     CHECK(satie.difficulty >= 1);
     CHECK(satie.difficulty <= 5);
-    // The prelude's constant sixteenth notes are busier than the Gymnopedie's slow waltz.
-    CHECK(bach.factors.onsets_per_second > satie.factors.onsets_per_second);
-    CHECK(bach.difficulty >= satie.difficulty);
-    CHECK(bach.title == "bach-bwv846-prelude");
+    // The prelude's constant sixteenth notes are harder than the Gymnopedie's slow waltz.
+    CHECK(bach.half_stars > satie.half_stars);
+    CHECK(bach.title == "Bach Bwv846 Prelude");
     CHECK(bach.hands_known());
     CHECK(bach.lowest_pitch == 36);
     CHECK(bach.highest_pitch == 81);
@@ -463,8 +415,8 @@ TEST_CASE("history: an entry with no runs has no best and was never played") {
 
 TEST_CASE("history: the best score is the highest accuracy, ties go to the higher speed") {
     SongEntry e = entry_of(melody_file({60, 62}));
-    using toonval::testing::make;
-    using toonval::testing::RunSpec;
+    using etude::testing::make;
+    using etude::testing::RunSpec;
     auto run = [&](std::uint64_t song, int graded, int missed, int speed, std::int32_t day) {
         RunSpec s;
         s.song = song;
@@ -493,11 +445,11 @@ TEST_CASE("history: the best score is the highest accuracy, ties go to the highe
 
 TEST_CASE("history: runs too short to count are played but not a best") {
     SongEntry e = entry_of(melody_file({60, 62}));
-    toonval::testing::RunSpec s;
+    etude::testing::RunSpec s;
     s.song = e.hash;
     s.graded = 3; // fewer than kMinGradedForBest
     s.missed = 0;
-    std::vector<RunRecord> runs = {toonval::testing::make(s)};
+    std::vector<RunRecord> runs = {etude::testing::make(s)};
     attach_history(e, runs);
     CHECK_FALSE(e.has_best);
     CHECK(e.run_count == 1);
@@ -506,15 +458,45 @@ TEST_CASE("history: runs too short to count are played but not a best") {
 
 TEST_CASE("history: attach_history replaces what an earlier call set") {
     SongEntry e = entry_of(melody_file({60, 62}));
-    toonval::testing::RunSpec s;
+    etude::testing::RunSpec s;
     s.song = e.hash;
-    std::vector<RunRecord> runs = {toonval::testing::make(s)};
+    std::vector<RunRecord> runs = {etude::testing::make(s)};
     attach_history(e, runs);
     REQUIRE(e.run_count == 1);
     attach_history(e, {});
     CHECK(e.run_count == 0);
     CHECK_FALSE(e.has_best);
     CHECK(e.last_run_index == -1);
+}
+
+TEST_CASE("history: one pass summarises every song as attach_history does each") {
+    using etude::testing::make;
+    using etude::testing::RunSpec;
+    auto run = [&](std::uint64_t song, int graded, int missed, std::int32_t day) {
+        RunSpec s;
+        s.song = song;
+        s.graded = graded;
+        s.missed = missed;
+        s.day = day;
+        return make(s);
+    };
+    std::vector<RunRecord> runs = {run(1, 40, 10, 10), run(2, 40, 0, 11), run(1, 40, 4, 12),
+                                   run(3, 3, 0, 13), run(0, 40, 0, 14), run(1, 40, 8, 15)};
+    const auto plays = summarise_plays(runs);
+    CHECK(plays.size() == 3); // hash 0 is no song
+    for (std::uint64_t h : {1u, 2u, 3u}) {
+        SongEntry e;
+        e.hash = h;
+        attach_history(e, runs);
+        const SongPlays& p = plays.at(h);
+        CHECK(p.runs == e.run_count);
+        CHECK(p.last_run_index == e.last_run_index);
+        CHECK(p.last_day == e.last_run_day);
+        CHECK(p.best_permille ==
+              (e.has_best ? static_cast<int>(std::lround(e.best.accuracy * 1000.0)) : -1));
+    }
+    CHECK(plays.at(1).best_permille == 900);
+    CHECK(plays.at(3).best_permille == -1); // too few notes for a best
 }
 
 // ---- Browsing

@@ -2,7 +2,7 @@
 // The score loaders get damaged, truncated and hostile input: they must return (ok or an error),
 // never crash, and a Song they return must be well formed. Run under ASan and UBSan for the memory
 // checks; the assertions here check the Song's shape.
-#include "toonval/musicxml.hpp"
+#include "etude/musicxml.hpp"
 
 #include "zip_builder.hpp"
 
@@ -16,7 +16,7 @@
 #include <string>
 #include <vector>
 
-using namespace toonval;
+using namespace etude;
 
 namespace {
 
@@ -96,6 +96,15 @@ void expect_well_formed(const ScoreLoadResult& r) {
         REQUIRE(s.measures[i].start_tick > s.measures[i - 1].start_tick);
         REQUIRE(s.measures[i].number == s.measures[i - 1].number + 1);
     }
+    for (const Measure& m : s.measures) {
+        REQUIRE(m.written_number() >= 0);
+        REQUIRE(m.written_number() <= static_cast<int>(s.measures.size()));
+    }
+    for (const Note& n : s.notes) {
+        REQUIRE(n.measure >= s.measures.front().number);
+        REQUIRE(n.measure <= s.measures.back().number);
+        REQUIRE(n.written_measure() >= 0);
+    }
     for (const TempoChange& t : s.tempo.changes) {
         REQUIRE(t.us_per_quarter >= 1);
     }
@@ -105,7 +114,7 @@ void expect_well_formed(const ScoreLoadResult& r) {
 }
 
 Bytes read_data(const std::string& name) {
-    std::ifstream in(std::string(TOONVAL_TEST_DATA_DIR) + "/" + name, std::ios::binary);
+    std::ifstream in(std::string(ETUDE_TEST_DATA_DIR) + "/" + name, std::ios::binary);
     REQUIRE_MESSAGE(in.good(), "missing test data " << name);
     return Bytes(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
 }
@@ -142,9 +151,9 @@ std::string small_mscx() {
            "</Score></museScore>";
 }
 
-// TOONVAL_FUZZ_SCALE=20 runs 20 times the mutations, for a long soak under the sanitizers.
+// ETUDE_FUZZ_SCALE=20 runs 20 times the mutations, for a long soak under the sanitizers.
 int fuzz_scale() {
-    const char* text = std::getenv("TOONVAL_FUZZ_SCALE");
+    const char* text = std::getenv("ETUDE_FUZZ_SCALE");
     const int n = text == nullptr ? 1 : std::atoi(text);
     return n >= 1 ? n : 1;
 }
@@ -194,6 +203,18 @@ TEST_CASE("score fuzz: a mutated real .mxl and .mscz never crash") {
     fuzz(
         read_data("beethoven-op48-4-ehre-gottes-musescore3.mscz"),
         [](const Bytes& b) { return load_score(b); }, 600, 300000);
+}
+
+TEST_CASE("score fuzz: mutated repeats, endings and jumps never crash or loop") {
+    // The voltas piece in all three formats: a mutation can drop a repeat sign, break an ending
+    // number or point a jump nowhere, and the expansion must still end with a well formed song.
+    fuzz(
+        read_data("repeats-voltas.musicxml"), [](const Bytes& b) { return load_musicxml(b); }, 3000,
+        500000);
+    fuzz(read_data("repeats-voltas.mxl"), [](const Bytes& b) { return load_mxl(b); }, 800, 600000);
+    fuzz(
+        read_data("repeats-voltas-musescore4.mscz"), [](const Bytes& b) { return load_score(b); },
+        400, 700000);
 }
 
 TEST_CASE("score fuzz: mutated stored zips never crash") {
@@ -248,6 +269,57 @@ TEST_CASE("hostile: absurd numbers do not overflow") {
         "measure>"
         "</part></score-partwise>";
     expect_well_formed(load_musicxml(Bytes(huge.begin(), huge.end())));
+}
+
+TEST_CASE("hostile: repeats that would expand past the note cap play straight through") {
+    // 2000 bars of 33 notes (66,000 notes) inside one repeat played 16 times would be over a
+    // million notes.
+    std::string xml =
+        "<score-partwise><part-list><score-part id=\"P1\"><part-name>x</part-name></score-part>"
+        "</part-list><part id=\"P1\">";
+    for (int bar = 1; bar <= 2000; ++bar) {
+        xml += "<measure number=\"" + std::to_string(bar) + "\">";
+        if (bar == 1) {
+            xml += "<attributes><divisions>16</divisions></attributes>"
+                   "<barline location=\"left\"><repeat direction=\"forward\"/></barline>";
+        }
+        for (int k = 0; k < 33; ++k) {
+            xml += "<note><pitch><step>C</step><octave>4</octave></pitch><duration>2</duration>"
+                   "</note>";
+        }
+        if (bar == 2000) {
+            xml += "<barline location=\"right\"><repeat direction=\"backward\" "
+                   "times=\"16\"/></barline>";
+        }
+        xml += "</measure>";
+    }
+    xml += "</part></score-partwise>";
+    const ScoreLoadResult r = load_musicxml(Bytes(xml.begin(), xml.end()));
+    expect_well_formed(r);
+    REQUIRE(r.ok);
+    CHECK(r.stats.repeats_capped);
+    CHECK(r.stats.bars_played == 2000);
+    CHECK(r.song.notes.size() == 66000);
+}
+
+TEST_CASE("hostile: a repeat on every bar of a long score stays inside the cap") {
+    std::string xml =
+        "<score-partwise><part-list><score-part id=\"P1\"><part-name>x</part-name></score-part>"
+        "</part-list><part id=\"P1\">";
+    for (int bar = 1; bar <= 5000; ++bar) {
+        xml += "<measure number=\"" + std::to_string(bar) + "\">";
+        xml += bar == 1 ? "<attributes><divisions>1</divisions></attributes>" : "";
+        xml += "<barline location=\"left\"><repeat direction=\"forward\"/></barline>"
+               "<note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note>"
+               "<barline location=\"right\"><repeat direction=\"backward\" times=\"16\"/>"
+               "</barline></measure>";
+    }
+    xml += "</part></score-partwise>";
+    const ScoreLoadResult r = load_musicxml(Bytes(xml.begin(), xml.end()));
+    expect_well_formed(r);
+    REQUIRE(r.ok);
+    CHECK(r.stats.bars_played == 5000 * 16); // every bar 16 times: exactly the cap
+    CHECK_FALSE(r.stats.repeats_capped);
 }
 
 TEST_CASE("hostile: very deep nesting and a very large bar count") {

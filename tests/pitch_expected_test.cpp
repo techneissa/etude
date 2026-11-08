@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "pitch_tones.hpp"
-#include "toonval/pitch_detect.hpp"
-#include "toonval/pitch_eval.hpp"
-#include "toonval/pitch_synth.hpp"
+#include "etude/pitch_detect.hpp"
+#include "etude/pitch_eval.hpp"
+#include "etude/pitch_synth.hpp"
 
 #include <algorithm>
 #include <vector>
 
 #include <doctest/doctest.h>
 
-using namespace toonval;
+using namespace etude;
 
 namespace {
 

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/midi_event.hpp"
+#include "etude/midi_event.hpp"
 
-namespace toonval {
+namespace etude {
 
 namespace {
 constexpr std::uint8_t kStatusBit = 0x80;
@@ -96,4 +96,4 @@ bool MidiStreamSplitter::next(ChannelMessage& out) {
     return false;
 }
 
-} // namespace toonval
+} // namespace etude

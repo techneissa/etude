@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/progress.hpp"
+#include "etude/progress.hpp"
+
+#include "timing_factor.hpp"
 
 #include "progress_fixtures.hpp"
 
@@ -10,9 +12,9 @@
 #include <numeric>
 #include <vector>
 
-using namespace toonval;
-using toonval::testing::make;
-using toonval::testing::RunSpec;
+using namespace etude;
+using etude::testing::make;
+using etude::testing::RunSpec;
 
 namespace {
 
@@ -213,7 +215,7 @@ TEST_CASE("history and bests over 100,000 runs") {
     auto ms =
         std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - t0)
             .count();
-    CHECK(ms < 10'000);
+    CHECK(ms < 10'000 * etude::test::kTimingFactor);
     REQUIRE(h.size() == 200);
     int total = 0;
     for (const HistoryPoint& p : h) {

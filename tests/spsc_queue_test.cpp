@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/midi_event.hpp"
-#include "toonval/spsc_queue.hpp"
+#include "etude/midi_event.hpp"
+#include "etude/spsc_queue.hpp"
 
 #include <cstdint>
 #include <thread>
 
 #include <doctest/doctest.h>
 
-using namespace toonval;
+using namespace etude;
 
 TEST_CASE("an empty queue pops nothing") {
     SpscQueue<int, 4> q;

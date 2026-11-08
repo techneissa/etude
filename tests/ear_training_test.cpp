@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/ear_training.hpp"
+#include "etude/ear_training.hpp"
 
-#include "toonval/pitch.hpp"
+#include "etude/pitch.hpp"
 
 #include <doctest/doctest.h>
 
@@ -11,7 +11,7 @@
 #include <string>
 #include <vector>
 
-using namespace toonval;
+using namespace etude;
 
 namespace {
 
@@ -175,6 +175,19 @@ TEST_CASE("ear: ascending only never goes down") {
     for (const EarQuestion& q : draw(3, s, 500)) {
         CHECK(q.semitones() > 0);
     }
+}
+
+TEST_CASE("ear: descending only never goes up, and an interval that may go neither way is an error") {
+    EarSettings s = intervals_in(kRange61, 1, 12);
+    s.allow_ascending = false;
+    for (const EarQuestion& q : draw(5, s, 500)) {
+        CHECK(q.semitones() < 0);
+    }
+    s.allow_descending = false;
+    EarTrainer none(1, s);
+    const EarQuestionResult r = none.next();
+    CHECK_FALSE(r.ok);
+    CHECK_FALSE(r.message.empty());
 }
 
 TEST_CASE("ear: the harmonic flag is carried to the question") {

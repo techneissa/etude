@@ -2,13 +2,13 @@
 // Builders for run records shared by the progress tests.
 #pragma once
 
-#include "toonval/run_record.hpp"
+#include "etude/run_record.hpp"
 
 #include <algorithm>
 #include <cstdint>
 #include <vector>
 
-namespace toonval::testing {
+namespace etude::testing {
 
 struct RunSpec {
     std::uint64_t song = 1;
@@ -73,4 +73,4 @@ inline RunRecord make_bars(std::uint64_t song, int bars, const std::vector<int>&
     return make(spec);
 }
 
-} // namespace toonval::testing
+} // namespace etude::testing

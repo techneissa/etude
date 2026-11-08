@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/midi_file.hpp"
+#include "etude/midi_file.hpp"
+
+#include "part_index.hpp"
+
+#include "etude/song_builder.hpp"
 
 #include <algorithm>
 #include <array>
@@ -7,16 +11,19 @@
 #include <cstring>
 #include <new>
 
-namespace toonval {
+namespace etude {
 namespace {
 
 constexpr std::uint8_t kDrumChannel = 9;
-constexpr std::size_t kMaxMeasures = 100'000;
+
+static_assert(kMaxSongNotes == 200'000, "the message for a song over the cap names the number");
+static_assert(kMaxSongEvents == 1'000'000, "the message for a song over the cap names the number");
 
 struct Failure {
     MidiFileError error = MidiFileError::None;
     std::size_t offset = 0;
     const char* what = "";
+    bool at_byte = true; // false when the problem is the file as a whole, not a place in it
 };
 
 // Bounds-checked big-endian reader over [pos, end).
@@ -127,8 +134,11 @@ struct Parsed {
     std::vector<RawEvent> events;
     std::vector<TempoEvent> tempos;
     std::vector<TimeSignature> time_signatures;
+    std::vector<KeyChange> keys;
     std::vector<TrackInfo> tracks;
     MidiLoadStats stats;
+    bool too_many_notes = false;  // more than kMaxSongNotes notes; the rest were not kept
+    bool too_many_events = false; // more than kMaxSongEvents channel events; the rest were not kept
 };
 
 class TrackParser {
@@ -229,7 +239,7 @@ class TrackParser {
                     info.program = d1;
                     info.has_program = true;
                 }
-                out_.events.push_back({tick, track_, ch, ChannelEventKind::Program, 0, d1});
+                add_event({tick, track_, ch, ChannelEventKind::Program, 0, d1});
             }
             return true;
         }
@@ -243,15 +253,18 @@ class TrackParser {
             note_off(ch, d1, tick);
         } else if (kind == 0xB0) {
             // Control changes, the sustain pedal (CC64) included, never touch note lengths.
-            out_.events.push_back({tick, track_, ch, ChannelEventKind::Control, d1, d2});
+            add_event({tick, track_, ch, ChannelEventKind::Control, d1, d2});
         } else if (kind == 0xE0) {
             auto bend = static_cast<std::uint16_t>((d2 << 7) | d1);
-            out_.events.push_back({tick, track_, ch, ChannelEventKind::PitchBend, 0, bend});
+            add_event({tick, track_, ch, ChannelEventKind::PitchBend, 0, bend});
         }
         return true;
     }
 
     void note_on(std::uint8_t ch, std::uint8_t pitch, std::uint8_t velocity, std::int64_t tick) {
+        if (sounding_.empty()) {
+            sounding_.resize(16); // a track with no notes never pays for the table
+        }
         Sounding& s = sounding_[ch][pitch];
         if (s.active && s.start_tick == tick) {
             ++out_.stats.duplicates_merged;
@@ -267,6 +280,9 @@ class TrackParser {
     }
 
     void note_off(std::uint8_t ch, std::uint8_t pitch, std::int64_t tick) {
+        if (sounding_.empty()) {
+            return; // an extra note-off
+        }
         Sounding& s = sounding_[ch][pitch];
         if (!s.active) {
             return; // an extra note-off
@@ -284,11 +300,26 @@ class TrackParser {
         s.active = false;
     }
 
+    void add_event(const RawEvent& e) {
+        if (out_.events.size() >= kMaxSongEvents) {
+            out_.too_many_events = true;
+            return;
+        }
+        out_.events.push_back(e);
+    }
+
     void emit(std::uint8_t ch, std::uint8_t pitch, const Sounding& s, std::int64_t end_tick) {
+        if (out_.notes.size() >= kMaxSongNotes) {
+            out_.too_many_notes = true;
+            return;
+        }
         out_.notes.push_back({s.start_tick, end_tick, track_, ch, pitch, s.velocity});
     }
 
     void end_track(std::int64_t tick) {
+        if (sounding_.empty()) {
+            return;
+        }
         for (std::uint8_t ch = 0; ch < 16; ++ch) {
             for (std::uint8_t pitch = 0; pitch < 128; ++pitch) {
                 Sounding& s = sounding_[ch][pitch];
@@ -342,6 +373,17 @@ class TrackParser {
                 out_.time_signatures.push_back({tick, p[0], static_cast<std::uint8_t>(1u << p[1])});
             }
             break;
+        case 0x59:
+            // Key signature: sharps (negative: flats) and 0 major, 1 minor. Anything else is not a
+            // real key.
+            if (len >= 2 && p[1] <= 1) {
+                const int sf = static_cast<std::int8_t>(p[0]);
+                if (sf >= -7 && sf <= 7) {
+                    out_.keys.push_back(
+                        key_from_signature(tick, sf, p[1] == 0 ? KeyMode::Major : KeyMode::Minor));
+                }
+            }
+            break;
         default:
             break;
         }
@@ -350,7 +392,7 @@ class TrackParser {
     Parsed& out_;
     std::uint16_t track_;
     int prefix_ = -1; // channel named by the last 0x20 meta, until the next channel event
-    std::vector<std::array<Sounding, 128>> sounding_ = std::vector<std::array<Sounding, 128>>(16);
+    std::vector<std::array<Sounding, 128>> sounding_; // by channel, filled by the first note-on
 };
 
 TempoMap build_tempo_map(std::vector<TempoEvent> tempos, int ppq) {
@@ -372,6 +414,13 @@ TempoMap build_tempo_map(std::vector<TempoEvent> tempos, int ppq) {
     return map;
 }
 
+// Microseconds per quarter note in force at a tick.
+std::uint32_t local_us_per_quarter(const TempoMap& map, std::int64_t tick) {
+    auto it = std::upper_bound(map.changes.begin(), map.changes.end(), tick,
+                               [](std::int64_t t, const TempoChange& c) { return t < c.tick; });
+    return (it == map.changes.begin() ? map.changes.front() : *(it - 1)).us_per_quarter;
+}
+
 std::vector<TimeSignature> build_time_signatures(std::vector<TimeSignature> sigs, int ppq) {
     // A bar under one tick long can't be placed.
     std::erase_if(sigs, [ppq](const TimeSignature& t) {
@@ -391,54 +440,11 @@ std::vector<TimeSignature> build_time_signatures(std::vector<TimeSignature> sigs
     return out;
 }
 
-std::int64_t bar_ticks(const TimeSignature& t, int ppq, std::int64_t bars) {
-    return bars * 4 * ppq * t.numerator / t.denominator;
-}
-
-bool build_measures(Song& song, Failure& fail) {
-    const int ppq = song.tempo.ticks_per_quarter;
-    const auto& sigs = song.time_signatures;
-    std::vector<Measure>& bars = song.measures;
-    for (std::size_t i = 0; i < sigs.size(); ++i) {
-        const TimeSignature& t = sigs[i];
-        bool last = i + 1 == sigs.size();
-        if (t.tick >= song.end_tick && !bars.empty()) {
-            break;
-        }
-        std::int64_t segment_end = last ? song.end_tick : sigs[i + 1].tick;
-        for (std::int64_t k = 0;; ++k) {
-            std::int64_t start = t.tick + bar_ticks(t, ppq, k);
-            if (start >= segment_end && !(bars.empty() && k == 0)) {
-                break;
-            }
-            if (bars.size() >= kMaxMeasures) {
-                fail = {MidiFileError::TooLarge, 0, "more bars than any real song"};
-                return false;
-            }
-            bars.push_back({0, start, song.tempo.seconds_at(start), t.numerator, t.denominator});
-        }
-    }
-    // A first bar shorter than the next one is a pickup: bar 0.
-    int first = 1;
-    if (bars.size() >= 2) {
-        std::int64_t len0 = bars[1].start_tick - bars[0].start_tick;
-        TimeSignature next{0, bars[1].numerator, bars[1].denominator};
-        if (len0 < bar_ticks(next, ppq, 1)) {
-            first = 0;
-        }
-    }
-    for (std::size_t i = 0; i < bars.size(); ++i) {
-        bars[i].number = first + static_cast<int>(i);
-    }
-    return true;
-}
-
 void build_parts(Song& song, const std::vector<TrackInfo>& tracks) {
+    PartIndex part_at;
     for (const Note& n : song.notes) {
-        auto it = std::find_if(song.parts.begin(), song.parts.end(), [&](const Part& p) {
-            return p.track == n.track && p.channel == n.channel;
-        });
-        if (it == song.parts.end()) {
+        std::size_t at = part_at.find(n.track, n.channel);
+        if (at == PartIndex::kNone) {
             const TrackInfo& t = tracks[n.track];
             const ChannelInfo& c = t.channels[n.channel];
             Part p;
@@ -450,9 +456,10 @@ void build_parts(Song& song, const std::vector<TrackInfo>& tracks) {
             p.has_program = c.has_program;
             p.drum = n.drum;
             song.parts.push_back(std::move(p));
-            it = song.parts.end() - 1;
+            at = song.parts.size() - 1;
+            part_at.add(n.track, n.channel, at);
         }
-        ++it->note_count;
+        ++song.parts[at].note_count;
     }
     std::sort(song.parts.begin(), song.parts.end(), [](const Part& a, const Part& b) {
         return a.track != b.track ? a.track < b.track : a.channel < b.channel;
@@ -473,7 +480,13 @@ MidiLoadResult fail_result(const Failure& f, MidiLoadStats stats = {}) {
     MidiLoadResult r;
     r.error = f.error;
     char buf[160];
-    std::snprintf(buf, sizeof buf, "%s: %s (byte %zu)", to_string(f.error), f.what, f.offset);
+    int n = std::snprintf(buf, sizeof buf, "%s", to_string(f.error));
+    if (f.what[0] != '\0' && n > 0 && static_cast<std::size_t>(n) < sizeof buf) {
+        n += std::snprintf(buf + n, sizeof buf - static_cast<std::size_t>(n), ": %s", f.what);
+    }
+    if (f.at_byte && n > 0 && static_cast<std::size_t>(n) < sizeof buf) {
+        std::snprintf(buf + n, sizeof buf - static_cast<std::size_t>(n), " (byte %zu)", f.offset);
+    }
     r.message = buf;
     r.stats = stats;
     return r;
@@ -504,7 +517,7 @@ MidiLoadResult load(const std::uint8_t* data, std::size_t size, const MidiLoadOp
         return fail_result({MidiFileError::Corrupt, 10, "no tracks"});
     }
     if (division & 0x8000) {
-        return fail_result({MidiFileError::SmpteDivision, 12, "SMPTE time division"});
+        return fail_result({MidiFileError::SmpteDivision, 12, ""});
     }
     if (division == 0) {
         return fail_result({MidiFileError::Corrupt, 12, "zero ticks per quarter note"});
@@ -535,6 +548,18 @@ MidiLoadResult load(const std::uint8_t* data, std::size_t size, const MidiLoadOp
             if (!TrackParser(parsed, track).parse(tr, f, cut_off)) {
                 return fail_result(f, parsed.stats);
             }
+            if (parsed.too_many_notes) {
+                return fail_result(
+                    {MidiFileError::TooLarge, 0, "more than 200000 notes in one song", false},
+                    parsed.stats);
+            }
+            if (parsed.too_many_events) {
+                return fail_result({MidiFileError::TooLarge, 0,
+                                    "more than 1000000 program changes, control changes and pitch "
+                                    "bends in one song",
+                                    false},
+                                   parsed.stats);
+            }
             parsed.stats.tracks_truncated += cut_off ? 1 : 0;
             ++track;
         }
@@ -547,7 +572,13 @@ MidiLoadResult load(const std::uint8_t* data, std::size_t size, const MidiLoadOp
     song.tempo = build_tempo_map(std::move(parsed.tempos), ppq);
     song.time_signatures = build_time_signatures(std::move(parsed.time_signatures), ppq);
 
-    song.notes.reserve(parsed.notes.size());
+    // A ghost note is shorter than the threshold and shorter than a 128th note at the tempo where
+    // it starts: 32nd notes at 300 BPM are 25 ms and real. If the filter would remove more than a
+    // tenth of the notes the file is not full of artifacts, so it keeps all of them.
+    std::vector<Note> all;
+    all.reserve(parsed.notes.size());
+    std::size_t ghosts = 0;
+    std::vector<bool> is_ghost(parsed.notes.size(), false);
     for (const RawNote& raw : parsed.notes) {
         Note n;
         n.start_tick = raw.start_tick;
@@ -560,11 +591,29 @@ MidiLoadResult load(const std::uint8_t* data, std::size_t size, const MidiLoadOp
         n.channel = raw.channel;
         n.drum = raw.channel == kDrumChannel;
         if (!n.drum && !options.keep_ghost_notes && n.duration_s < options.ghost_threshold_s) {
+            const double hundred_twenty_eighth_s =
+                local_us_per_quarter(song.tempo, raw.start_tick) / 1e6 / 32.0;
+            if (n.duration_s < hundred_twenty_eighth_s) {
+                is_ghost[all.size()] = true;
+                ++ghosts;
+            }
+        }
+        all.push_back(n);
+    }
+    const bool filter = ghosts > 0 && ghosts * 10 <= all.size();
+    result.stats.ghost_filter_skipped = ghosts > 0 && !filter;
+    song.notes.reserve(all.size() - (filter ? ghosts : 0));
+    for (std::size_t i = 0; i < all.size(); ++i) {
+        if (filter && is_ghost[i]) {
             ++result.stats.ghost_notes_dropped;
             continue;
         }
-        song.notes.push_back(n);
-        song.end_tick = std::max(song.end_tick, n.end_tick);
+        song.notes.push_back(all[i]);
+        song.end_tick = std::max(song.end_tick, all[i].end_tick);
+    }
+    all = {};
+    if (song.notes.empty()) {
+        return fail_result({MidiFileError::NoNotes, 0, "", false}, result.stats);
     }
     std::sort(song.notes.begin(), song.notes.end(), [](const Note& a, const Note& b) {
         if (a.start_tick != b.start_tick) {
@@ -577,15 +626,17 @@ MidiLoadResult load(const std::uint8_t* data, std::size_t size, const MidiLoadOp
     });
     song.duration_s = song.tempo.seconds_at(song.end_tick);
 
-    Failure f;
-    if (!build_measures(song, f)) {
-        return fail_result(f, result.stats);
+    if (!build_song_measures(song)) {
+        return fail_result({MidiFileError::TooLarge, 0, "more bars than any real song", false},
+                           result.stats);
     }
     for (Note& n : song.notes) {
         n.measure = song.measure_at(n.start_tick);
     }
     build_parts(song, parsed.tracks);
     build_events(song, std::move(parsed.events));
+    song.keys = std::move(parsed.keys);
+    complete_keys(song);
     if (options.assign_hands) {
         assign_hands_from_names(song);
     }
@@ -626,8 +677,10 @@ const char* to_string(MidiFileError error) {
         return "SMPTE time division is not supported";
     case MidiFileError::TooLarge:
         return "MIDI file too large";
+    case MidiFileError::NoNotes:
+        return "the MIDI file has no notes to play";
     }
     return "unknown error";
 }
 
-} // namespace toonval
+} // namespace etude

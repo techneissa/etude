@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/sections_store.hpp"
+#include "etude/sections_store.hpp"
 
-#include "toonval/content_hash.hpp"
-#include "toonval/session_state.hpp"
+#include "etude/content_hash.hpp"
+#include "etude/session_state.hpp"
 
 #include <algorithm>
 #include <charconv>
 #include <cmath>
 #include <map>
 
-namespace toonval {
+namespace etude {
 
 // The session keeps section ids and playlist places as ints within these bounds.
 static_assert(kMaxSectionId == static_cast<SectionId>(kMaxSessionSectionId));
@@ -364,4 +364,4 @@ void write_sections(SettingsDocument& doc, const SectionLibrary& library) {
     }
 }
 
-} // namespace toonval
+} // namespace etude

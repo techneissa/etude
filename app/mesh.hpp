@@ -9,7 +9,7 @@
 #include <cstddef>
 #include <vector>
 
-namespace toonval::app {
+namespace etude::app {
 
 class Mesh {
   public:
@@ -36,6 +36,11 @@ class Mesh {
     // glow or shade fades `inner` to transparent.
     void ring(const SDL_FRect& r, float radius, float width, SDL_FColor outer, SDL_FColor inner);
 
+    // The upper half of an ellipse's outline centred on (`cx`, `cy`) with radii `rx`, `ry`: a line
+    // `width` pixels wide with soft edges `feather` pixels wide on either side.
+    void upper_arc(float cx, float cy, float rx, float ry, float width, float feather,
+                   SDL_FColor colour);
+
     // A rounded rectangle textured with a tiling texture: texture coordinates run from 0 at the
     // rectangle's top-left corner and grow by 1 every `tile` pixels.
     void rounded_rect_tiled(const SDL_FRect& r, float radius, SDL_FColor colour, float tile);
@@ -49,6 +54,17 @@ class Mesh {
     void quad(const SDL_FPoint (&p)[4], SDL_FColor colour);
 
     std::size_t vertex_count() const { return vertices_.size(); }
+    // What has been added since clear(), for a pass that draws the mesh itself (glow_shader.hpp).
+    const std::vector<SDL_Vertex>& vertices() const { return vertices_; }
+    const std::vector<int>& indices() const { return indices_; }
+
+    // Room for this many vertices and indices, so a frame that adds up to that much allocates
+    // nothing. Never shrinks: a frame that needs more (a denser view, "Notes ahead" raised after
+    // the song loaded) grows it once.
+    void reserve(std::size_t vertices, std::size_t indices) {
+        vertices_.reserve(vertices);
+        indices_.reserve(indices);
+    }
 
     // Draws everything added since clear(), in order, with `mode` (blend or add) and `texture`
     // (none for the untextured shapes).
@@ -75,4 +91,4 @@ inline SDL_FColor mix(SDL_FColor a, SDL_FColor b, float t) {
             a.a + (b.a - a.a) * t};
 }
 
-} // namespace toonval::app
+} // namespace etude::app

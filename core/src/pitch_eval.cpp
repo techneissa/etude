@@ -1,15 +1,18 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/pitch_eval.hpp"
+#include "etude/pitch_eval.hpp"
 
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
 
-namespace toonval {
+namespace etude {
 
 namespace {
 
 constexpr float kOnsetToleranceS = 0.020f;
+// A melody note is rendered until this long after its damper falls: ten of the damper's 30 ms
+// time constants, -87 dB.
+constexpr float kReleaseTailS = 0.3f;
 
 float to_ms(std::int64_t samples, int sample_rate) {
     return 1000.0f * static_cast<float>(samples) / static_cast<float>(sample_rate);
@@ -103,6 +106,50 @@ NoteScore score_note(int note, std::int64_t onset, std::int64_t end, const Pitch
     return score;
 }
 
+NoteScore score_chord(const int* notes, int count, std::int64_t onset, std::int64_t end,
+                      const PitchEvent* events, int event_count, int sample_rate) {
+    NoteScore score;
+    const auto tol = static_cast<std::int64_t>(kOnsetToleranceS * static_cast<float>(sample_rate));
+    bool not_sure = false;
+    bool correct = false;
+    for (int i = 0; i < event_count; ++i) {
+        const PitchEvent& e = events[i];
+        if (e.onset_sample < onset - tol || e.onset_sample >= end) {
+            continue;
+        }
+        if (e.type == PitchEventType::NotSure) {
+            not_sure = true;
+            continue;
+        }
+        if (e.type != PitchEventType::NoteOn) {
+            continue;
+        }
+        const bool in_chord = std::find(notes, notes + count, e.note) != notes + count;
+        if (in_chord) {
+            if (!correct) {
+                correct = true;
+                score.latency_samples = e.sample - onset;
+                score.reported_note = e.note;
+            }
+            continue;
+        }
+        bool octave = false;
+        for (int k = 0; k < count; ++k) {
+            octave = octave || std::abs(e.note - notes[k]) % 12 == 0;
+        }
+        score.reported_note = e.note;
+        score.outcome = octave ? NoteOutcome::OctaveError : NoteOutcome::Wrong;
+        score.latency_samples = -1;
+        return score;
+    }
+    if (correct) {
+        score.outcome = NoteOutcome::Correct;
+    } else {
+        score.outcome = not_sure ? NoteOutcome::NotSure : NoteOutcome::Missed;
+    }
+    return score;
+}
+
 int register_of(int note) {
     if (note < 36) {
         return 0;
@@ -116,29 +163,32 @@ const char* register_name(int index) {
     return index >= 0 && index < kRegisterCount ? kNames[index] : "?";
 }
 
-void EvalReport::add(int note, const NoteScore& score, int sample_rate) {
-    for (RegisterStats* s : {&registers[static_cast<size_t>(register_of(note))], &total}) {
-        ++s->notes;
-        switch (score.outcome) {
-        case NoteOutcome::Correct:
-            ++s->correct;
-            s->latency_ms.push_back(to_ms(score.latency_samples, sample_rate));
-            break;
-        case NoteOutcome::Wrong:
-            ++s->wrong;
-            break;
-        case NoteOutcome::OctaveError:
-            ++s->wrong;
-            ++s->octave;
-            break;
-        case NoteOutcome::NotSure:
-            ++s->not_sure;
-            break;
-        case NoteOutcome::Missed:
-            ++s->missed;
-            break;
-        }
+void RegisterStats::add(const NoteScore& score, int sample_rate) {
+    ++notes;
+    switch (score.outcome) {
+    case NoteOutcome::Correct:
+        ++correct;
+        latency_ms.push_back(to_ms(score.latency_samples, sample_rate));
+        break;
+    case NoteOutcome::Wrong:
+        ++wrong;
+        break;
+    case NoteOutcome::OctaveError:
+        ++wrong;
+        ++octave;
+        break;
+    case NoteOutcome::NotSure:
+        ++not_sure;
+        break;
+    case NoteOutcome::Missed:
+        ++missed;
+        break;
     }
+}
+
+void EvalReport::add(int note, const NoteScore& score, int sample_rate) {
+    registers[static_cast<size_t>(register_of(note))].add(score, sample_rate);
+    total.add(score, sample_rate);
 }
 
 float rate(int count, int notes) {
@@ -190,8 +240,15 @@ EvalReport evaluate_synthetic(const SynthEvalOptions& options) {
                                events.data(), static_cast<int>(events.size()), rate_hz);
                 report.add(note, score, rate_hz);
                 if (options.records != nullptr) {
-                    options.records->push_back({note, options.velocities[v], variant,
-                                                clip.interferer_note, score, events, clip.onset});
+                    options.records->push_back({note,
+                                                options.velocities[v],
+                                                variant,
+                                                clip.interferer_note,
+                                                score,
+                                                events,
+                                                clip.onset,
+                                                {},
+                                                0});
                 }
             }
         }
@@ -220,33 +277,51 @@ EvalReport evaluate_melody_synthetic(const SynthEvalOptions& options, int melodi
             const int min_ms = note < 48 ? 250 : 140;
             t += (min_ms + next(400 - min_ms + 1)) * rate_hz / 1000;
             int step = 0;
-            while (step == 0) {
+            const bool repeat = options.melody_repeats > 0.0f &&
+                                static_cast<float>(next(1000)) < 1000.0f * options.melody_repeats;
+            while (step == 0 && !repeat) {
                 step = next(15) - 7;
             }
             note = std::clamp(note + step, options.low_note, options.high_note);
         }
+        const bool skip = m < options.melody_first;
         const int length = t + rate_hz / 4;
         std::vector<float> audio(static_cast<size_t>(length), 0.0f);
         std::vector<float> one(static_cast<size_t>(length), 0.0f);
         const float velocity = options.velocities[static_cast<size_t>(
             next(static_cast<int>(std::max<size_t>(1, options.velocities.size()))))];
+        std::vector<float> note_velocity(static_cast<size_t>(notes), velocity);
         for (int i = 0; i < notes; ++i) {
-            std::fill(one.begin(), one.end(), 0.0f);
             PianoToneOptions tone;
             tone.note = pitch[static_cast<size_t>(i)];
-            tone.velocity = velocity;
+            tone.velocity =
+                options.melody_note_velocities
+                    ? options.velocities[static_cast<size_t>(
+                          next(static_cast<int>(std::max<size_t>(1, options.velocities.size()))))]
+                    : velocity;
+            note_velocity[static_cast<size_t>(i)] = tone.velocity;
             tone.detune_cents = static_cast<float>(next(1001) - 500) / 100.0f;
+            if (skip) {
+                continue;
+            }
             tone.seed = options.seed * 7919u + static_cast<unsigned>(m * 1000 + i);
-            add_piano_tone(one.data(), length, onset[static_cast<size_t>(i)], tone, rate_hz);
-            // The damper falls 40 ms after the next note starts.
+            // The damper falls 40 ms after the next note starts; kReleaseTailS later the note is
+            // gone and is not rendered further.
             const int release =
                 i + 1 < notes ? onset[static_cast<size_t>(i) + 1] + rate_hz / 25 : length;
-            for (int k = 0; k < length; ++k) {
+            const int stop = std::min(
+                length, release + static_cast<int>(kReleaseTailS * static_cast<float>(rate_hz)));
+            std::fill(one.begin() + onset[static_cast<size_t>(i)], one.begin() + stop, 0.0f);
+            add_piano_tone(one.data(), stop, onset[static_cast<size_t>(i)], tone, rate_hz);
+            for (int k = onset[static_cast<size_t>(i)]; k < stop; ++k) {
                 const float fade = k < release ? 1.0f
                                                : std::exp(-static_cast<float>(k - release) /
                                                           (0.03f * static_cast<float>(rate_hz)));
                 audio[static_cast<size_t>(k)] += one[static_cast<size_t>(k)] * fade;
             }
+        }
+        if (skip) {
+            continue;
         }
         if (options.clip.interferer) {
             // A steady other tone under the whole melody, at interferer_db against a mid note.
@@ -282,8 +357,15 @@ EvalReport evaluate_melody_synthetic(const SynthEvalOptions& options, int melodi
                         near.push_back(e);
                     }
                 }
-                options.records->push_back({pitch[static_cast<size_t>(i)], velocity, m, -1, score,
-                                            near, onset[static_cast<size_t>(i)]});
+                options.records->push_back({pitch[static_cast<size_t>(i)],
+                                            note_velocity[static_cast<size_t>(i)],
+                                            m,
+                                            -1,
+                                            score,
+                                            near,
+                                            onset[static_cast<size_t>(i)],
+                                            {},
+                                            0});
             }
         }
     }
@@ -336,6 +418,184 @@ ExpectedEvalReport evaluate_expected_synthetic(const SynthEvalOptions& options) 
         }
     }
     detector.set_expected_notes(nullptr, 0);
+    return report;
+}
+
+const char* open_chord_context_name(int index) {
+    static constexpr const char* kNames[kOpenChordContexts] = {"silence", "ringing", "near",
+                                                               "near+ring"};
+    return index >= 0 && index < kOpenChordContexts ? kNames[index] : "?";
+}
+
+namespace {
+
+// Chord shapes, in semitones above the lowest note: dyads from a minor third to an octave, close
+// triads (root position and inversions) and open triads (the third or the fifth an octave up).
+struct ChordShape {
+    int count;
+    std::array<int, 3> steps;
+};
+constexpr std::array<ChordShape, 17> kChordShapes = {{{2, {0, 3, 0}},
+                                                      {2, {0, 4, 0}},
+                                                      {2, {0, 5, 0}},
+                                                      {2, {0, 7, 0}},
+                                                      {2, {0, 8, 0}},
+                                                      {2, {0, 9, 0}},
+                                                      {2, {0, 12, 0}},
+                                                      {3, {0, 4, 7}},
+                                                      {3, {0, 3, 7}},
+                                                      {3, {0, 3, 8}},
+                                                      {3, {0, 4, 9}},
+                                                      {3, {0, 5, 9}},
+                                                      {3, {0, 5, 8}},
+                                                      {3, {0, 7, 16}},
+                                                      {3, {0, 7, 15}},
+                                                      {3, {0, 12, 16}},
+                                                      {3, {0, 12, 15}}}};
+
+// Lowest key of register `r` and its highest.
+int register_low(int r) { return r == 0 ? kPianoLowNote : 36 + 12 * (r - 1); }
+int register_high(int r) { return r == 0 ? 35 : std::min(kPianoHighNote, register_low(r) + 11); }
+
+} // namespace
+
+OpenChordReport evaluate_open_chord_synthetic(const SynthEvalOptions& options, int chords) {
+    OpenChordReport report;
+    PitchDetector detector = calibrated_detector(options);
+    const int rate_hz = options.detector.sample_rate;
+    std::uint64_t state = options.seed * 0x9E3779B97F4A7C15ull + 31;
+    auto next = [&state](int n) {
+        state = state * 6364136223846793005ull + 1442695040888963407ull;
+        return static_cast<int>((state >> 33) % static_cast<std::uint64_t>(n));
+    };
+    const auto uniform = [&next](float lo, float hi) {
+        return lo + (hi - lo) * static_cast<float>(next(1001)) / 1000.0f;
+    };
+    const auto pick_velocity = [&] {
+        return options.velocities[static_cast<size_t>(
+            next(static_cast<int>(std::max<size_t>(1, options.velocities.size()))))];
+    };
+    // A shape on a root in the register, moved down so its top note fits on the keyboard.
+    const auto place = [](const ChordShape& shape, int root, std::array<int, 3>& keys) {
+        root = std::clamp(root, kPianoLowNote,
+                          kPianoHighNote - shape.steps[static_cast<size_t>(shape.count) - 1]);
+        for (int i = 0; i < shape.count; ++i) {
+            keys[static_cast<size_t>(i)] = root + shape.steps[static_cast<size_t>(i)];
+        }
+    };
+    const int lead = static_cast<int>(options.clip.lead_in_s * static_cast<float>(rate_hz));
+    const int tail = static_cast<int>(options.clip.note_s * static_cast<float>(rate_hz));
+    const int ms = rate_hz / 1000;
+    for (int c = 0; c < chords; ++c) {
+        const auto context = static_cast<OpenChordContext>(c % kOpenChordContexts);
+        const int reg = (c / kOpenChordContexts) % kRegisterCount;
+        const bool ringing =
+            context == OpenChordContext::Ringing || context == OpenChordContext::NearRinging;
+        const bool near =
+            context == OpenChordContext::NearSilence || context == OpenChordContext::NearRinging;
+        const ChordShape& shape = kChordShapes[static_cast<size_t>(next(kChordShapes.size()))];
+        std::array<int, 3> keys{};
+        place(shape, register_low(reg) + next(register_high(reg) - register_low(reg) + 1), keys);
+        const float velocity = pick_velocity();
+
+        // The chord ringing before, if any, and when this one starts.
+        const ChordShape& prev_shape = kChordShapes[static_cast<size_t>(next(kChordShapes.size()))];
+        std::array<int, 3> prev{};
+        place(prev_shape, keys[0] + next(15) - 7, prev);
+        const int gap = ((keys[0] < 48 ? 250 : 150) + next(keys[0] < 48 ? 151 : 251)) * ms;
+        const int prev_onset = lead;
+        const int onset = ringing ? lead + gap : lead;
+        std::array<int, 3> starts{};
+        for (int i = 0; i < shape.count; ++i) {
+            starts[static_cast<size_t>(i)] =
+                i == 0 ? onset
+                       : starts[static_cast<size_t>(i) - 1] + (near ? (5 + next(26)) * ms : 0);
+        }
+        const int length = starts[static_cast<size_t>(shape.count) - 1] + tail;
+        // Every strike is drawn first, so a chord that is skipped draws the same numbers.
+        struct Strike {
+            PianoToneOptions tone;
+            int at = 0;
+            int release = 0;
+        };
+        std::array<Strike, 6> strikes{};
+        int strike_count = 0;
+        const auto strike = [&](int key, int at, float vel, int release, std::uint64_t seed) {
+            Strike& s = strikes[static_cast<size_t>(strike_count++)];
+            s.tone.note = key;
+            s.tone.velocity = vel;
+            s.tone.detune_cents =
+                uniform(-options.clip.max_detune_cents, options.clip.max_detune_cents);
+            s.tone.inharmonicity_scale =
+                1.0f + options.clip.inharmonicity_spread * uniform(-1.0f, 1.0f);
+            s.tone.seed = seed;
+            s.at = at;
+            s.release = release;
+        };
+        const std::uint64_t base = options.seed * 104729u + static_cast<std::uint64_t>(c) * 16u;
+        if (ringing) {
+            // Its damper falls 40 ms after this chord starts, as in the melodies.
+            const float prev_velocity = pick_velocity();
+            for (int i = 0; i < prev_shape.count; ++i) {
+                strike(prev[static_cast<size_t>(i)], prev_onset,
+                       options.melody_note_velocities ? pick_velocity() : prev_velocity,
+                       onset + rate_hz / 25, base + 8u + static_cast<std::uint64_t>(i));
+            }
+        }
+        for (int i = 0; i < shape.count; ++i) {
+            strike(keys[static_cast<size_t>(i)], starts[static_cast<size_t>(i)],
+                   options.melody_note_velocities ? pick_velocity() : velocity, length,
+                   base + static_cast<std::uint64_t>(i));
+        }
+        if (c < options.melody_first) {
+            continue;
+        }
+        std::vector<float> audio(static_cast<size_t>(length), 0.0f);
+        std::vector<float> one(static_cast<size_t>(length), 0.0f);
+        for (int i = 0; i < strike_count; ++i) {
+            const Strike& s = strikes[static_cast<size_t>(i)];
+            std::fill(one.begin(), one.end(), 0.0f);
+            add_piano_tone(one.data(), length, s.at, s.tone, rate_hz);
+            for (int k = s.at; k < length; ++k) {
+                const float fade = k < s.release ? 1.0f
+                                                 : std::exp(-static_cast<float>(k - s.release) /
+                                                            (0.03f * static_cast<float>(rate_hz)));
+                audio[static_cast<size_t>(k)] += one[static_cast<size_t>(k)] * fade;
+            }
+        }
+        if (options.clip.interferer) {
+            // A steady other tone under the whole clip, as in the melodies.
+            PianoToneOptions other;
+            other.note = std::clamp(keys[0] + 5, kPianoLowNote, kPianoHighNote);
+            other.velocity = velocity;
+            other.hammer_noise = 0.0f;
+            std::fill(one.begin(), one.end(), 0.0f);
+            add_piano_tone(one.data(), length, 0, other, rate_hz);
+            const float gain = std::pow(10.0f, options.clip.interferer_db / 20.0f);
+            for (size_t k = 0; k < audio.size(); ++k) {
+                audio[k] += gain * one[k];
+            }
+        }
+        add_room_noise(audio.data(), length, options.clip.noise_rms, base ^ 0xC0DEull);
+        detector.reset();
+        const auto events = run_detector(detector, audio.data(), length, options.block);
+        const NoteScore score = score_chord(keys.data(), shape.count, onset, length, events.data(),
+                                            static_cast<int>(events.size()), rate_hz);
+        report.registers.add(keys[0], score, rate_hz);
+        report.contexts[static_cast<size_t>(context)].add(score, rate_hz);
+        if (options.records != nullptr) {
+            std::vector<PitchEvent> near_events;
+            for (const auto& e : events) {
+                if (e.onset_sample >= onset - rate_hz / 50) {
+                    near_events.push_back(e);
+                }
+            }
+            NoteRecord rec{keys[0], velocity, c, -1, score, near_events, onset, {}, 0};
+            rec.chord.assign(keys.begin(), keys.begin() + shape.count);
+            rec.context = static_cast<int>(context);
+            options.records->push_back(rec);
+        }
+    }
     return report;
 }
 
@@ -402,4 +662,4 @@ ChordEvalReport evaluate_chord_synthetic(const SynthEvalOptions& options, int ch
     return report;
 }
 
-} // namespace toonval
+} // namespace etude

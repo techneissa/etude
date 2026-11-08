@@ -1,0 +1,19 @@
+%abc-2.1
+% CC0 1.0: three tiny tunes written for this repo, no rights reserved. The file
+% header gives every tune its default note length.
+L:1/4
+
+X:1
+T:Scale Up
+K:C
+CDEF|GABc|]
+
+X:2
+T:Scale Down
+K:C
+cBAG|FEDC|]
+
+X:10
+T:Arpeggio
+K:G
+GBdg|dBGB|]

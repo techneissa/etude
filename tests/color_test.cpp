@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/color.hpp"
+#include "etude/color.hpp"
 
 #include <cmath>
 
 #include <doctest/doctest.h>
 
-using namespace toonval;
+using namespace etude;
 
 namespace {
 bool near(double a, double b, double eps) { return std::fabs(a - b) <= eps; }
@@ -28,14 +28,6 @@ TEST_CASE("hsv wraps the hue and clamps saturation and value") {
     CHECK(from_hsv(0, 5, 3) == from_hsv(0, 1, 1));
     CHECK(from_hsv(0, 1, -1) == RGBA{0, 0, 0, 255});
     CHECK(from_hsv(0, 1, 1, 0.5f).a == 128);
-}
-
-TEST_CASE("hsl hits known values") {
-    CHECK(from_hsl(0, 1, 0.5) == RGBA{255, 0, 0, 255});
-    CHECK(from_hsl(240, 1, 0.5) == RGBA{0, 0, 255, 255});
-    CHECK(from_hsl(0, 0, 0.5) == RGBA{128, 128, 128, 255});
-    CHECK(from_hsl(123, 0.4, 1.0) == RGBA{255, 255, 255, 255});
-    CHECK(from_hsl(123, 0.4, 0.0) == RGBA{0, 0, 0, 255});
 }
 
 TEST_CASE("lerp mixes channels and alpha and clamps t") {
@@ -120,6 +112,33 @@ TEST_CASE("ensure_contrast lightens on a dark background until the ratio holds")
     const RGBA light{250, 250, 250};
     const RGBA pale{200, 220, 255};
     CHECK(contrast_ratio(ensure_contrast(pale, light, 4.5), light) >= 4.5);
+}
+
+TEST_CASE("lift_to_contrast reaches the ratio and keeps the hue where ensure_contrast fades it") {
+    const RGBA bg{34, 38, 52};
+    for (const RGBA fg : {RGBA{217, 31, 160}, RGBA{154, 76, 246}, RGBA{14, 90, 60}, RGBA{0, 0, 0},
+                          RGBA{20, 20, 20}}) {
+        CAPTURE(to_hex(fg));
+        const RGBA lifted = lift_to_contrast(fg, bg, 4.5);
+        CHECK(contrast_ratio(lifted, bg) >= 4.5);
+        CHECK(lifted.a == fg.a);
+    }
+    // Already fine: unchanged.
+    const RGBA bright{250, 250, 120};
+    CHECK(lift_to_contrast(bright, bg, 4.5) == bright);
+    // Two colours of different hue stay apart after the lift; the mix toward white that
+    // ensure_contrast makes brings them close.
+    const RGBA a{154, 76, 246};
+    const RGBA b{217, 31, 160};
+    const double apart = perceptual_distance(lift_to_contrast(a, bg, 7.0), lift_to_contrast(b, bg, 7.0));
+    const double faded = perceptual_distance(ensure_contrast(a, bg, 7.0), ensure_contrast(b, bg, 7.0));
+    CHECK(apart > faded);
+    // A ratio above what white reaches gives white.
+    CHECK(lift_to_contrast({10, 10, 10}, bg, 30.0) == RGBA{255, 255, 255, 255});
+    // On a light background it darkens.
+    const RGBA light{250, 250, 250};
+    const RGBA pale{200, 220, 255};
+    CHECK(contrast_ratio(lift_to_contrast(pale, light, 4.5), light) >= 4.5);
 }
 
 TEST_CASE("hex text round-trips and rejects bad input") {

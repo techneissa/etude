@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/scales.hpp"
+#include "etude/scales.hpp"
 
-#include "toonval/pitch.hpp"
+#include "etude/pitch.hpp"
 
 #include <cstdlib>
 
-namespace toonval {
+namespace etude {
 namespace {
 
 constexpr std::array<int, 7> kMajor{0, 2, 4, 5, 7, 9, 11};
@@ -270,7 +270,18 @@ Tonic default_tonic(int root_pc, ScaleType type, bool prefer_flats) {
     if (sharp_cost != flat_cost) {
         return sharp_cost < flat_cost ? sharp_tonic : flat_tonic;
     }
-    return prefer_flats ? flat_tonic : sharp_tonic;
+    // The seven-note diatonic scales have key signatures, and a tie there is the key signature's
+    // tie; the other types (G# harmonic minor, whose Ab spelling needs a Fb) keep sharps.
+    const bool diatonic = type == ScaleType::Major || type == ScaleType::NaturalMinor ||
+                          type == ScaleType::Dorian || type == ScaleType::Phrygian ||
+                          type == ScaleType::Lydian || type == ScaleType::Mixolydian ||
+                          type == ScaleType::Locrian;
+    return prefer_flats || (diatonic && tie_prefers_flats(pc)) ? flat_tonic : sharp_tonic;
+}
+
+bool tie_prefers_flats(int tonic_pc) {
+    const int pc = pitch_class(tonic_pc);
+    return pc == 1 || pc == 3 || pc == 5 || pc == 8 || pc == 10;
 }
 
 std::string spelled_name(const SpelledNote& note) {
@@ -315,4 +326,4 @@ std::vector<std::string> scale_note_names_with_octave(Tonic tonic, ScaleType typ
     return names;
 }
 
-} // namespace toonval
+} // namespace etude

@@ -1,193 +1,20 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/screen_layout.hpp"
-
+// screen_layout: the first topics (split from screen_layout_test.cpp).
+#include "etude/screen_layout.hpp"
 #include <cmath>
 #include <limits>
+#include <utility>
 #include <vector>
-
 #include <doctest/doctest.h>
+#include "sample_looks.hpp"
 
-using namespace toonval;
+#include "screen_layout_test_support.hpp"
+
+using namespace etude;
+using namespace etude::test;
+using namespace screen_layout_test_support;
 
 namespace {
-
-constexpr float kPpmm96 = 96.0f / 25.4f;
-
-struct Case {
-    float w;
-    float h;
-    float ppmm;
-};
-
-std::vector<const RectF*> rects(const ScreenLayout& l) {
-    return {&l.top_row, &l.chord_label, &l.note_area, &l.keyboard};
-}
-
-// Positive-area intersection, written out here on purpose and not shared with the code under test.
-bool overlap(const RectF& a, const RectF& b) {
-    if (a.w <= 0 || a.h <= 0 || b.w <= 0 || b.h <= 0) {
-        return false;
-    }
-    return a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
-}
-
-// Everything every layout must satisfy, at any size.
-void check_invariants(const ScreenLayout& l, float width, float height, const char* what) {
-    INFO(what);
-    const float W = std::floor(std::isfinite(width) && width > 0 ? width : 0.0f);
-    const float H = std::floor(std::isfinite(height) && height > 0 ? height : 0.0f);
-    for (const RectF* r : {&l.key_bed, &l.key_area}) {
-        CHECK(std::isfinite(r->y));
-        CHECK(r->x >= 0.0f);
-        CHECK(r->w >= 0.0f);
-        CHECK(r->h >= 0.0f);
-        if (l.keyboard.h > 0.0f) {
-            CHECK(r->y >= l.keyboard.y);
-            CHECK(r->bottom() <= l.keyboard.bottom());
-        }
-    }
-    for (const RectF* r : rects(l)) {
-        CHECK(std::isfinite(r->x));
-        CHECK(std::isfinite(r->y));
-        CHECK(std::isfinite(r->w));
-        CHECK(std::isfinite(r->h));
-        CHECK(r->x >= 0.0f);
-        CHECK(r->y >= 0.0f);
-        CHECK(r->w >= 0.0f);
-        CHECK(r->h >= 0.0f);
-        CHECK(r->x + r->w <= W);
-        CHECK(r->y + r->h <= H);
-    }
-    if (W < 1.0f || H < 1.0f) {
-        // No room at all: everything is empty and hidden.
-        for (const RectF* r : rects(l)) {
-            CHECK(r->empty());
-        }
-        CHECK_FALSE(l.chord_label_visible);
-        CHECK_FALSE(l.status_visible);
-        CHECK(l.gear.empty());
-        CHECK(l.status_text.empty());
-        CHECK_FALSE(l.block_labels_visible);
-        CHECK_FALSE(l.key_labels_visible);
-        CHECK_FALSE(l.c_markers_visible);
-        return;
-    }
-    const auto all = rects(l);
-    for (std::size_t i = 0; i < all.size(); ++i) {
-        for (std::size_t j = i + 1; j < all.size(); ++j) {
-            CHECK_FALSE(overlap(*all[i], *all[j]));
-        }
-    }
-    // The key bed and the key area split the keyboard exactly: bed on top, keys start where it
-    // ends.
-    if (l.keyboard.h > 0.0f) {
-        CHECK(l.key_bed.y == l.keyboard.y);
-        CHECK(l.key_bed.bottom() == l.key_area.y);
-        CHECK(l.key_area.bottom() == l.keyboard.bottom());
-        // At least the minimum, unless the keyboard is so small that 20 percent of it is less.
-        CHECK(l.key_bed.h >= std::min(kMinKeyBedPx, std::floor(l.keyboard.h * 0.2f)));
-        CHECK(l.key_bed.h <= 0.2f * l.keyboard.h);
-        CHECK(l.key_area.h > 0.0f);
-        CHECK(l.key_bed.w == (l.key_bed.h > 0.0f ? l.keyboard.w : 0.0f));
-        CHECK(l.key_area.w == l.keyboard.w);
-        CHECK(l.felt_line_h >= (l.key_bed.h > 0.0f ? 1.0f : 0.0f));
-        CHECK(l.felt_line_h <= l.key_bed.h);
-        CHECK(l.key_shadow_h >= std::min(2.0f, l.key_area.h));
-        CHECK(l.key_shadow_h <= l.key_area.h);
-    } else {
-        CHECK(l.key_bed.empty());
-        CHECK(l.key_area.empty());
-        CHECK(l.felt_line_h == 0.0f);
-        CHECK(l.key_shadow_h == 0.0f);
-    }
-    // The keyboard sits flush with the bottom edge and nothing is drawn below it. The top row is
-    // at the top, above the chord label.
-    CHECK(l.keyboard.bottom() == H);
-    for (const RectF* r : {&l.top_row, &l.chord_label, &l.note_area}) {
-        CHECK(r->bottom() <= l.keyboard.y);
-    }
-    CHECK(l.top_row.y == 0.0f);
-    CHECK(l.chord_label.y == l.top_row.bottom());
-    CHECK(l.note_area.y == l.chord_label.bottom());
-    // Together they fill the window height exactly.
-    CHECK(l.top_row.h + l.chord_label.h + l.note_area.h + l.keyboard.h == H);
-    // The gear and the status text sit inside the top row, side by side, never touching.
-    if (!l.gear.empty()) {
-        CHECK(l.gear.y == l.top_row.y);
-        CHECK(l.gear.h == l.top_row.h);
-        CHECK(l.gear.right() == l.top_row.right());
-        CHECK(l.gear.w <= l.top_row.h);
-    }
-    if (!l.status_text.empty()) {
-        CHECK(l.status_text.x > 0.0f);
-        CHECK(l.status_text.y == l.top_row.y);
-        CHECK(l.status_text.bottom() == l.top_row.bottom());
-        CHECK(l.status_text.right() < l.gear.x);
-    }
-    CHECK(l.note_area.h >= kMinNoteAreaShare * H);
-    // Text lives inside its rect.
-    if (l.chord_label_visible) {
-        CHECK(l.chord_label_font_px >= kMinChordFontPx);
-        CHECK(l.chord_label_font_px * kLineHeightEm <= l.chord_label.h);
-        CHECK(l.chord_label_font_px * kLabelCharWidthEm * static_cast<float>(kChordLabelMaxChars) <=
-              l.chord_label.w);
-    } else {
-        CHECK(l.chord_label_font_px == 0.0f);
-        CHECK(l.chord_label.empty());
-    }
-    if (l.status_visible) {
-        CHECK(l.status_font_px >= kMinLabelFontPx);
-        CHECK(l.status_font_px * kTopRowMinHeightEm <= l.top_row.h);
-        CHECK_FALSE(l.status_text.empty());
-    } else {
-        CHECK(l.status_font_px == 0.0f);
-    }
-    if (l.block_labels_visible) {
-        CHECK(l.note_label_font_px >= kMinLabelFontPx);
-        CHECK(l.note_label_font_px <= l.keyboard.h);
-    } else {
-        CHECK(l.note_label_font_px == 0.0f);
-    }
-    if (l.c_markers_visible) {
-        CHECK(l.c_marker_font_px >= kMinLabelFontPx);
-        CHECK(l.c_marker_font_px <= l.keyboard.h);
-    } else {
-        CHECK(l.c_marker_font_px == 0.0f);
-    }
-    if (l.key_labels_visible) {
-        CHECK(l.key_label_font_px >= kMinLabelFontPx);
-        CHECK(l.key_label_font_px <= l.keyboard.h);
-    } else {
-        CHECK(l.key_label_font_px == 0.0f);
-    }
-}
-
-std::vector<Case> sweep_cases() {
-    std::vector<Case> out;
-    const float densities[] = {2.0f, kPpmm96, 5.0f, 6.4f, 10.0f};
-    // Named sizes: 4:3, 16:10, 16:9, 21:9, 32:9, portrait, the 800x480 floor, tiny, 4K, 8K.
-    const float sizes[][2] = {
-        {800, 480},   {1024, 600},  {1024, 768},  {1280, 720},  {1280, 800},  {1600, 1200},
-        {1920, 1080}, {2560, 1080}, {3440, 1440}, {3840, 2160}, {5120, 1440}, {7680, 4320},
-        {480, 800},   {720, 1280},  {1080, 1920}, {100, 50},    {320, 240},   {64, 64},
-        {10, 10},     {1, 1},       {0, 0},       {800, 0},     {0, 480},     {799.5f, 479.5f}};
-    for (const auto& s : sizes) {
-        for (float d : densities) {
-            out.push_back({s[0], s[1], d});
-        }
-    }
-    // Every aspect ratio from 4:3 to 21:9 at several heights, including odd pixel counts.
-    for (float h : {480.0f, 481.0f, 600.0f, 721.0f, 1080.0f, 1440.0f, 2160.0f}) {
-        for (int step = 0; step <= 16; ++step) {
-            const float aspect =
-                4.0f / 3.0f + (21.0f / 9.0f - 4.0f / 3.0f) * static_cast<float>(step) / 16.0f;
-            for (float d : {kPpmm96, 5.0f}) {
-                out.push_back({std::round(h * aspect), h, d});
-            }
-        }
-    }
-    return out;
-}
 
 std::vector<LookSettings> sweep_looks() {
     std::vector<LookSettings> out;
@@ -214,8 +41,8 @@ std::vector<LookSettings> sweep_looks() {
             }
         }
     }
-    for (PresetId id : kAllPresets) {
-        out.push_back(preset(id));
+    for (Sample id : kAllSamples) {
+        out.push_back(sample_look(id));
     }
     return out;
 }
@@ -226,13 +53,16 @@ TEST_CASE("a 1080p window is stacked top row, chord label, notes, keyboard") {
     const ScreenLayout l = compute_layout(1920, 1080, kPpmm96, LookSettings{});
     check_invariants(l, 1920, 1080, "1080p");
     CHECK(l.top_row.y == 0.0f);
+    CHECK(l.bar_under.empty()); // the bar is not pinned
     CHECK(l.chord_label.y == l.top_row.bottom());
     CHECK(l.note_area.y == l.chord_label.bottom());
     CHECK(l.keyboard.y == l.note_area.bottom());
     CHECK(l.keyboard.bottom() == 1080.0f);
     for (const RectF* r : rects(l)) {
-        CHECK(r->x == 0.0f);
-        CHECK(r->w == 1920.0f);
+        if (!r->empty()) {
+            CHECK(r->x == 0.0f);
+            CHECK(r->w == 1920.0f);
+        }
     }
     CHECK(l.chord_label_visible);
     CHECK(l.status_visible);
@@ -419,10 +249,15 @@ TEST_CASE("bad inputs give empty layouts or the default density, never garbage")
 
 // ---- Behaviour the first renderer's layout had and the renderer still relies on ----
 
-TEST_CASE("at 1080p the chord label is large and the notes get most of the screen") {
+TEST_CASE("at 1080p the chord label is calm and the notes get most of the screen") {
     const ScreenLayout l = compute_layout(1920, 1080, kPpmm96, LookSettings{});
     check_invariants(l, 1920, 1080, "1080p");
-    CHECK(l.chord_label_font_px >= 0.08f * 1080.0f); // sized from the window height, not 8 mm
+    // Sized from the window height, not 8 mm, and no banner: a share of what the first renderer
+    // drew (kChordLabelShare), so the strip leaves the notes about 70% of the screen.
+    CHECK(l.chord_label_font_px >= 0.04f * 1080.0f);
+    CHECK(l.chord_label_font_px <= 0.06f * 1080.0f);
+    CHECK(l.chord_label.h <= 0.06f * 1080.0f);
+    CHECK(l.note_area.h >= 0.65f * 1080.0f);
     CHECK(l.note_area.h >= 0.5f * 1080.0f);
     CHECK(l.status_font_px >= 0.02f * 1080.0f);
 }
@@ -500,124 +335,4 @@ TEST_CASE("a C marker shrinks with the key width and hides before it collides") 
     CHECK(fit_label_font_px(14.0f, 18.0f, 2) >= kMinLabelFontPx);
     // 88 keys across 800 px: 15 px keys, "C-1" (3 characters) is unreadable there.
     CHECK(fit_label_font_px(14.0f, 800.0f / 52.0f - 1.6f, 3) == 0.0f);
-}
-
-// ---- The top row: status text, gear, and the bar when it is revealed ----
-
-namespace {
-
-std::vector<Case> wide_cases() {
-    // 800x480 up to 21:9, at several densities.
-    std::vector<Case> out;
-    for (float h : {480.0f, 600.0f, 720.0f, 900.0f, 1080.0f, 1440.0f}) {
-        for (int step = 0; step <= 8; ++step) {
-            const float aspect =
-                4.0f / 3.0f + (21.0f / 9.0f - 4.0f / 3.0f) * static_cast<float>(step) / 8.0f;
-            const float w = std::max(800.0f, std::round(h * aspect));
-            for (float d : {kPpmm96, 5.0f, 6.4f}) {
-                out.push_back({w, h, d});
-            }
-        }
-    }
-    return out;
-}
-
-} // namespace
-
-TEST_CASE("the top row is one touch target tall from 800x480 to 21:9, and the stack holds") {
-    for (const Case& c : wide_cases()) {
-        const ScreenLayout l = compute_layout(c.w, c.h, c.ppmm, LookSettings{});
-        check_invariants(l, c.w, c.h, "wide");
-        CHECK(l.top_row.h == std::ceil(kMinTouchTargetMm * c.ppmm));
-        CHECK(l.top_row.w == c.w);
-        CHECK(l.chord_label.y == l.top_row.bottom());
-        CHECK(l.note_area.y == l.chord_label.bottom());
-        CHECK(l.keyboard.y == l.note_area.bottom());
-        CHECK(l.keyboard.bottom() == c.h); // nothing below the keyboard
-        CHECK(l.status_visible);
-    }
-    // The documented floor: 800x480 on a 5 px/mm panel (a 7-inch touch screen).
-    CHECK(compute_layout(800, 480, 5.0f, LookSettings{}).top_row.h >= 75.0f);
-}
-
-TEST_CASE("the top row is capped in windows too short for a 15 mm row") {
-    const ScreenLayout l = compute_layout(1280, 150, kPpmm96, LookSettings{});
-    check_invariants(l, 1280, 150, "short");
-    CHECK(l.top_row.h <= kMaxTopRowShare * 150.0f);
-}
-
-TEST_CASE("the gear is a square in the top-right corner and the status area never reaches it") {
-    for (const Case& c : wide_cases()) {
-        const ScreenLayout l = compute_layout(c.w, c.h, c.ppmm, LookSettings{});
-        CHECK(l.gear.w == l.top_row.h);
-        CHECK(l.gear.h == l.top_row.h);
-        CHECK(l.gear.right() == c.w);
-        CHECK(l.gear.y == 0.0f);
-        CHECK(l.status_text.x > 0.0f);
-        CHECK(l.status_text.right() < l.gear.x);
-        CHECK_FALSE(overlap(l.status_text, l.gear));
-    }
-}
-
-TEST_CASE("the note area gets the height the old status line had") {
-    // Before the top row, a 1280x720 window at 96 dpi had a 57 px control bar and a 26 px status
-    // line under it. Now the status is in the top row and the notes start 26 px higher.
-    const ScreenLayout l = compute_layout(1280, 720, kPpmm96, LookSettings{});
-    CHECK(l.top_row.h == 57.0f);
-    const float old_note_h = 720.0f - 57.0f - 26.0f - l.chord_label.h - l.keyboard.h;
-    CHECK(l.note_area.h == old_note_h + 26.0f);
-}
-
-TEST_CASE("a revealed bar takes the right end of the status area and the text shrinks") {
-    for (const Case& c : wide_cases()) {
-        const ScreenLayout l = compute_layout(c.w, c.h, c.ppmm, LookSettings{});
-        for (float bar_w : {100.0f, 400.0f, 700.0f, 5000.0f}) {
-            const TopRowSplit s = split_top_row(l, bar_w, 0.0f, false);
-            INFO("bar " << bar_w << " in " << c.w << "x" << c.h);
-            CHECK(s.bar.w == std::min(bar_w, l.status_text.w));
-            CHECK(s.bar.right() == l.status_text.right()); // next to the gear
-            CHECK(s.bar.right() < l.gear.x);
-            CHECK(s.bar.y == l.top_row.y);
-            CHECK(s.bar.h == l.top_row.h);
-            CHECK_FALSE(overlap(s.bar, l.gear));
-            CHECK_FALSE(overlap(s.bar, s.status_text));
-            if (!s.status_text.empty()) {
-                CHECK(s.status_text.x == l.status_text.x);
-                CHECK(s.status_text.right() < s.bar.x);
-                CHECK(s.status_text.w < l.status_text.w);
-            }
-        }
-    }
-}
-
-TEST_CASE(
-    "a centred bar sits in the middle, moves right to keep status text, never past the gear") {
-    const ScreenLayout l = compute_layout(1280, 720, kPpmm96, LookSettings{});
-    const TopRowSplit mid = split_top_row(l, 400.0f, 0.0f, true);
-    CHECK(mid.bar.x == 440.0f);
-    CHECK(mid.status_text.right() < mid.bar.x);
-    // Asked to keep 600 px of status text: the bar moves right of it.
-    const TopRowSplit kept = split_top_row(l, 400.0f, 600.0f, true);
-    CHECK(kept.bar.x > mid.bar.x);
-    CHECK(kept.status_text.w >= 600.0f);
-    CHECK(kept.bar.right() <= l.status_text.right());
-    // Asked for more than fits: the bar stops at the gear and the text gives way.
-    const TopRowSplit tight = split_top_row(l, 400.0f, 5000.0f, true);
-    CHECK(tight.bar.right() == l.status_text.right());
-    CHECK(tight.bar.w == 400.0f);
-    CHECK_FALSE(overlap(tight.bar, tight.status_text));
-}
-
-TEST_CASE("no bar, or a bad width, leaves the status area whole") {
-    const ScreenLayout l = compute_layout(1280, 720, kPpmm96, LookSettings{});
-    for (float bad : {0.0f, -10.0f, std::numeric_limits<float>::quiet_NaN()}) {
-        const TopRowSplit s = split_top_row(l, bad, 0.0f, false);
-        CHECK(s.bar.empty());
-        CHECK(s.status_text.x == l.status_text.x);
-        CHECK(s.status_text.w == l.status_text.w);
-    }
-    // A bar as wide as the whole area leaves no status text at all, rather than a sliver under it.
-    const TopRowSplit full = split_top_row(l, l.status_text.w, 0.0f, false);
-    CHECK(full.status_text.empty());
-    CHECK(full.bar.x == l.status_text.x);
 }

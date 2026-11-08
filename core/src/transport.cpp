@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/transport.hpp"
+#include "etude/transport.hpp"
+
+#include "etude/meter.hpp"
 
 #include <algorithm>
 #include <cmath>
 
-namespace toonval {
+namespace etude {
 namespace {
 
 // A stall of many loop lengths in one update stops wrapping after this many; the position stays
@@ -21,8 +23,10 @@ const Measure* find_measure(const std::vector<Measure>& bars, int number) {
 
 } // namespace
 
+int clamp_speed_percent(int percent) { return std::clamp(percent, kMinSpeedPercent, kMaxSpeedPercent); }
+
 int snap_speed_percent(int percent) {
-    int p = std::clamp(percent, kMinSpeedPercent, kMaxSpeedPercent);
+    const int p = clamp_speed_percent(percent);
     return (p + kSpeedStepPercent / 2) / kSpeedStepPercent * kSpeedStepPercent;
 }
 
@@ -117,10 +121,10 @@ TransportState Transport::state() const {
     if (!playing_) {
         return TransportState::Paused;
     }
-    if (held_) {
-        return TransportState::Held;
+    if (count_in_left_ > 0.0) {
+        return TransportState::CountIn;
     }
-    return count_in_left_ > 0.0 ? TransportState::CountIn : TransportState::Playing;
+    return held_ ? TransportState::Held : TransportState::Playing;
 }
 
 void Transport::push(const TransportOp& op) {
@@ -149,67 +153,15 @@ double Transport::beat_seconds_at(double song_seconds) const {
     auto sig = std::upper_bound(signatures_.begin(), signatures_.end(), tick,
                                 [](std::int64_t k, const TimeSignature& s) { return k < s.tick; });
     const TimeSignature& s = sig == signatures_.begin() ? signatures_.front() : *(sig - 1);
-    return t.us_per_quarter / 1e6 * 4.0 / s.denominator;
+    return t.us_per_quarter / 1e6 * ticks_per_beat(1.0, s.numerator, s.denominator);
 }
 
-int Transport::numerator_at(double song_seconds) const {
+int Transport::beats_per_bar_at(double song_seconds) const {
     auto tick = static_cast<std::int64_t>(std::floor(tempo_.tick_at(song_seconds)));
     auto sig = std::upper_bound(signatures_.begin(), signatures_.end(), tick,
                                 [](std::int64_t k, const TimeSignature& s) { return k < s.tick; });
-    return (sig == signatures_.begin() ? signatures_.front() : *(sig - 1)).numerator;
-}
-
-// Click ops for the bar beats in [from_s, to_s). A pickup bar (number 0) is the end of a bar, so
-// its beats are numbered back from the next bar's last beat.
-void Transport::emit_beats(double from_s, double to_s, std::int64_t from_ns, std::int64_t to_ns) {
-    if (measures_.empty() || to_s <= from_s) {
-        return;
-    }
-    auto ns_at = [&](double t) {
-        return from_ns +
-               std::llround((t - from_s) / (to_s - from_s) * static_cast<double>(to_ns - from_ns));
-    };
-    auto first = std::upper_bound(measures_.begin(), measures_.end(), from_s,
-                                  [](double s, const Measure& m) { return s < m.start_s; });
-    std::size_t i =
-        first == measures_.begin() ? 0 : static_cast<std::size_t>(first - measures_.begin()) - 1;
-    for (; i < measures_.size(); ++i) {
-        const Measure& m = measures_[i];
-        if (m.start_s >= to_s) {
-            return;
-        }
-        const bool has_next = i + 1 < measures_.size();
-        const std::int64_t next_tick = has_next ? measures_[i + 1].start_tick : INT64_MAX;
-        const double spacing = 4.0 * tempo_.ticks_per_quarter / m.denominator; // ticks per beat
-        int beats = m.numerator;
-        int label = 1;
-        if (m.number == 0 && has_next) {
-            const int bar_beats = measures_[i + 1].numerator;
-            beats = std::max(1, static_cast<int>(std::llround(
-                                    static_cast<double>(next_tick - m.start_tick) / spacing)));
-            label = std::max(1, bar_beats - beats + 1);
-        }
-        for (int k = 0; k < beats; ++k) {
-            double tick = static_cast<double>(m.start_tick) + k * spacing;
-            if (tick >= static_cast<double>(next_tick)) {
-                break;
-            }
-            double t = tempo_.seconds_at(std::llround(tick));
-            if (t < from_s) {
-                continue;
-            }
-            if (t >= to_s) {
-                return;
-            }
-            TransportOp op;
-            op.kind = TransportOp::Kind::Click;
-            op.at_ns = ns_at(t);
-            op.to_s = t;
-            op.beat = label + k;
-            op.accent = op.beat == 1;
-            push(op);
-        }
-    }
+    const TimeSignature& s = sig == signatures_.begin() ? signatures_.front() : *(sig - 1);
+    return beats_per_bar(s.numerator, s.denominator);
 }
 
 void Transport::settle(std::int64_t now_ns) {
@@ -224,7 +176,7 @@ void Transport::settle(std::int64_t now_ns) {
     }
     const std::int64_t start_ns = last_ns_;
     last_ns_ = now_ns;
-    if (!playing_ || held_) {
+    if (!playing_) {
         return;
     }
     const double wall = static_cast<double>(now_ns - start_ns) / 1e9;
@@ -232,24 +184,11 @@ void Transport::settle(std::int64_t now_ns) {
     auto ns_at = [&](double w) { return start_ns + round_ns(w); };
     const double rate = speed_percent_ / 100.0; // song seconds per wall second
 
+    // The count-in runs on even while Wait Mode holds the clock at the first chord.
     if (count_in_left_ > 0.0) {
         const double beats_per_s = rate / count_in_beat_s_;
         const double need = count_in_left_ / beats_per_s;
         const double use = std::min(need, wall);
-        const double e0 = count_in_total_ - count_in_left_; // beats counted so far
-        const double e1 = e0 + use * beats_per_s;
-        while (count_in_next_click_ <= count_in_total_ && count_in_next_click_ - 1 <= e1 + 1e-9) {
-            TransportOp op;
-            op.kind = Kind::Click;
-            op.at_ns = ns_at(std::max(0.0, (count_in_next_click_ - 1 - e0) / beats_per_s));
-            op.to_s =
-                position_s_ - (count_in_total_ - (count_in_next_click_ - 1)) * count_in_beat_s_;
-            op.beat = (count_in_next_click_ - 1) % count_in_numerator_ + 1;
-            op.accent = op.beat == 1;
-            op.count_in = true;
-            push(op);
-            ++count_in_next_click_;
-        }
         if (use >= need) {
             count_in_left_ = 0.0;
         } else {
@@ -257,6 +196,9 @@ void Transport::settle(std::int64_t now_ns) {
             return;
         }
         spent = use;
+    }
+    if (held_) {
+        return;
     }
 
     for (int step = 0; step < kMaxStepsPerUpdate; ++step) {
@@ -299,9 +241,6 @@ void Transport::settle(std::int64_t now_ns) {
         move.to_s = limit;
         move.speed_percent = speed_percent_;
         push(move);
-        if (metronome_) {
-            emit_beats(p, limit, move.at_ns, move.end_ns);
-        }
         position_s_ = limit;
         spent = t1;
 
@@ -353,23 +292,38 @@ void Transport::play(std::int64_t now_ns) {
     op.to_s = position_s_;
     push(op);
     count_in_left_ = 0.0;
-    if (count_in_beats_ > 0) {
-        count_in_total_ = count_in_beats_;
-        count_in_left_ = count_in_beats_;
-        count_in_beat_s_ = beat_seconds_at(position_s_);
-        count_in_numerator_ = std::max(1, numerator_at(position_s_));
-        count_in_next_click_ = 1;
-        // The first beat sounds now.
-        TransportOp click;
-        click.kind = TransportOp::Kind::Click;
-        click.at_ns = now_ns;
-        click.to_s = position_s_ - count_in_total_ * count_in_beat_s_;
-        click.beat = 1;
-        click.accent = true;
-        click.count_in = true;
-        push(click);
-        count_in_next_click_ = 2;
+    int numerator = std::max(1, beats_per_bar_at(position_s_));
+    int beats = count_in_beats_;
+    if (count_in_bars_ > 0) {
+        // Whole bars of the meter here. Starting at a pickup bar, the bar counted is the one the
+        // pickup ends (the next bar's meter), less the pickup's own beats: the pickup then falls on
+        // the last beats of the count.
+        int pickup_beats = 0;
+        if (measures_.size() > 1 && measures_.front().number == 0 &&
+            position_s_ <= measures_.front().start_s + 1e-9) {
+            const Measure& pickup = measures_.front();
+            const double spacing =
+                ticks_per_beat(tempo_.ticks_per_quarter, pickup.numerator, pickup.denominator);
+            pickup_beats = std::max(
+                0, static_cast<int>(std::llround(
+                       static_cast<double>(measures_[1].start_tick - pickup.start_tick) / spacing)));
+            numerator = std::max(1, beats_per_bar(measures_[1].numerator, measures_[1].denominator));
+        }
+        beats = std::max(1, count_in_bars_ * numerator - pickup_beats);
     }
+    if (beats > 0) {
+        count_in_total_ = beats;
+        count_in_left_ = beats;
+        count_in_beat_s_ = beat_seconds_at(position_s_);
+        count_in_numerator_ = numerator;
+    }
+}
+
+double Transport::count_in_wall_left_s() const {
+    if (!counting_in()) {
+        return 0.0;
+    }
+    return count_in_left_ * count_in_beat_s_ / (speed_percent_ / 100.0);
 }
 
 void Transport::pause(std::int64_t now_ns) {
@@ -403,9 +357,35 @@ void Transport::seek(std::int64_t now_ns, double song_seconds) {
     hold_at_.reset(); // armed for the old position; Wait Mode arms the next one on its update
 }
 
+bool Transport::skip(std::int64_t now_ns, double delta_s) {
+    settle(now_ns);
+    double target = position_s_ + delta_s;
+    // Inside a loop a skip stays in it: past the end wraps to the start, before the start stops
+    // there. From outside, a skip that lands outside the loop ends it, like any other jump.
+    if (loop_on_ && position_s_ >= loop_a_ && position_s_ < loop_b_ &&
+        (target >= loop_b_ || target < loop_a_)) {
+        target = loop_a_;
+    }
+    return scrub(now_ns, target);
+}
+
+bool Transport::scrub(std::int64_t now_ns, double song_seconds) {
+    settle(now_ns);
+    if (std::isnan(song_seconds)) {
+        return false;
+    }
+    const double target = std::clamp(song_seconds, 0.0, duration_s_);
+    const bool leaves_loop = loop_on_ && (target < loop_a_ || target >= loop_b_);
+    if (leaves_loop) {
+        clear_loop(now_ns);
+    }
+    seek(now_ns, target);
+    return leaves_loop;
+}
+
 int Transport::set_speed_percent(std::int64_t now_ns, int percent) {
     settle(now_ns);
-    speed_percent_ = snap_speed_percent(percent);
+    speed_percent_ = clamp_speed_percent(percent);
     return speed_percent_;
 }
 
@@ -497,6 +477,6 @@ void Transport::set_auto_speed_up(std::int64_t now_ns, const AutoSpeedUp& policy
 
 void Transport::set_count_in_beats(int beats) { count_in_beats_ = std::max(0, beats); }
 
-void Transport::set_metronome(bool enabled) { metronome_ = enabled; }
+void Transport::set_count_in_bars(int bars) { count_in_bars_ = std::clamp(bars, 0, 4); }
 
-} // namespace toonval
+} // namespace etude

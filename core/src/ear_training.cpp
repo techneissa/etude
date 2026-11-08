@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "toonval/ear_training.hpp"
+#include "etude/ear_training.hpp"
 
-#include "toonval/pitch.hpp"
-#include "toonval/song_builder.hpp"
+#include "etude/pitch.hpp"
+#include "etude/song_builder.hpp"
 
 #include <algorithm>
 #include <array>
@@ -10,7 +10,7 @@
 #include <cstdlib>
 #include <vector>
 
-namespace toonval {
+namespace etude {
 namespace {
 
 constexpr int kMaxInterval = 36;
@@ -42,6 +42,36 @@ std::uint64_t EarRng::below(std::uint64_t n) {
     return v % n;
 }
 
+// A note question: a uniformly drawn note of the range, never the same twice in a row.
+EarQuestionResult EarTrainer::next_note() {
+    EarQuestionResult result;
+    const KeyRange range = settings_.range;
+    std::vector<int> notes;
+    for (int n = range.lowest; n <= range.highest; ++n) {
+        if (!(settings_.white_keys_only && is_black_key(n))) {
+            notes.push_back(n);
+        }
+    }
+    if (notes.empty()) {
+        result.message = "no note of the range can be asked";
+        return result;
+    }
+    EarQuestion q;
+    q.kind = EarQuestionKind::Note;
+    // Never the same note twice in a row, when there is another.
+    for (int attempt = 0; attempt < 64; ++attempt) {
+        q.first = q.second = notes[rng_.below(notes.size())];
+        if (notes.size() == 1 || !have_previous_ || !question_equal(q, previous_)) {
+            break;
+        }
+    }
+    previous_ = q;
+    have_previous_ = true;
+    result.ok = true;
+    result.question = q;
+    return result;
+}
+
 EarQuestionResult EarTrainer::next() {
     EarQuestionResult result;
     const KeyRange range = settings_.range;
@@ -55,36 +85,17 @@ EarQuestionResult EarTrainer::next() {
     };
 
     if (settings_.kind == EarQuestionKind::Note) {
-        std::vector<int> notes;
-        for (int n = range.lowest; n <= range.highest; ++n) {
-            if (usable(n)) {
-                notes.push_back(n);
-            }
-        }
-        if (notes.empty()) {
-            result.message = "no note of the range can be asked";
-            return result;
-        }
-        EarQuestion q;
-        q.kind = EarQuestionKind::Note;
-        // Never the same note twice in a row, when there is another.
-        for (int attempt = 0; attempt < 64; ++attempt) {
-            q.first = q.second = notes[rng_.below(notes.size())];
-            if (notes.size() == 1 || !have_previous_ || !question_equal(q, previous_)) {
-                break;
-            }
-        }
-        previous_ = q;
-        have_previous_ = true;
-        result.ok = true;
-        result.question = q;
-        return result;
+        return next_note();
     }
 
     if (settings_.min_interval < 1 || settings_.max_interval > kMaxInterval ||
         settings_.min_interval > settings_.max_interval) {
         result.message = "the interval sizes must be within 1.." + std::to_string(kMaxInterval) +
                          " semitones, smallest first";
+        return result;
+    }
+    if (!settings_.allow_ascending && !settings_.allow_descending) {
+        result.message = "the interval must be allowed to go up or down";
         return result;
     }
     // Every signed interval size that has at least one first note for which both notes fit.
@@ -95,7 +106,8 @@ EarQuestionResult EarTrainer::next() {
     std::vector<Choice> choices;
     for (int size = settings_.min_interval; size <= settings_.max_interval; ++size) {
         for (int sign : {1, -1}) {
-            if (sign < 0 && !settings_.allow_descending) {
+            if ((sign < 0 && !settings_.allow_descending) ||
+                (sign > 0 && !settings_.allow_ascending)) {
                 continue;
             }
             Choice c{sign * size, {}};
@@ -201,4 +213,4 @@ Song ear_question_song(const EarQuestion& q, const ExerciseSettings& play) {
     return song;
 }
 
-} // namespace toonval
+} // namespace etude
