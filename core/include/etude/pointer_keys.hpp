@@ -93,8 +93,6 @@ class PointerKeys {
     void up(PointerId id, std::int64_t time_ns, std::vector<MidiEvent>& out);
     void release_all(std::int64_t time_ns, std::vector<MidiEvent>& out);
 
-    // The pointer's current note, or nullopt.
-    std::optional<int> note_of(PointerId id) const;
     // Pointers that went down on a key and are still down, whether or not a key is under them.
     int active_pointers() const;
     // Notes sounding.

@@ -40,8 +40,6 @@ Family family_of(ChordQuality quality) {
 
 } // namespace
 
-bool chord_has_fingering(ChordQuality quality) { return family_of(quality) != Family::None; }
-
 std::optional<ChordFingering> chord_fingering(ChordQuality quality, int inversion) {
     const Family family = family_of(quality);
     ChordFingering f;

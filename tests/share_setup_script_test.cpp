@@ -9,35 +9,15 @@
 
 #include "etude/network_share.hpp"
 
-#include <sys/wait.h>
-
-#include <cstdio>
-#include <cstdlib>
-
 using namespace upload_test;
 
 namespace {
 
-struct Run {
-    int status = -1;
-    std::string out;
-};
+const std::string kScript = std::string(ETUDE_SOURCE_DIR) + "/deploy/pi/setup.sh";
 
 // Runs the script with bash; `args` and `env` are shell words.
-Run setup(const fs::path& sandbox, const std::string& args, const std::string& env = "") {
-    const fs::path script = fs::path(ETUDE_SOURCE_DIR) / "deploy/pi/setup.sh";
-    const std::string command = env + " bash '" + script.string() + "' --share-sandbox '" +
-                                sandbox.string() + "' " + args + " 2>&1 </dev/null";
-    Run run;
-    FILE* pipe = ::popen(command.c_str(), "r");
-    REQUIRE(pipe != nullptr);
-    char buffer[512];
-    while (std::fgets(buffer, sizeof buffer, pipe) != nullptr) {
-        run.out += buffer;
-    }
-    const int raw = ::pclose(pipe);
-    run.status = raw == -1 ? -1 : WEXITSTATUS(raw);
-    return run;
+ShellRun setup(const fs::path& sandbox, const std::string& args, const std::string& env = "") {
+    return shell(env + " bash '" + kScript + "' --share-sandbox '" + sandbox.string() + "' " + args);
 }
 
 int count(const std::string& text, const std::string& word) {
@@ -56,7 +36,7 @@ bool has_line(const std::string& text, const std::string& line) {
 
 TEST_CASE("share setup: the share's file, bound to the private interfaces, no guest") {
     TempDir pi;
-    const Run run = setup(pi.path, "--share-interface eth0 --share-interface wlan0",
+    const ShellRun run = setup(pi.path, "--share-interface eth0 --share-interface wlan0",
                           "ETUDE_SHARE_PASSWORD=Secret123");
     INFO(run.out);
     REQUIRE(run.status == 0);
@@ -71,6 +51,7 @@ TEST_CASE("share setup: the share's file, bound to the private interfaces, no gu
     CHECK(has_line(conf, "   valid users = etude"));
     CHECK(has_line(conf, "   read only = no"));
     CHECK(has_line(conf, "[etude]"));
+    CHECK(has_line(conf, "   vfs objects = catia fruit streams_xattr")); // ? : * " < > | mapped
     CHECK(conf.find("guest ok = yes") == std::string::npos);
     // The share is the Inbox of the app user's Songs folder, made for the app.
     const std::string inbox =
@@ -97,7 +78,7 @@ TEST_CASE("share setup: running it again changes nothing and keeps the password"
             0);
     const std::string conf = read_file(pi.path / "etc/samba/etude-share.conf");
     const std::string smb = read_file(pi.path / "etc/samba/smb.conf");
-    const Run again = setup(pi.path, "--share-interface eth0");
+    const ShellRun again = setup(pi.path, "--share-interface eth0");
     INFO(again.out);
     REQUIRE(again.status == 0);
     CHECK(count(again.out, "[change]") == 0);
@@ -110,7 +91,7 @@ TEST_CASE("share setup: running it again changes nothing and keeps the password"
 TEST_CASE("share setup: a changed interface rewrites the file, the include stays single") {
     TempDir pi;
     REQUIRE(setup(pi.path, "--share-interface eth0", "ETUDE_SHARE_PASSWORD=x").status == 0);
-    const Run run = setup(pi.path, "--share-interface wlan0");
+    const ShellRun run = setup(pi.path, "--share-interface wlan0");
     REQUIRE(run.status == 0);
     CHECK(
         has_line(read_file(pi.path / "etc/samba/etude-share.conf"), "   interfaces = lo wlan0"));
@@ -120,7 +101,7 @@ TEST_CASE("share setup: a changed interface rewrites the file, the include stays
 TEST_CASE("share setup: --reset-share-password sets a new password") {
     TempDir pi;
     REQUIRE(setup(pi.path, "--share-interface eth0", "ETUDE_SHARE_PASSWORD=one").status == 0);
-    const Run run = setup(pi.path, "--share-interface eth0 --reset-share-password",
+    const ShellRun run = setup(pi.path, "--share-interface eth0 --reset-share-password",
                           "ETUDE_SHARE_PASSWORD=zq7Wd9Kx");
     REQUIRE(run.status == 0);
     CHECK(run.out.find("zq7Wd9Kx") == std::string::npos); // given, so not printed
@@ -129,7 +110,7 @@ TEST_CASE("share setup: --reset-share-password sets a new password") {
 
 TEST_CASE("share setup: with no password given one is made and printed once") {
     TempDir pi;
-    const Run run = setup(pi.path, "--share-interface eth0");
+    const ShellRun run = setup(pi.path, "--share-interface eth0");
     REQUIRE(run.status == 0);
     const std::size_t at = run.out.find("with the password ");
     REQUIRE(at != std::string::npos);
@@ -138,14 +119,14 @@ TEST_CASE("share setup: with no password given one is made and printed once") {
     CHECK(rest.find("(made for you") != std::string::npos);
     // It is printed once, and the second run, which keeps it, does not print it.
     const std::string word = rest.substr(0, 12);
-    const Run again = setup(pi.path, "--share-interface eth0");
+    const ShellRun again = setup(pi.path, "--share-interface eth0");
     CHECK(again.out.find(word) == std::string::npos);
 }
 
 TEST_CASE("share setup: the share can be a folder of the caller's choosing") {
     TempDir pi;
     const fs::path folder = pi.path / "music";
-    const Run run = setup(pi.path, "--share-interface eth0 --share-path '" + folder.string() + "'");
+    const ShellRun run = setup(pi.path, "--share-interface eth0 --share-path '" + folder.string() + "'");
     REQUIRE(run.status == 0);
     CHECK(has_line(read_file(pi.path / "etc/samba/etude-share.conf"),
                    "   path = " + folder.string()));
@@ -167,7 +148,7 @@ TEST_CASE("share setup: only home-network interfaces are shared on, not VPNs or 
                "11: utun3    inet 10.9.0.1/24 scope global utun3\n"
                "12: veth1@if5    inet 192.168.9.1/24 scope global veth1\n"
                "13: eth3    inet 8.8.4.4/24 scope global eth3\n");
-    const Run run =
+    const ShellRun run =
         setup(pi.path, "", "ETUDE_SHARE_IP_LISTING='" + (pi.path / "ip.txt").string() + "'");
     INFO(run.out);
     REQUIRE(run.status == 0);
@@ -181,7 +162,7 @@ TEST_CASE("share setup: a share that testparm refuses is not installed") {
     TempDir pi;
     fs::create_directories(pi.path / "bin");
     write_script(pi.path / "bin/testparm", "#!/bin/sh\necho 'Unknown parameter' >&2\nexit 1\n");
-    const Run run =
+    const ShellRun run =
         setup(pi.path, "--share-interface eth0", "PATH='" + (pi.path / "bin").string() + "':$PATH");
     INFO(run.out);
     CHECK(run.status != 0);
@@ -197,17 +178,9 @@ TEST_CASE("share setup: a share that testparm refuses is not installed") {
 }
 
 TEST_CASE("share setup: the dry run prints the plan") {
-    const fs::path script = fs::path(ETUDE_SOURCE_DIR) / "deploy/pi/setup.sh";
-    const std::string command = "bash '" + script.string() +
-                                "' --dry-run --share-only --share-interface eth0 2>&1 </dev/null";
-    FILE* pipe = ::popen(command.c_str(), "r");
-    REQUIRE(pipe != nullptr);
-    std::string out;
-    char buffer[512];
-    while (std::fgets(buffer, sizeof buffer, pipe) != nullptr) {
-        out += buffer;
-    }
-    CHECK(::pclose(pipe) == 0);
+    const ShellRun dry = shell("bash '" + kScript + "' --dry-run --share-only --share-interface eth0");
+    const std::string& out = dry.out;
+    CHECK(dry.status == 0);
     CHECK(out.find("Network folder") != std::string::npos);
     CHECK(out.find("etude-share.conf") != std::string::npos);
     CHECK(out.find("+ cp ") != std::string::npos);              // printed ...
@@ -215,7 +188,7 @@ TEST_CASE("share setup: the dry run prints the plan") {
 }
 
 TEST_CASE("share setup: the command the app shows is a real option of the script") {
-    const std::string script = read_file(fs::path(ETUDE_SOURCE_DIR) / "deploy/pi/setup.sh");
+    const std::string script = read_file(kScript);
     const std::string command = etude::kShareSetupCommand;
     CHECK(command == "sudo deploy/pi/setup.sh --share-only");
     CHECK(script.find("--share-only)") != std::string::npos);

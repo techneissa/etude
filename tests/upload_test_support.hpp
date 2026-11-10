@@ -1,12 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// What the upload and folder-watch tests share: a temporary folder and small file helpers.
+// What the data and security tests share: a temporary folder, small file helpers and a shell runner.
 #pragma once
+
+#include <doctest/doctest.h>
 
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
 #include <algorithm>
+#include <cstdio>
 #include <filesystem>
 #include <fstream>
 #include <iterator>
@@ -43,9 +46,8 @@ inline void write_file(const fs::path& p, const std::string& bytes = "x") {
 }
 
 // A shell script a test runs as a stand-in program ("#!/bin/sh" first line). macOS checks each new
-// executable the first time it runs (about 0.25 s), so every script is one shared, already-run
-// trampoline hard-linked to `path` that sources `<path>.body`; the script is not copied elsewhere
-// (a copy would lose its body).
+// executable on its first run (about 0.25 s), so every script is a hard link of one already-run
+// trampoline that sources `<path>.body`: never copy the script elsewhere.
 inline void write_script(const fs::path& path, const std::string& script) {
     static const struct Trampoline {
         fs::path file;
@@ -78,6 +80,25 @@ inline void write_script(const fs::path& path, const std::string& script) {
     if (ec) {
         fs::copy_file(trampoline.file, path, ec);
     }
+}
+
+// The output (stderr too) and exit status of a shell command.
+struct ShellRun {
+    int status = -1;
+    std::string out;
+};
+
+inline ShellRun shell(const std::string& command) {
+    ShellRun run;
+    FILE* pipe = ::popen((command + " 2>&1 </dev/null").c_str(), "r");
+    REQUIRE(pipe != nullptr);
+    char buffer[512];
+    while (std::fgets(buffer, sizeof buffer, pipe) != nullptr) {
+        run.out += buffer;
+    }
+    const int raw = ::pclose(pipe);
+    run.status = raw == -1 ? -1 : WEXITSTATUS(raw);
+    return run;
 }
 
 inline std::string read_file(const fs::path& p) {

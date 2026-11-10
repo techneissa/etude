@@ -113,7 +113,6 @@ class PitchDetector {
 
     // Forget all audio and note state (keeps the calibration and learned tuning).
     void reset();
-    std::int64_t samples_processed() const;
     std::int64_t dropped_events() const;
 
     // Noise floor: listen to the silent room or instrument between begin and end (about three
@@ -127,8 +126,6 @@ class PitchDetector {
     float a4_hz() const; // the learned value when learn_tuning is on
     // Turns learning from confident notes on or off. Off returns to the A4 set by set_a4_hz.
     void set_learn_tuning(bool on);
-
-    void set_method(PitchMethod method);
 
     // Expected-note mode: after each onset, answer only "is this the expected note (or chord)?"
     // with an Expected event. Up to 8 notes; count 0 returns to open detection.

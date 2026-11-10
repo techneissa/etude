@@ -55,7 +55,6 @@ inline constexpr float kCell = kHit + kHitGap; // the pitch of a row of controls
 inline constexpr float kFace = 36.0f;   // the drawn face of a button, toggle, segment track, stepper
 inline constexpr float kChip = 28.0f;   // a badge inside a face (the speed, a count)
 inline constexpr float kChipMinW = 56.0f; // a text chip's least width (a short word like "All")
-inline constexpr float kRow = kHit;     // a settings row
 inline constexpr float kMenuW = 272.0f; // the accompaniment menu's card
 inline constexpr float kBand = 52.0f;   // the section band under the bar
 inline constexpr float kTransposeW = 288.0f; // the transposition card
@@ -81,7 +80,6 @@ inline constexpr float kRadiusSheet = 20.0f;  // the settings sheet, the editor
 inline constexpr float kRadiusSm = kRadiusInner;
 inline constexpr float kRadiusMd = kRadiusControl;
 inline constexpr float kRadiusLg = kRadiusCard;
-inline constexpr float kControl = kFace;
 // State strengths (alpha of white over the face, or of the accent).
 inline constexpr float kFillAlpha = 0.055f;    // the idle face of a filled control
 inline constexpr float kHoverAlpha = 0.085f;   // a mouse over it, never a finger
@@ -113,9 +111,6 @@ inline constexpr float kWideGrow2 = 1.6f; // and at step 2
 inline constexpr int wide_step(float window_w) {
     return window_w >= kWideStep2W ? 2 : window_w >= kWideStep1W ? 1 : 0;
 }
-inline constexpr float wide_grow(int step) {
-    return step >= 2 ? kWideGrow2 : step == 1 ? kWideGrow1 : 1.0f;
-}
 
 // One rule for a popup or message drawn over the app (a toast, the info bubble, a confirm, a card).
 // From `wide_step` 1 (1366 points) its words take the sizes of the crash notice at that step, and
@@ -144,7 +139,7 @@ inline constexpr float popup_type(float pt, int step, PopupText role) {
     const float to = role == PopupText::Title ? kDisplay : role == PopupText::Text ? kTitle : kBody;
     return pt > to ? pt : to;
 }
-// A button's face and hit height over its own: `wide_grow(1)` at both wide steps.
+// A button's face and hit height over its own: `kWideGrow1` at both wide steps.
 inline constexpr float popup_grow(int step) { return step <= 0 ? 1.0f : kWideGrow1; }
 // A card's width in design points: its own `base` at step 0, else `base` grown for the step, kept
 // under `kPopupMaxW` and `kPopupShare` of the window (`window_w`, in design points), and never
@@ -278,7 +273,6 @@ inline constexpr float kPick = 10.5f; // the radius of a picked song's check
 inline constexpr float kFiltersW = 320.0f;
 inline constexpr float kLevelChipW = 52.0f;
 inline constexpr float kConfirmW = 420.0f;
-inline constexpr int kMenuRowsMax = 7; // a list popover scrolls past this many rows
 // The opening bars in the details.
 inline constexpr float kPreviewH = 132.0f;
 // Sheet music in the preview: staff spaces in its height, and the least space, in points.
@@ -320,7 +314,6 @@ inline constexpr float kTilePicGood = 120.0f;     // keys any shorter than this 
 inline constexpr float kTilePicMin = 56.0f;       // a picture box any shorter than this over a title row is not drawn there: the tile is one row
 inline constexpr float kSidePicShare = 0.45f;     // a one-row tile: its picture is this share of the tile's width at most
 inline constexpr float kContinueH = 56.0f;
-inline constexpr float kFootIcon = tok::kHit;     // the footer's icon chip
 // The scale card.
 inline constexpr float kRingMax = 300.0f;         // the picker's square, at most
 inline constexpr float kTypeCellMin = 126.0f;     // a type's cell in the rows, at least: only a default (tests, no font); the app measures the longest name in the font
@@ -434,7 +427,6 @@ inline constexpr float kTileFlatH = 52.0f;  // flat: the avatar beside the name,
 inline constexpr float kTileFlatMinW = 150.0f;
 inline constexpr float kRowH = 48.0f;       // the "Progress and household" row
 inline constexpr float kSheetW = 780.0f;    // the profile sheet, at most: fourteen colours, a hit and a gap each, fit its row
-inline constexpr float kDeleteGap = 48.0f;  // the least between Delete and Cancel (a few fingers' widths)
 inline constexpr float kSheetNeedW = 520.0f; // the room the goal stepper and both buttons take in a row
 inline constexpr float kGoalLabelW = 84.0f; // "Daily goal"
 inline constexpr float kAvatarSheet = 64.0f;
@@ -447,10 +439,8 @@ inline constexpr float kDeleteW = 108.0f;   // Delete, at the left end of the co
 inline constexpr float kRemoveW = 124.0f;   // the confirm's Delete, at the far end from Cancel
 inline constexpr float kConfirmText = 18.0f; // what the confirm says is lost: over body size, across the card
 inline constexpr int kConfirmLines = 3;      // its lines at most with the title row: two of explanation, then the warning
-inline constexpr int kConfirmLinesTight = 2; // ... and without it, over a keyboard: one of explanation, then the warning
 inline constexpr float kConfirmFieldH = 48.0f; // the typed-name field, as the sheet's name field
 inline constexpr float kConfirmLineRatio = 1.2f; // a line's height over its size: close, so two lines and the field fit over a keyboard
-inline constexpr float kConfirmLineH = kConfirmText * kConfirmLineRatio;
 inline constexpr int kGoalStepMin = 5;      // the goal's stepper moves by this
 inline constexpr int kGoalMin = 0;          // 0 turns the goal off
 inline constexpr int kGoalMax = 720;

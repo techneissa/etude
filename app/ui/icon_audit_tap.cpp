@@ -3,6 +3,8 @@
 // has settled after the one before.
 #include "icon_audit.hpp"
 
+#include <SDL3/SDL.h>
+
 #include <cstddef>
 #include <string_view>
 

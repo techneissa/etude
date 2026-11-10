@@ -157,19 +157,6 @@ std::string chord_tone_name(const Chord& chord, const ChordSpelling& spelling, i
     return line_name(spelling.root_line + steps_of(chord.quality, semitones));
 }
 
-std::string spelled_chord_name(const Chord& chord, const ChordSpelling& spelling) {
-    if (!chord.found) {
-        return {};
-    }
-    std::string name = line_name(spelling.root_line);
-    name += chord_suffix(chord.quality);
-    if (chord.bass_pc != chord.root_pc) {
-        name += '/';
-        name += line_name(spelling.bass_line);
-    }
-    return name;
-}
-
 Chord respell_symmetric(const Chord& chord, const KeyChange* key) {
     if (!chord.found) {
         return chord;

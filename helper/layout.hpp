@@ -30,8 +30,6 @@ bool point_link(const Context& c, const std::string& link, const std::string& ve
                 std::string& error);
 
 #if defined(ETUDE_HELPER_TEST_HOOKS)
-// Tests only: from the `nth` next `point_link` on (1 is the next) every call fails. 0 clears it.
-void fail_links_from_in_test(int nth);
 // Tests only: while set, the fsync of the prefix folder after a link is switched fails.
 void fail_fsync_in_test(bool fail);
 #endif

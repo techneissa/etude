@@ -328,7 +328,6 @@ void FlowEvaluator::decide_group(std::size_t a0, std::size_t n, std::size_t b0, 
     }
     std::vector<MatchCell>& cells = match_cells_;
     cells.resize(row[n + 1]);
-    matching_cells_ += row[n + 1];
     cells[0] = MatchCell{}; // row 0: no notes, nothing matched
     const auto get = [&](std::size_t r, std::size_t j) -> MatchCell& {
         return cells[row[r] + std::min(j, hi[r]) - lo[r]];

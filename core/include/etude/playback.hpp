@@ -156,7 +156,6 @@ class Playback {
     const Transposition& transposition() const { return transposition_; }
 
     void set_click_sound(const ClickSound& sound) { click_ = sound; }
-    const ClickSound& click_sound() const { return click_; }
 
     // Notes that have been started and not stopped.
     std::size_t sounding_count() const { return active_.size(); }
@@ -178,11 +177,6 @@ class Playback {
     // set_transposition(): apply() picks up a change at the next op, as set_transposition() at that
     // op's time would. The source must outlive this Playback, or be unset with follow(nullptr).
     void follow(const TranspositionSource* source);
-
-    // How many file events the last restore of the piano's state (a seek) replayed on top of a
-    // checkpoint: never more than checkpoint_events(), however long the song. A test reads it.
-    std::size_t last_restore_replayed() const { return last_restore_replayed_; }
-    static constexpr std::size_t checkpoint_events() { return kCheckpointEvents; }
 
     Playback(const Playback&) = default;
     Playback(Playback&&) = default;

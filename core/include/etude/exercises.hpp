@@ -117,32 +117,4 @@ ExerciseResult make_arpeggio_exercise(const ArpeggioSpec& spec,
 
 // ----- Chord drills -----
 
-struct ChordDrillItem {
-    int root_pc = 0;
-    ChordQuality quality = ChordQuality::Major;
-    int inversion = 0; // 0 root position; k puts the k-th tone (counting from 0) in the bass
-};
-
-struct ChordDrillSpec {
-    std::vector<ChordDrillItem> items;
-    HandsChoice hands = HandsChoice::Right;
-    double step_beats = 4.0; // time from one chord to the next
-    double hold_beats = 3.0; // how long each is held; at most step_beats
-    bool prefer_flats = false;
-};
-
-// Chords one after another. The right hand plays the chord with its bass in C4..B4, the left hand
-// alone in C3..B3, and together the left hand adds the bass an octave below (the name is
-// unchanged). Each chord moves by whole octaves to fit `settings.range`.
-//
-// Every chord is checked with detect_chord(): the notes must read as the root and quality asked
-// for, and the step's label is chord_name() of that reading, so the name on screen is what the
-// chord display shows when the player holds those keys. A request that reads as another chord (C6
-// in first inversion is Am7/E) or as no chord is an error naming it; inversion_drill() lists the
-// ones that work.
-ExerciseResult make_chord_drill(const ChordDrillSpec& spec, const ExerciseSettings& settings = {});
-
-// Root position and every inversion of a chord that detect_chord() reads back as the same chord.
-std::vector<ChordDrillItem> inversion_drill(int root_pc, ChordQuality quality);
-
 } // namespace etude

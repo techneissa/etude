@@ -34,7 +34,6 @@ struct ShiftFits {
         }
         return outside[static_cast<std::size_t>(semitones + kMaxTransposeSemitones)];
     }
-    bool all_fit(int semitones) const { return notes > 0 && outside_at(semitones) == 0; }
 };
 
 ShiftFits shift_fits(std::span<const Note> notes, KeyRange keyboard);

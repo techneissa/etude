@@ -82,15 +82,4 @@ ScaleDiagram scale_diagram(int root_pc, ScaleType type) {
     return d;
 }
 
-std::string scale_title(int root_pc, ScaleType type) {
-    const int root = ((root_pc % 12) + 12) % 12;
-    const Tonic tonic = default_tonic(root, type);
-    std::string name = spelled_name(SpelledNote{tonic.letter, tonic.accidental, root});
-    std::string word = scale_type_name(type);
-    if (!word.empty()) {
-        word[0] = static_cast<char>(std::tolower(static_cast<unsigned char>(word[0])));
-    }
-    return name + " " + word;
-}
-
 } // namespace etude

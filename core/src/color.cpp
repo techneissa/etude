@@ -186,45 +186,6 @@ double perceptual_distance(RGBA a, RGBA b) {
                      (x.b - y.b) * (x.b - y.b));
 }
 
-RGBA simulate_vision(RGBA c, ColourVision vision) {
-    // Rows of the severity 1.0 matrices, linear RGB in, linear RGB out.
-    using Matrix = std::array<std::array<double, 3>, 3>;
-    static constexpr Matrix kProtanopia{{{0.152286, 1.052583, -0.204868},
-                                         {0.114503, 0.786281, 0.099216},
-                                         {-0.003882, -0.048116, 1.051998}}};
-    static constexpr Matrix kDeuteranopia{{{0.367322, 0.860646, -0.227968},
-                                           {0.280085, 0.672501, 0.047413},
-                                           {-0.011820, 0.042940, 0.968881}}};
-    static constexpr Matrix kTritanopia{{{1.255528, -0.076749, -0.178779},
-                                         {-0.078411, 0.930809, 0.147602},
-                                         {0.004733, 0.691367, 0.303900}}};
-    const Matrix* m = nullptr;
-    switch (vision) {
-    case ColourVision::Typical:
-        return c;
-    case ColourVision::Protanopia:
-        m = &kProtanopia;
-        break;
-    case ColourVision::Deuteranopia:
-        m = &kDeuteranopia;
-        break;
-    case ColourVision::Tritanopia:
-        m = &kTritanopia;
-        break;
-    }
-    if (m == nullptr) {
-        return c;
-    }
-    const std::array<double, 3> lin{srgb_to_linear(c.r), srgb_to_linear(c.g), srgb_to_linear(c.b)};
-    std::array<std::uint8_t, 3> out{};
-    for (std::size_t i = 0; i < 3; ++i) {
-        const auto& row = (*m)[i];
-        const double v = row[0] * lin[0] + row[1] * lin[1] + row[2] * lin[2];
-        out[i] = to_byte(linear_to_srgb(clamp01(v)));
-    }
-    return {out[0], out[1], out[2], c.a};
-}
-
 RGBA lerp(RGBA a, RGBA b, float t) {
     const double k = clamp_t(t);
     return {lerp_byte(a.r, b.r, k), lerp_byte(a.g, b.g, k), lerp_byte(a.b, b.b, k),
@@ -250,26 +211,6 @@ double contrast_ratio(RGBA a, RGBA b) {
     const double la = relative_luminance(a);
     const double lb = relative_luminance(b);
     return (std::max(la, lb) + 0.05) / (std::min(la, lb) + 0.05);
-}
-
-RGBA ensure_contrast(RGBA fg, RGBA bg, double min_ratio) {
-    if (contrast_ratio(fg, bg) >= min_ratio) {
-        return fg;
-    }
-    const RGBA target =
-        relative_luminance(bg) < 0.5 ? RGBA{255, 255, 255, fg.a} : RGBA{0, 0, 0, fg.a};
-    if (contrast_ratio(target, bg) < min_ratio) {
-        return target;
-    }
-    // Smallest step toward the target that passes. Rounding to bytes can undershoot, so the
-    // search works on the rounded result.
-    float lo = 0.0f; // fails
-    float hi = 1.0f; // passes
-    for (int i = 0; i < 20; ++i) {
-        const float mid = 0.5f * (lo + hi);
-        (contrast_ratio(lerp(fg, target, mid), bg) >= min_ratio ? hi : lo) = mid;
-    }
-    return lerp(fg, target, hi);
 }
 
 RGBA lift_to_contrast(RGBA fg, RGBA bg, double min_ratio) {

@@ -83,11 +83,6 @@ int speed_for_target(const Song& song, double target_bpm, double song_s) {
     return speed_for_bpm(target_bpm, main_beat_bpm(song, song_s));
 }
 
-BpmRange bpm_range(const Song& song, double song_s) {
-    const double main = main_beat_bpm(song, song_s);
-    return {main * kMinSpeedPercent / 100.0, main * kMaxSpeedPercent / 100.0};
-}
-
 int display_bpm(double bpm) {
     if (!(bpm > 0.0) || !std::isfinite(bpm)) {
         return 1;

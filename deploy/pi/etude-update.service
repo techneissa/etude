@@ -20,12 +20,12 @@ ExecStart=/usr/local/lib/etude/etude-update-helper apply
 # run_program gives it to be reaped): 2401 s at the defaults, 3201 s at the largest values the settings
 # file may ask for (SERVICE_TIMEOUT 90, READY_TIMEOUT 120, MAX_STARTS 4). systemd ends the run with
 # SIGTERM at the limit, which the helper turns into the same way out as any failure.
-# tests/helper_apply_test.cpp reads this line and keeps it above both, with margin.
+# Keep it above both, with margin.
 TimeoutStartSec=3600
 # After SIGTERM the helper goes back short (a hard stop of the app if it must, the links back, the
 # start queued and tried twice, the data restore left to `count` before the app starts):
 # worst_case_stop_seconds, 996 s (the same at the largest settings). systemd's default of 90 s would kill
-# it in the middle of stopping an app that will not stop. tests/helper_apply_test.cpp reads this line.
+# it in the middle of stopping an app that will not stop.
 TimeoutStopSec=1200
 StandardOutput=journal
 StandardError=journal

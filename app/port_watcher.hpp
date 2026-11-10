@@ -50,8 +50,6 @@ class PortWatcher {
     std::uint32_t changes() const { return state_->changes.load(std::memory_order_acquire); }
     // True once the thread has listed the ports once.
     bool listed_once() const { return state_->listed_once.load(std::memory_order_acquire); }
-    // True when the destructor left the thread behind (for the tests).
-    bool detached() const { return detached_; }
 
   private:
     struct State {

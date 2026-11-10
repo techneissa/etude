@@ -104,7 +104,6 @@ class KeyboardLayout {
     // True when the layout's range differs from the requested one.
     bool adjusted() const { return adjusted_; }
     int white_key_count() const { return white_count_; }
-    float white_width() const { return white_width_; }
 
     // The key's shape for drawing the keyboard and hitting it (see the class comment). Notes
     // outside the range return a zero-width rect.

@@ -78,11 +78,6 @@ void PracticeTablesJob::hold(bool on) {
     wake_.notify_all();
 }
 
-void PracticeTablesJob::set_check_hook(std::function<void()> hook) {
-    const std::lock_guard lock(mutex_);
-    check_hook_ = std::move(hook);
-}
-
 void PracticeTablesJob::discard(FlowEvaluator::Prepared&& flow, WaitEvaluator::Prepared&& wait) {
     {
         const std::lock_guard lock(mutex_);
@@ -143,15 +138,9 @@ void PracticeTablesJob::run() {
         running_ = true;
         abort_ = false;
         const std::uint64_t epoch = epoch_;
-        const std::function<void()> hook = check_hook_;
         lock.unlock();
 
-        const FlowEvaluator::AbortCheck abort = [this, &hook] {
-            if (hook) {
-                hook();
-            }
-            return abort_.load();
-        };
+        const FlowEvaluator::AbortCheck abort = [this] { return abort_.load(); };
         TablesResult result;
         result.serial = request.serial;
         result.hands = request.hands;
@@ -166,9 +155,6 @@ void PracticeTablesJob::run() {
 
         lock.lock();
         running_ = false;
-        if (!whole) {
-            ++stopped_builds_;
-        }
         if (whole && !abort_.load() && epoch == epoch_ && !stop_) {
             done_ = std::move(result);
             wake_loop(WakeSource::PracticeTables);

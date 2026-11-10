@@ -166,14 +166,6 @@ bool check_pitch_answer(const EarQuestion& q, int played_note, bool ignore_octav
     return ignore_octave ? pitch_class(played_note) == pitch_class(want) : played_note == want;
 }
 
-bool check_interval_answer(const EarQuestion& q, int answered_semitones, bool check_direction) {
-    if (q.kind != EarQuestionKind::Interval) {
-        return false;
-    }
-    return check_direction ? answered_semitones == q.semitones()
-                           : std::abs(answered_semitones) == std::abs(q.semitones());
-}
-
 std::string interval_name(int semitones) {
     static constexpr std::array<const char*, 13> kNames = {
         "unison",      "minor 2nd", "major 2nd", "minor 3rd", "major 3rd", "perfect 4th", "tritone",

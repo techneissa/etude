@@ -16,7 +16,6 @@
 namespace etude::app {
 
 void SongController::rebuild_evaluators(std::int64_t /*now_ns*/, bool same_song) {
-    ++evaluator_rebuilds_;
     FlowOptions f;
     f.window_ms = options_.hit_window_ms;
     f.latency_ms = options_.latency_ms;

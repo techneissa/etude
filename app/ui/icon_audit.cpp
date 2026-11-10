@@ -7,6 +7,8 @@
 #include "item_hook.hpp"
 #include "tokens.hpp"
 
+#include <SDL3/SDL.h>
+
 #include <imgui_internal.h> // the current window's name and clip rect
 
 #include <algorithm>

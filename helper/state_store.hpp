@@ -76,9 +76,6 @@ bool save_pending(const Context& c, const PendingUpdate& state, std::string& err
 #if defined(ETUDE_HELPER_TEST_HOOKS)
 // Tests only: the `nth` next `save_pending` (1 is the next) fails, once. 0 clears it.
 void fail_save_in_test(int nth);
-// Tests only: how many times a blocked lock wait was cut short by a signal and went on waiting. A
-// test that sends signals reads it to know one reached the waiter inside `flock`.
-int lock_signals_seen_in_test();
 #endif
 
 } // namespace etude::helper

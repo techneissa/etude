@@ -51,9 +51,6 @@ bool key_mode_from_name(std::string_view name, KeyMode& mode);
 
 // A key from the signature a file writes (clamped to -7..7) and its mode.
 KeyChange key_from_signature(std::int64_t tick, int fifths, KeyMode mode);
-// A key from the tonic's place on the line of fifths (C 0, G 1, F# 6, F -1, Bb -2) and its mode;
-// the signature follows (ABC's `K:D dorian`: tonic 2, dorian, no accidentals).
-KeyChange key_from_tonic_line(std::int64_t tick, int tonic_line, KeyMode mode);
 // A key from a pitch class and a mode, the signature with the fewest accidentals; of two with six
 // (F# or Gb major, Eb or D# minor) the tonic's `tie_prefers_flats` decides (F# major, Eb minor).
 KeyChange key_from_pitch_class(std::int64_t tick, int tonic_pc, KeyMode mode,
@@ -95,10 +92,6 @@ KeyLabelParts key_label_parts(const KeyChange& key, bool solfege, int transpose_
                               bool prefer_flats = false);
 // The label as one line of text for logs and tests: "G major 1#", "Eb minor 6b" ("Sol major").
 std::string key_label_text(const KeyLabelParts& parts);
-// The same line as the player reads it, with the signs ♭ and ♯ in place of b and #: "G major 1♯",
-// "E♭ minor 6♭". The scene draws the signs as shapes; this is the text for anything else (a
-// screen reader, a toast, a log a person reads).
-std::string key_label_display(const KeyLabelParts& parts);
 
 // ---- Estimating a key from the notes (Krumhansl-Schmuckler)
 

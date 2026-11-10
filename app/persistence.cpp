@@ -145,11 +145,6 @@ void Persistence::apply_profile(UiModel& model, std::string_view text) {
     model.look = model.look.clamped();
 }
 
-bool Persistence::uncollected() const {
-    const std::lock_guard<std::mutex> lock(mutex_);
-    return result_ready_;
-}
-
 // A write is queued, under way, or finished with its outcome not yet taken: `job_` still belongs to
 // it until collect() has read it.
 bool Persistence::writing() const {

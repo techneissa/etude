@@ -2,6 +2,8 @@
 #include "audio_out.hpp"
 #include "log_ring.hpp"
 
+#include <SDL3/SDL.h>
+
 #include <algorithm>
 #include <chrono>
 #include <cmath>

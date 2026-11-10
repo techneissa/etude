@@ -364,7 +364,6 @@ class FlowEvaluator {
     // that swapped them. Empty (and cheap) when nothing was retired.
     // How many times this evaluator built its own targets (set_song and set_transposition without
     // tables that fit), for tests.
-    std::uint64_t builds() const { return builds_; }
     bool has_retired() const { return !retired_.empty(); }
     std::vector<Prepared> take_retired() {
         std::vector<Prepared> out;
@@ -451,12 +450,6 @@ class FlowEvaluator {
     // Undecided notes and presses, for tests.
     std::size_t pending_notes() const { return pending_.size(); }
     std::size_t pending_presses() const { return presses_.size(); }
-    // Cells the matching tables held since set_song: the work done deciding notes, which grows with
-    // the notes times the presses within one window of each, not with the notes times all the
-    // presses of a run. For tests.
-    std::uint64_t matching_cells() const { return matching_cells_; }
-    // Passes held: the one in progress and those not yet taken. For tests.
-    std::size_t kept_passes() const { return passes_.size(); }
 
   private:
     struct Pending {
@@ -535,7 +528,6 @@ class FlowEvaluator {
     MeasureTable measures_ = std::make_shared<const std::vector<Measure>>();
     Prepared offered_;                 // offer_targets()'s, kept for the next set_transposition()
     std::vector<Prepared> retired_;    // the tables the last swaps replaced, for take_retired()
-    std::uint64_t builds_ = 0;
     void retire_targets();             // moves targets_ and offered_ into retired_
 
     TransportTimeline timeline_;
@@ -550,7 +542,6 @@ class FlowEvaluator {
     std::vector<MatchCell> match_cells_;
     std::vector<long> match_pick_;
     std::vector<char> match_used_;
-    std::uint64_t matching_cells_ = 0;
     std::vector<std::int64_t> unsure_; // wall times of events that could not be judged
     std::vector<WrongPress> wrong_presses_;  // decided wrong, not yet taken
     int dropped_wrong_presses_ = 0;          // decided wrong past the cap, not kept
@@ -674,7 +665,6 @@ class WaitEvaluator {
     // As FlowEvaluator::take_retired, for the chords.
     // How many times this evaluator built its own chords (set_song and set_transposition without
     // tables that fit), for tests.
-    std::uint64_t builds() const { return builds_; }
     bool has_retired() const { return !retired_.empty(); }
     std::vector<Prepared> take_retired() {
         std::vector<Prepared> out;
@@ -745,8 +735,6 @@ class WaitEvaluator {
     // Keys of the chord being waited for, after transposition, in key order. The span reads a
     // member that the next call, or anything that changes the chords, replaces.
     std::span<const int> waiting_keys() const;
-    // As FlowEvaluator::kept_passes.
-    std::size_t kept_passes() const { return passes_.size(); }
 
   private:
     struct Key {
@@ -804,7 +792,6 @@ class WaitEvaluator {
     std::size_t bars_ = 1;      // the bars they cover, and one for the run in progress
     Prepared offered_; // offer_targets()'s, kept for the next set_transposition()
     std::vector<Prepared> retired_; // the tables the last swaps replaced, for take_retired()
-    std::uint64_t builds_ = 0;
     void retire_chords();           // moves chords_ and offered_ into retired_
     std::size_t next_ = 0; // the chord being waited for
     mutable std::vector<int> waiting_keys_; // waiting_keys()'s answer, kept so a call allocates nothing

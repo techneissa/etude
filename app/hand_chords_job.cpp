@@ -54,11 +54,6 @@ void HandChordsJob::wait_idle() {
     idle_.wait(lock, [this] { return !waiting_.has_value() && !running_; });
 }
 
-std::uint64_t HandChordsJob::analyses() const {
-    const std::lock_guard lock(mutex_);
-    return analyses_;
-}
-
 void HandChordsJob::run() {
     std::unique_lock lock(mutex_);
     while (true) {

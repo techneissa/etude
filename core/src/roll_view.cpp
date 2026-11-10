@@ -119,20 +119,6 @@ RollView view_around(const Song& song, double start_s, double end_s, double marg
     return clamped_view(song, mid - span * 0.5, span);
 }
 
-RollView reveal_time(const Song& song, const RollView& view, double seconds, double margin_s) {
-    if (std::isnan(seconds)) {
-        return view;
-    }
-    const double m = std::min(std::max(0.0, margin_s), view.span_s() * 0.4);
-    if (seconds < view.start_s + m) {
-        return clamped_view(song, seconds - m, view.span_s());
-    }
-    if (seconds > view.end_s - m) {
-        return clamped_view(song, seconds + m - view.span_s(), view.span_s());
-    }
-    return view;
-}
-
 int bars_in_view(const Song& song, const RollView& view) {
     if (song.measures.empty()) {
         return 0;

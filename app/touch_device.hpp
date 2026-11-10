@@ -11,7 +11,8 @@
 #include "log_ring.hpp"
 #include "etude/touch_kind.hpp"
 
-#include <SDL3/SDL.h>
+#include <SDL3/SDL_stdinc.h>
+#include <SDL3/SDL_touch.h>
 
 #include <cstdint>
 #include <cstdio>

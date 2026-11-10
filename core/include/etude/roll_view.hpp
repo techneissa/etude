@@ -46,9 +46,6 @@ RollView pan_view(const Song& song, const RollView& view, double delta_s);
 // A view of [start_s, end_s] with `margin` (a fraction of its length) on each side, widened to the
 // narrowest zoom and kept inside the song.
 RollView view_around(const Song& song, double start_s, double end_s, double margin = 0.06);
-// Moves the view the least that brings `seconds` inside it (with `margin_s` to spare); the zoom
-// stays.
-RollView reveal_time(const Song& song, const RollView& view, double seconds, double margin_s = 0.0);
 // How many bars the view shows (counting partial ones), 0 for a song with no bars.
 int bars_in_view(const Song& song, const RollView& view);
 // The cursor snaps to beats at this zoom.

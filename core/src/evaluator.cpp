@@ -248,7 +248,6 @@ void FlowEvaluator::start_song() {
     wrong_presses_.clear();
     dropped_wrong_presses_ = 0;
     forget_presses();
-    matching_cells_ = 0;
     reserve_working_space();
     if (clock_ns_ != kNever) {
         ignore_before_ns_ = std::max(ignore_before_ns_, clock_ns_);
@@ -303,7 +302,6 @@ std::vector<FlowEvaluator::Target> FlowEvaluator::targets_for(const std::vector<
 }
 
 void FlowEvaluator::build_targets() {
-    ++builds_;
     targets_ = targets_for(*notes_, options_.hands, options_.transposition, unplayable_s_,
                            practised_);
 }

@@ -67,7 +67,6 @@ void SongController::load(LoadedSong song, std::int64_t now_ns, PreparedSong&& p
     split_point_ = applied_split_ = kAutoSplit;
     suggested_split_ = 0;
     split_seconds_ = 0.0;
-    splits_applied_ = 0;
     ++split_serial_;
     never_offer_ = false; // the sync brings the song's saved choice back
     offer_settled_by_choice_ = false;
@@ -127,77 +126,12 @@ void SongController::load(LoadedSong song, std::int64_t now_ns, PreparedSong&& p
     pump(now_ns);
 }
 
-void SongController::unload(std::int64_t now_ns) {
-    if (!loaded_) {
-        return;
-    }
-    pump(now_ns);
-    stop_audition(now_ns);
-    finish_run(now_ns);
-    cancel_countdown();
-    resume_after_menu_ = false;
-    loop_a_.reset();
-    loop_b_.reset();
-    loop_passes_.clear();
-    ++load_serial_;
-    ++notes_serial_;
-    split_job_->cancel();
-    split_point_ = applied_split_ = kAutoSplit;
-    suggested_split_ = 0;
-    ++split_serial_;
-    never_offer_ = false;
-    offer_settled_by_choice_ = false;
-    const Song empty;
-    playback_.drop_song(now_ns, scratch_);
-    enqueue_reactive(scratch_, now_ns, true);
-    sound_cursor_.reset();
-    audition_pb_.drop_song(now_ns, scratch_);
-    audition_stale_ = true;
-    playback_tables_ = {};
-    enqueue_plain(scratch_);
-    audition_tp_.set_song(empty);
-    audition_tp_.take_ops(audition_ops_);
-    audition_ops_.clear();
-    transport_.set_song(empty);
-    grid_.set_song(empty);
-    acc_parts_.clear();
-    acc_muted_.clear();
-    loaded_ = false;
-    drop_tables();
-    {
-        const std::lock_guard lent(lent_->mutex);
-        song_ = LoadedSong{};
-        lent_->song = nullptr;
-        ++lent_->generation;
-    }
-    window_.build(empty);
-    densest_window_ = 0;
-    grades_.clear();
-    wrongs_.clear();
-    read_hands_scope(true);
-    rebuild_evaluators(now_ns);
-    pump(now_ns);
-}
-
 bool SongController::tables_inline() const {
     return !loaded_ || song_.song.notes.size() <= inline_table_notes_;
 }
 
 bool SongController::tables_pending() const {
     return loaded_ && (applied_hands_ != practice_hands() || !(source_.value() == wanted_));
-}
-
-void SongController::hold_tables(bool on) {
-    if (tables_job_ == nullptr) {
-        tables_job_ = std::make_unique<PracticeTablesJob>();
-    }
-    tables_job_->hold(on);
-}
-
-void SongController::wait_tables() {
-    if (tables_job_ != nullptr) {
-        tables_job_->wait_idle();
-    }
 }
 
 void SongController::drop_tables() {

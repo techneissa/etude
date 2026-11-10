@@ -262,16 +262,6 @@ MedalSet evaluate_medals(std::span<const RunRecord> runs, const MedalContext& co
     return out;
 }
 
-std::vector<MedalGain> new_medals(const MedalSet& before, const MedalSet& after) {
-    std::vector<MedalGain> gained;
-    for (std::size_t i = 0; i < kAchievementCount; ++i) {
-        if (after.tier[i] > before.tier[i]) {
-            gained.push_back({static_cast<Achievement>(i), after.tier[i]});
-        }
-    }
-    return gained;
-}
-
 std::vector<MedalProgress> closest_to_next(const MedalSet& set, std::size_t count) {
     std::vector<MedalProgress> out;
     for (std::size_t i = 0; i < kAchievementCount; ++i) {

@@ -109,9 +109,6 @@ class RendererRecovery {
     // The path the recovery ended on (it may be `basic` after a fallback).
     void finish(RendererPath used) { path_ = used; }
 
-    // Start-up fell back from the chosen path, or the developer moved the run to another one.
-    void set_path(RendererPath path) { path_ = path; }
-
   private:
     void request(LossCause cause) {
         // The first cause stands: a lost event beats the present failures it brings.

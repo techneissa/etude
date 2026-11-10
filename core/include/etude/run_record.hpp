@@ -163,7 +163,6 @@ struct CivilDate {
 };
 // Days since 1970-01-01 <-> proleptic Gregorian date.
 CivilDate civil_from_day(std::int32_t day);
-std::int32_t day_from_civil(const CivilDate& date);
 
 // ---- Storage
 

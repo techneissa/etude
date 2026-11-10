@@ -125,10 +125,6 @@ class SettingsDocument {
     // document is empty). Leaves an existing format line, including a newer one, alone.
     void ensure_format();
 
-    // How many parts the document holds in memory, the preamble and removed ones not yet
-    // dropped included. For tests of the compaction.
-    std::size_t held_parts() const { return parts_.size(); }
-
   private:
     struct Part {
         std::string name;        // "" for the preamble

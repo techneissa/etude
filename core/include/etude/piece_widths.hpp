@@ -55,15 +55,6 @@ class PieceWidths {
         return true;
     }
 
-    // Sizes still to measure for `pieces`, in total (for progress and tests).
-    std::size_t sizes_missing(std::span<const Index> pieces) const {
-        std::size_t n = 0;
-        for (const Index i : pieces) {
-            n += entries_[i].next < kSizes ? kSizes - entries_[i].next : 0;
-        }
-        return n;
-    }
-
     // Measures the sizes `pieces` still lack, one size for all of them at a time, the smallest
     // missing size first (so the font changes size once per size). `width(piece, px)` measures;
     // `out_of_time()` is asked after each size and ends the call when it says true, so a caller

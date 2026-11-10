@@ -9,11 +9,10 @@ namespace etude {
 // cue; the colour only adds to it, so nothing is told by colour alone.
 //
 // Colour: a smooth ramp through named stops, green at 1 star, yellow at 2.5, orange at 3.5 and red
-// at 5, mixed in sRGB between them. Every stop reads at `kLevelStarMinContrast` (3:1, what a
+// at 5, mixed in sRGB between them. Every stop reads at 3:1 (what a
 // drawn shape needs) on the dark surface the cards sit on, and with High contrast on the colour is
 // lifted in lightness, keeping its hue, to `kLevelStarHighContrastMinContrast` (4.5:1).
 inline constexpr int kLevelStars = 5;
-inline constexpr double kLevelStarMinContrast = 3.0;
 inline constexpr double kLevelStarHighContrastMinContrast = 4.5;
 // The surface the stars are measured on: the library card's face.
 inline constexpr RGBA kLevelStarSurface{22, 25, 34, 255};

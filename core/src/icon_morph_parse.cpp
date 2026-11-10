@@ -400,18 +400,6 @@ PathError parse_svg_path(std::string_view d, CubicPath& out) {
     return PathError::None;
 }
 
-PathError add_circle(CubicPath& out, float cx, float cy, float r) {
-    Builder b(out);
-    b.move({cx + r, cy});
-    if (const PathError e = arc(b, r, r, 0.0f, false, true, {cx - r, cy}); e != PathError::None) {
-        return e;
-    }
-    if (const PathError e = arc(b, r, r, 0.0f, false, true, {cx + r, cy}); e != PathError::None) {
-        return e;
-    }
-    return b.close();
-}
-
 PathError add_rect(CubicPath& out, float x, float y, float w, float h, float rx) {
     rx = std::clamp(rx, 0.0f, std::min(w, h) * 0.5f);
     Builder b(out);

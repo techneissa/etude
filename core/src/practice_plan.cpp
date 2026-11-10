@@ -143,18 +143,6 @@ PlanStep PracticePlan::jump_to_item(const SongSections& sections, std::size_t in
     return advance(sections, index);
 }
 
-PlanStep PracticePlan::jump_to_section(const SongSections& sections, SectionId section) {
-    if (!active_) {
-        return PlanStep{};
-    }
-    for (std::size_t i = 0; i < items_.size(); ++i) {
-        if (items_[i].section == section && resolves(sections, i)) {
-            return enter(sections, i);
-        }
-    }
-    return PlanStep{};
-}
-
 PlanStep PracticePlan::sections_merged(const SongSections& sections, SectionId survivor,
                                        std::span<const SectionId> absorbed) {
     if (!active_) {
@@ -193,10 +181,6 @@ void PracticePlan::reset() {
     index_ = 0;
     passes_ = 0;
     loop_start_s_ = loop_end_s_ = 0.0;
-}
-
-void PracticePlan::set_base_speed_percent(int percent) {
-    base_speed_ = snap_speed_percent(percent);
 }
 
 bool apply_plan_step(Transport& transport, std::int64_t now_ns, const PlanStep& step) {

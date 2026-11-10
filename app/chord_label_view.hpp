@@ -19,7 +19,7 @@
 #include "etude/screen_layout.hpp"
 #include "etude/transpose.hpp"
 
-#include <SDL3/SDL.h>
+#include <SDL3/SDL_render.h>
 
 #include <array>
 #include <cstdint>
@@ -93,8 +93,6 @@ class ChordLabelView {
     void draw_names(SDL_Renderer* renderer, Text& text, Mesh& mesh, const ChordLabelFrame& in,
                     const ChordLabelGeometry& g, std::span<Shown> shown,
                     std::span<const ChordNamePlace> places);
-    Art* art_for(Text& text, int hand, int index, const HandChordLabel& label, int font,
-                 const Art* keep);
     void lay(Text& text, Art& art, const ChordNameParts& name, float font);
 
     std::array<ChordLabelFade, 2> fades_;

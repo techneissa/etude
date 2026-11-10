@@ -9,7 +9,8 @@
 #include "etude/idle_gate.hpp"
 #include "etude/look.hpp"
 
-#include <SDL3/SDL.h>
+#include <SDL3/SDL_events.h>
+#include <SDL3/SDL_mouse.h>
 
 #include <cstdint>
 

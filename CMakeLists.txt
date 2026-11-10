@@ -45,15 +45,11 @@ endif()
 
 # Warnings for our own targets only, not for fetched dependencies.
 add_library(etude_warnings INTERFACE)
-if(MSVC)
-  target_compile_options(etude_warnings INTERFACE /W4)
-else()
-  target_compile_options(etude_warnings INTERFACE -Wall -Wextra -Wpedantic -Wshadow -Wconversion)
-  # GCC's maybe-uninitialized fires on moves of a std::optional at -O2 (GCC 13, x86-64) where
-  # nothing is uninitialized, and under -Werror that fails the build. Clang still checks it.
-  if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    target_compile_options(etude_warnings INTERFACE -Wno-maybe-uninitialized)
-  endif()
+target_compile_options(etude_warnings INTERFACE -Wall -Wextra -Wpedantic -Wshadow -Wconversion)
+# GCC's maybe-uninitialized fires on moves of a std::optional at -O2 (GCC 13, x86-64) where
+# nothing is uninitialized, and under -Werror that fails the build. Clang still checks it.
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+  target_compile_options(etude_warnings INTERFACE -Wno-maybe-uninitialized)
 endif()
 
 include(cmake/Dependencies.cmake)
@@ -61,14 +57,14 @@ include(cmake/Dependencies.cmake)
 if(NOT ETUDE_UPDATE_HELPER_ONLY)
   add_subdirectory(core)
 endif()
-if(ETUDE_BUILD_UPDATE_HELPER AND UNIX)
+if((ETUDE_BUILD_UPDATE_HELPER AND UNIX) OR ETUDE_BUILD_TESTS)
   add_subdirectory(helper)
 endif()
 if(ETUDE_BUILD_APP OR ETUDE_BUILD_TESTS)
   include(cmake/PianoAsset.cmake)
   include(cmake/Synth.cmake)
 endif()
-if(ETUDE_BUILD_APP)
+if(ETUDE_BUILD_APP OR ETUDE_BUILD_TESTS)
   add_subdirectory(app)
 endif()
 if(ETUDE_BUILD_TOOLS)

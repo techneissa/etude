@@ -7,9 +7,9 @@
 // new one has its pictures, so a change never leaves the score blank.
 #pragma once
 
+#include "loaded_song.hpp"
 #include "sheet_name_fit.hpp"
 #include "sheet_worker.hpp"
-#include "song_controller.hpp"
 #include "text.hpp"
 
 #include "etude/look.hpp"
@@ -20,7 +20,9 @@
 #include "etude/sheet_view.hpp"
 #include "etude/touch_gesture.hpp"
 
-#include <SDL3/SDL.h>
+#include <SDL3/SDL_events.h>
+#include <SDL3/SDL_render.h>
+#include <SDL3/SDL_video.h>
 
 #include <array>
 #include <cstdint>
@@ -31,6 +33,8 @@
 #include <vector>
 
 namespace etude::app {
+
+class SongController;
 
 // Whether sheet music can be shown for the open song, for the view switch.
 struct SheetOffer {

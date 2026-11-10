@@ -6,7 +6,7 @@
 #include "ui.hpp"
 #include "ui_model.hpp"
 
-#include <SDL3/SDL.h>
+#include <SDL3/SDL_events.h>
 
 #include <functional>
 

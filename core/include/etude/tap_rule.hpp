@@ -88,8 +88,6 @@ class TapTracker {
     bool cancelled() const { return cancelled_; }
     float start_x() const { return x0_; }
     float start_y() const { return y0_; }
-    // The farthest the pointer got from where it landed.
-    float travel() const { return travel_; }
     double held_s() const { return t_ - t0_; }
 
     // The press just lifted counts as a tap.

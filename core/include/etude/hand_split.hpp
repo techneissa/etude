@@ -57,7 +57,7 @@ namespace etude {
 // Notes that already have a hand (named tracks, a single line) are the context of the others: they
 // sit in the registers and in the hands' recent notes, and no cut may put them in the other hand.
 //
-// Limits, measured on the real files in tests/data (see tests/hand_split_test.cpp): pitch alone
+// Limits, measured on the real files in tests/data: pitch alone
 // cannot tell hands apart when they interleave, and the reference hands of a piece are the staves
 // of its score, which a hand cannot always follow. Satie's first Gymnopedie has chords in the
 // treble staff under a melody (59 62 66 together with 78), wider than one hand reaches, and

@@ -24,8 +24,6 @@ void install_interrupt_handlers() {
     ::sigaction(SIGINT, &action, nullptr);
 }
 
-void raise_interrupt() { g_raised = 1; }
-
 bool interrupt_in_wait() {
     if (g_raised == 0) {
         return false;

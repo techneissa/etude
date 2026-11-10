@@ -11,8 +11,7 @@
 
 namespace etude::app {
 
-// Who asked for the frame: counted, so a test that finds the loop awake when nothing moves can say
-// which thread woke it (WakeCounts, wake_report).
+// Who asked for the frame.
 enum class WakeSource : std::uint8_t {
     Other,
     SongOpen,
@@ -32,7 +31,6 @@ enum class WakeSource : std::uint8_t {
     Update,
     Count,
 };
-const char* wake_source_name(WakeSource source) noexcept;
 
 // Any thread except an audio capture callback: asks the loop to run a frame now. Calls the wake hook
 // (one SDL_PushEvent) at most once per idle period: only the call that finds the loop armed does.
@@ -49,11 +47,5 @@ std::uint64_t wake_requests() noexcept;
 // Until disarm_wait(), a wake request calls the hook.
 bool arm_wait(std::uint64_t seen) noexcept;
 void disarm_wait() noexcept;
-
-// How many wake requests each source has made since the start.
-using WakeCounts = std::array<std::uint64_t, static_cast<std::size_t>(WakeSource::Count)>;
-WakeCounts wake_counts() noexcept;
-// "upload 3, library 1": the sources that woke the loop between two readings, or "none".
-std::string wake_report(const WakeCounts& before, const WakeCounts& after);
 
 } // namespace etude::app

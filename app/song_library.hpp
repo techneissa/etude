@@ -6,7 +6,7 @@
 #pragma once
 
 #include "loop_wake.hpp"
-#include "song_controller.hpp"
+#include "loaded_song.hpp"
 
 #include "etude/abc.hpp"
 #include "etude/library.hpp"
@@ -185,8 +185,6 @@ class SongLibrary {
     void set_abc_chords(bool on);
     bool abc_chords() const { return abc_chords_.load(); }
     int unreadable() const { return static_cast<int>(state_.failed()); }
-    // Songs parsed from the cache instead of the file (tests).
-    std::size_t cache_hits() const { return cache_hits_.load(); }
     const std::vector<std::filesystem::path>& roots() const { return roots_; }
     // Asks the worker to read this file next (a song to restore); no effect when it has no job
     // for it. Never waits.
@@ -337,7 +335,6 @@ class SongLibrary {
     std::condition_variable cv_;
     std::thread worker_;
     std::atomic<bool> stop_{false};
-    std::atomic<std::size_t> cache_hits_{0};
 };
 
 } // namespace etude::app

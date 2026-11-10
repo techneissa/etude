@@ -11,6 +11,8 @@
 #include "window_run.hpp"
 #include "window_state.hpp"
 
+#include <SDL3/SDL.h>
+
 #include <algorithm>
 #include <filesystem>
 #include <optional>

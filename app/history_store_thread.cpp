@@ -22,11 +22,9 @@
 #include <utility>
 #include <variant>
 
-#if !defined(_WIN32)
 #include <fcntl.h>
 #include <sys/file.h>
 #include <unistd.h>
-#endif
 
 namespace etude::app {
 
@@ -41,17 +39,13 @@ void HistoryStore::set_state(HistoryState next) {
 }
 
 // The folder, or the file when there is one, cannot be written by this program (permissions, a
-// read-only disk). Without a way to ask (Windows), the answer is yes.
+// read-only disk).
 bool HistoryStore::not_writable_for_app() const {
-#if defined(_WIN32)
-    return true;
-#else
     if (::access(directory_.c_str(), W_OK) != 0) {
         return true;
     }
     std::error_code ec;
     return fs::exists(path(), ec) && ::access(path().c_str(), W_OK) != 0;
-#endif
 }
 
 void HistoryStore::say(std::string text) {
@@ -151,10 +145,6 @@ EventsRead HistoryStore::read_answer(const Job& job, std::uint64_t song_hash,
 // The lock file keeps two etudes from sharing one history. flock is released by the system when
 // the process ends, however it ends.
 bool HistoryStore::take_instance_lock() {
-#if defined(_WIN32)
-    instance_locked_ = true; // no lock file here: the journal is replayed as before
-    return true;
-#else
     const fs::path lock = directory_ / kHistoryLockName;
     lock_fd_ = ::open(lock.c_str(), O_RDWR | O_CREAT | O_CLOEXEC, 0644);
     if (lock_fd_ < 0) {
@@ -169,16 +159,13 @@ bool HistoryStore::take_instance_lock() {
     }
     instance_locked_ = true;
     return true;
-#endif
 }
 
 void HistoryStore::release_instance_lock() {
-#if !defined(_WIN32)
     if (lock_fd_ >= 0) {
         ::close(lock_fd_);
         lock_fd_ = -1;
     }
-#endif
 }
 
 // Another etude owns the history: read what is there, change nothing.

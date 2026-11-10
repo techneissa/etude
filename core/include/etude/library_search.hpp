@@ -92,11 +92,6 @@ struct SearchTies {
     std::span<const std::uint8_t> favourite;
 };
 
-// The edit distance (Levenshtein) of `a` and `b`, or `max + 1` when it is more than `max`.
-int bounded_edit_distance(std::string_view a, std::string_view b, int max);
-// The least edit distance of `query` and `word` or any beginning of `word`, or `max + 1` when it is
-// more than `max`. "moonlite" is 2 from "moonligh", a beginning of "moonlight".
-int prefix_edit_distance(std::string_view query, std::string_view word, int max);
 // The typos a query word of `bytes` bytes may have: 0 below kOneTypoLetters, 1, or 2 from
 // kTwoTypoLetters.
 int typos_allowed(std::size_t bytes);
@@ -111,7 +106,6 @@ class SearchIndex {
     // Keeps the first `n` songs.
     void resize(std::size_t n);
     std::size_t size() const { return songs_.size(); }
-    std::size_t vocabulary_size() const { return words_.size(); }
 
     // The songs matching `query`, best first (see above). `include`, when not empty, leaves out a
     // song whose byte is 0. A query with no word gives no hits. The list is the index's own and
@@ -160,9 +154,6 @@ class SearchIndex {
     };
 
     std::uint32_t intern(std::string_view word);
-    std::string_view word_text(std::uint32_t id) const {
-        return {chars_.data() + words_[id].offset, words_[id].length};
-    }
     void add_field(std::string_view text, Field field, Song& song, bool title);
     std::size_t read_query(std::string_view query);
     void sort_hits(const SearchTies& ties);

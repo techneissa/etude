@@ -157,10 +157,6 @@ struct SongSections {
     // is the section after the marker.
     EditResult move_marker(const Song& song, std::size_t index, double to_s,
                            bool snap_to_bars = true);
-    // Removes the marker nearest to `near_s`, merging the sections on both sides.
-    // `absorbed`, when not null, gets the id of the section that was merged away (see merge).
-    EditResult remove_marker(const Song& song, double near_s,
-                             std::vector<SectionId>* absorbed = nullptr);
     // Merges sections that are neighbours in time into the earliest one (its id and, if custom,
     // its name stay). Plan items of the others move to it. Plan items that land next to each other
     // on the merged section (or next to an item that was already on it) collapse into one: it

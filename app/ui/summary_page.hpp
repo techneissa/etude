@@ -38,8 +38,6 @@ class SummaryPageView {
     float scale() const { return scale_; }
     // The page shows its Board tab (it opened on Timing).
     void show_board() { tab_ = 1; }
-    // The Board tab is the one showing.
-    bool board_tab() const { return tab_ == 1; }
     // The Runs tab is the one showing (it exists only where the Board tab has no room for the chart).
     bool runs_tab() const { return tab_ == 2; }
     void show_runs() { tab_ = 2; }

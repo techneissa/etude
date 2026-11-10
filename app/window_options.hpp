@@ -5,7 +5,7 @@
 
 #include "audio_out.hpp"
 #include "dev_script.hpp"
-#include "song_controller.hpp"
+#include "song_sound.hpp"
 #include "ui.hpp"
 #include "ui/icon_audit.hpp"
 
@@ -15,6 +15,7 @@
 #include "etude/renderer_path.hpp"
 #include "etude/results_card.hpp"
 #include "etude/session_state.hpp"
+#include "etude/song_schedule.hpp"
 
 #include <chrono>
 #include <cstdint>

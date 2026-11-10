@@ -228,6 +228,12 @@ in shows up in the library with the "1 new song" toast within a few seconds. Fai
 share does not answer from a guest (no password), nor from another subnet or a VPN. Settings, Add
 songs, Network folder says "Shared as etude" while `smbd` runs and "Set up with the Pi" after
 `sudo systemctl stop smbd` (leave and open the page again: it is read once a visit).
+**(untested)** Names with characters Windows cannot hold: on a Pi set up before this change, run
+`sudo deploy/pi/setup.sh --share-only` first, so its share gets the mapping. Then upload "Why? (take 2).mid" from the phone
+page. It is saved under that name (`ls` on the Pi shows the `?`). Then open the share from a Mac and,
+if one is at hand, a Windows computer: the song is listed (the `?` may show as a box), opens, and
+copying it out and back in keeps one file. `testparm -s` must not complain about `vfs objects`; if the
+`catia:mappings` line or `fruit:encoding = native` is refused, say so in the report.
 **(untested)** `include =` at the end of `smb.conf` carrying its own `[global]` section: if
 `testparm` complains, say so in the report.
 
@@ -251,5 +257,5 @@ with a toast.
   numbers and its highest temperature; whether 120 Hz was offered and its bench.
 - `midi-ports` output, and whether replugging worked.
 - Any error text, and `journalctl -u etude.service -b` for step 10.
-- Step 11: `testparm -s` output, whether the share answered without a password, and whether an
+- Step 11: `testparm -s` output, how "Why? (take 2).mid" looked from the Mac and the Windows computer, whether the share answered without a password, and whether an
   unmounted-while-copying stick left anything in the Inbox.

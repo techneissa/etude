@@ -76,9 +76,6 @@ class Persistence {
     // way.
     void apply_profile(UiModel& model, std::string_view text);
 
-    // A write has finished and update() or wait() has not taken its outcome yet.
-    bool uncollected() const;
-
   private:
     friend struct PersistenceProbe; // the tests hand a model over at an exact moment
     // Hands `model` to the writer. False when the writer is still busy with the one before.

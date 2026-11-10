@@ -7,8 +7,6 @@
 #include <cstdint>
 #include <vector>
 
-#include "etude/pitch_synth.hpp"
-
 namespace pitch_test {
 
 inline constexpr int kRate = 48000;
@@ -41,30 +39,9 @@ inline std::vector<double> rich(double a, double odd_scale = 1.0) {
     return amps;
 }
 
-// Frequency of `note` in a tuning of `a4_hz`, raised by `cents`.
-inline double grid_hz(int note, double cents = 0.0, double a4_hz = 440.0) {
-    return a4_hz * std::exp2((note - 69) / 12.0 + cents / 1200.0);
-}
-
-// Eight partials a/n whose frequencies are stretched the way a piano string stretches them
-// (the synthesiser's inharmonicity for the note), `cents` from the key in a tuning of `a4_hz`.
-// Short frames of an exactly harmonic tone read a few cents flat, because the detector corrects
-// for the stretch it expects; this tone has the stretch it expects.
-inline std::vector<float> stretched_tone(int note, double cents, int length, int start,
-                                         double a4_hz = 440.0) {
-    std::vector<float> out(static_cast<size_t>(length), 0.0f);
-    const double f0 = a4_hz * std::exp2((note - 69) / 12.0 + cents / 1200.0);
-    const double b = etude::synth_inharmonicity(note);
-    for (int i = start; i < length; ++i) {
-        const double t = static_cast<double>(i - start) / kRate;
-        double v = 0.0;
-        for (int n = 1; n <= 8; ++n) {
-            v += (0.3 / n) *
-                 std::sin(kTau * f0 * n * std::sqrt(1.0 + b * n * n) * t + 0.3 * (n - 1));
-        }
-        out[static_cast<size_t>(i)] = static_cast<float>(v);
-    }
-    return out;
+// Frequency of `note` (A4 = 440 Hz), raised by `cents`.
+inline double grid_hz(int note, double cents = 0.0) {
+    return 440.0 * std::exp2((note - 69) / 12.0 + cents / 1200.0);
 }
 
 // Fades `samples` linearly to silence over `fade` samples starting at `from`, silent after.
@@ -90,12 +67,10 @@ inline void add_sub_octave(std::vector<float>& samples, double f0, double level,
 }
 
 // Deterministic white noise in [-amplitude, amplitude], silent before `start`.
-inline std::vector<float> noise(int length, float amplitude, std::uint32_t seed, int start = 0,
-                                int count = -1) {
+inline std::vector<float> noise(int length, float amplitude, std::uint32_t seed, int start = 0) {
     std::vector<float> out(static_cast<size_t>(length), 0.0f);
-    const int end = count < 0 ? length : std::min(length, start + count);
     std::uint32_t state = seed;
-    for (int i = start; i < end; ++i) {
+    for (int i = start; i < length; ++i) {
         state = state * 1664525u + 1013904223u;
         out[static_cast<size_t>(i)] =
             (static_cast<float>(state >> 8) / 16777216.0f - 0.5f) * 2.0f * amplitude;

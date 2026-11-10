@@ -24,11 +24,9 @@
 #include <utility>
 #include <variant>
 
-#if !defined(_WIN32)
 #include <fcntl.h>
 #include <sys/file.h>
 #include <unistd.h>
-#endif
 
 namespace etude::app {
 
@@ -261,25 +259,6 @@ std::uint64_t HistoryStore::request_run_events(std::int64_t run_id) {
     job.extra = Job::Extra::ReadRun;
     job.profile_id = active_;
     job.run_id = run_id;
-    std::lock_guard lock(mutex_);
-    if (!accepting_) {
-        return 0;
-    }
-    job.serial = ++read_serial_;
-    queue_.push_back(std::move(job));
-    work_.notify_one();
-    return read_serial_;
-}
-
-std::uint64_t HistoryStore::request_ghost(std::uint64_t song_hash, const GhostSetup& wanted) {
-    if (song_hash == 0) {
-        return 0;
-    }
-    Job job;
-    job.extra = Job::Extra::ReadGhost;
-    job.profile_id = active_;
-    job.song_hash = song_hash;
-    job.setup = wanted;
     std::lock_guard lock(mutex_);
     if (!accepting_) {
         return 0;

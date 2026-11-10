@@ -85,10 +85,4 @@ PracticeChanges note_changes(PracticeChanges earlier, const SongPractice& at_ope
 // `base` with the changed fields taken from `changes`.
 SongPractice apply_changes(const SongPractice& base, const PracticeChanges& changes);
 
-// `stored` (what the history holds for the song) laid over a song that was opened with `at_open`
-// before the history had loaded: each field the player changed since (`now` differs from
-// `at_open`) keeps the player's value, every other takes the stored one.
-SongPractice with_player_changes(const SongPractice& stored, const SongPractice& at_open,
-                                 const SongPractice& now);
-
 } // namespace etude

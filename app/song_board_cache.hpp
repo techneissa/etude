@@ -33,8 +33,6 @@ class SongBoardCache {
     const SongBoard* board(Period period) const {
         return built_ ? &boards_[static_cast<std::size_t>(period)] : nullptr;
     }
-    // How many times the boards were built (for the tests).
-    int builds() const { return builds_; }
 
   private:
     struct Key {
@@ -47,7 +45,6 @@ class SongBoardCache {
     };
     bool built_ = false;
     Key key_;
-    int builds_ = 0;
     std::array<SongBoard, 3> boards_;
 };
 

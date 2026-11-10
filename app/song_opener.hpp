@@ -8,6 +8,7 @@
 // the opener. No SDL: std only, so the tests use it.
 #pragma once
 
+#include "prepared_song.hpp"
 #include "song_library.hpp"
 
 #include "etude/session_restore.hpp"

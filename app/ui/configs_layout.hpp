@@ -182,12 +182,6 @@ inline float configs_empty_words_room(const ConfigsCards& c, float u) {
     return std::max(1.0f, c.preview_w - 2.0f * tok::kS2 * u);
 }
 
-// The room the line that says there is no one to copy from has in its row: less a side pad each
-// end.
-inline float configs_note_room(float row_w, float u) {
-    return std::max(1.0f, row_w - 2.0f * tok::kS3 * u);
-}
-
 // The room the Reset all row's words have: the row less its icon, the air round it and a side pad.
 inline float configs_reset_words_room(float row_w, float u) {
     return std::max(1.0f, row_w - (tok::kIconSm + tok::kS2 + 2.0f * tok::kS3) * u);
@@ -211,7 +205,6 @@ inline constexpr float kConfirmAvatar = 40.0f;     // the avatar's diameter at s
 inline constexpr float kConfirmAvatarWide = 52.0f; // and from step 1
 inline constexpr float kConfirmTitleLine = 1.25f;  // line heights, over the type size
 inline constexpr float kConfirmDetailLine = 1.35f;
-inline constexpr float kConfirmDetailLinesMax = 3.0f;
 } // namespace configs_tok
 
 // The width the card's words wrap to, in ImGui points.

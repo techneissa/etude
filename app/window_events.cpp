@@ -5,6 +5,8 @@
 #include "ear_session.hpp"
 #include "window_state.hpp"
 
+#include <SDL3/SDL.h>
+
 #include <cstdint>
 #include <cstdio>
 #include <string>

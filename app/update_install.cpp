@@ -238,21 +238,18 @@ bool UpdateService::Shared::hand_over(const UpdateOffer& offer, ui::UpdateView& 
     return false;
 }
 
-void UpdateService::Shared::run_install() {
-    if (!options.mac.bundle.empty()) {
-        run_install_mac();
-        return;
-    }
-    UpdateOffer offered;
+// Takes the offer to install and publishes the Downloading view; false when there is none.
+bool UpdateService::Shared::begin_install(UpdateOffer& offered, ui::UpdateView& base,
+                                          ui::UpdateView& view) {
     {
         std::lock_guard lock(mutex);
         offered = found;
     }
     if (!offered.valid || options.update_dir.empty()) {
-        return;
+        return false;
     }
-    const ui::UpdateView base = current();
-    ui::UpdateView view = base;
+    base = current();
+    view = base;
     view.phase = ui::UpdatePhase::Downloading;
     view.version = offered.release.version;
     view.percent = 0;
@@ -260,6 +257,20 @@ void UpdateService::Shared::run_install() {
     view.detail.clear();
     view.cancellable = true;
     publish(view);
+    return true;
+}
+
+void UpdateService::Shared::run_install() {
+    if (!options.mac.bundle.empty()) {
+        run_install_mac();
+        return;
+    }
+    UpdateOffer offered;
+    ui::UpdateView base;
+    ui::UpdateView view;
+    if (!begin_install(offered, base, view)) {
+        return;
+    }
     const auto give_up = [&](FailureText why) { fail_install(base, std::move(why)); };
     const auto cancel_back = [&] {
         remove_handoff(options.update_dir);

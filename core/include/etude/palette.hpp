@@ -37,7 +37,6 @@ inline constexpr std::array<ColorScheme, kColorSchemeCount> kAllColorSchemes{
 
 // The name shown on its row, and the word it is saved as.
 std::string_view palette_name(Palette p);
-std::string_view palette_key(Palette p);
 
 inline constexpr int kMaxSwatches = 12;
 
@@ -70,16 +69,9 @@ std::optional<Palette> matching_palette(const LookSettings& look, ColorScheme sc
 // The current scheme's swatches back to the palette remembered for it.
 void reset_to_palette(LookSettings& look);
 
-// Which swatches a palette row's strip shows for `scheme`, at most `kStripSwatches`: all of a
-// short list, and an even pick of a long one (the white keys C D E F G A of the twelve notes).
-inline constexpr std::size_t kStripSwatches = 6;
 std::span<const int> strip_swatches(ColorScheme scheme);
 
 // --- Colour-blind check ------------------------------------------------------------------------
-
-// The smallest perceptual distance (OKLab) between any two of `colors` as someone with `vision`
-// sees them. 1 (black against white) for fewer than two colours.
-double min_distance_seen(std::span<const RGBA> colors, ColourVision vision);
 
 // --- Picker ------------------------------------------------------------------------------------
 
@@ -119,7 +111,6 @@ ColourPick with_square_at(ColourPick p, double x, double y);
 inline constexpr std::size_t kQuickColumns = 8;
 inline constexpr std::size_t kQuickShades = 3;              // light, bright, deep
 inline constexpr std::size_t kQuickRows = kQuickShades + 1; // and the greys
-inline constexpr std::size_t kQuickPickCount = kQuickRows * kQuickColumns;
 inline constexpr std::array<double, kQuickColumns> kQuickHues{0.0,   30.0,  60.0,  120.0,
                                                               180.0, 240.0, 280.0, 320.0};
 inline constexpr double kQuickLightSaturation = 0.45; // the light row: the hue, half way to white

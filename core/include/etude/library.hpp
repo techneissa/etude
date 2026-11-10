@@ -93,10 +93,6 @@ std::string fold_for_search(std::string_view text);
 // `out` has too little capacity, so a buffer reserved once serves every keystroke.
 void fold_for_search_into(std::string_view text, std::string& out);
 
-// True when every white-space separated word of `query` (folded the same way) occurs in
-// `folded_title`. An empty query matches everything.
-bool matches_search(std::string_view folded_title, std::string_view query);
-
 // ---- Keyboard fit
 
 enum class KeyFit : std::uint8_t {
@@ -144,7 +140,7 @@ struct SongEntry {
     // rest and kept with it: what tells that two files are versions of one piece.
     MelodyContour melody;
 
-    // From the run history (attach_history).
+    // From the run history.
     bool has_best = false;
     BestEntry best;          // the best accuracy over every mode, hands and speed
     int run_count = 0;       // runs of this song, repeats left out
@@ -209,11 +205,6 @@ struct LibraryLoad {
 LibraryLoad load_library_entry(std::span<const std::uint8_t> bytes, std::string_view file_name,
                                const LibraryLoadOptions& options = {});
 
-// Sets the history fields of `entry` from `runs` (oldest first, as progress.hpp expects), replacing
-// what an earlier call set. The best is the highest accuracy over song_bests(), a tie going to the
-// higher speed; a song with no run of at least kMinGradedForBest graded notes has none.
-void attach_history(SongEntry& entry, std::span<const RunRecord> runs);
-
 // What the history says of one song, for the whole library at once.
 struct SongPlays {
     int runs = 0;                // runs of the song, repeats left out
@@ -221,9 +212,9 @@ struct SongPlays {
     std::int32_t last_day = 0;   // the local day of the latest run
     int best_permille = -1;      // the best accuracy in thousandths, -1 for none
 };
-// One pass over `runs` (oldest first): per song hash, the same runs, latest run and best as
-// attach_history gives one entry (the best is the highest accuracy of a run with at least
-// kMinGradedForBest graded notes, rounded to thousandths). Runs with hash 0 are left out.
+// One pass over `runs` (oldest first): per song hash, the runs, latest run and best (the best is
+// the highest accuracy of a run with at least kMinGradedForBest graded notes, rounded to
+// thousandths). Runs with hash 0 are left out.
 std::unordered_map<std::uint64_t, SongPlays> summarise_plays(std::span<const RunRecord> runs);
 
 // ---- Browsing
@@ -250,20 +241,11 @@ enum class KeyboardFilter : std::uint8_t {
 enum class PlayedFilter : std::uint8_t { Any, PlayedOnly, UnplayedOnly };
 
 struct LibraryFilter {
-    std::string text; // matches_search against the title; empty matches all
     int min_difficulty = 1;
     int max_difficulty = 5; // an empty range (min > max) matches nothing
     KeyboardFilter keyboard = KeyboardFilter::Any;
     KeyRange range = kRange61; // the player's keyboard, used by `keyboard`
     PlayedFilter played = PlayedFilter::Any;
 };
-
-bool matches_filter(const SongEntry& entry, const LibraryFilter& filter);
-
-// Indices into `entries` of the songs that pass the filter, in sort order. Does not copy or change
-// the entries.
-std::vector<std::size_t> browse_library(std::span<const SongEntry> entries,
-                                        const LibraryFilter& filter = {},
-                                        const LibrarySort& sort = {});
 
 } // namespace etude

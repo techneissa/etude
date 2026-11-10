@@ -83,10 +83,6 @@ ScoreParts score_parts(const RunRecord& in, const ScoreContext& context) {
     return parts;
 }
 
-int score_run(const RunRecord& run, const ScoreContext& context) {
-    return score_parts(run, context).score;
-}
-
 RunRecord scored(const RunRecord& in, const ScoreContext& context) {
     RunRecord run = sanitized(in);
     const ScoreParts parts = score_parts(run, context);

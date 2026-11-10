@@ -7,8 +7,9 @@
 #pragma once
 
 #include "lent_song.hpp"
-#include "song_controller.hpp"
+#include "prepared_song.hpp"
 
+#include "etude/difficulty.hpp"
 #include "etude/hand_split.hpp"
 #include "etude/song.hpp"
 

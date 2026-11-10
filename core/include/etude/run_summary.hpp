@@ -117,10 +117,6 @@ struct RunSummary {
     const SummaryHand& hand(Hand h) const { return hands[static_cast<std::size_t>(h)]; }
 };
 
-// The summary of a run. `events` may be empty (an older run, or one whose notes were pruned): the
-// record alone then gives the summary. `measures` give each named bar its written number.
-RunSummary summarize_run(const RunRecord& record, const RunEvents& events, const ReplaySong& song);
-
 // The bars of `summary` ready to practise: what `SectionsController::practise_bars` takes. Every
 // trouble bar by default, or the first `max_bars` of them; a bar too short to loop is dropped and
 // counted. `duration_s` is the end of the song's last bar.

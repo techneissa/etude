@@ -10,6 +10,7 @@
 #include "etude/pitch.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -129,64 +130,106 @@ void Scene::draw_keyboard(const FrameInput& in) {
     const SDL_Rect key_clip = pixel_rect(area);
     gfx::set_clip(renderer_, &key_clip);
 
+    // Each key's paint, once for the passes below.
+    std::array<Lit, 128> lits{};
+    std::array<std::uint8_t, 128> unlit{};
+    for (int note = range_.lowest; note <= range_.highest; ++note) {
+        const std::size_t i = static_cast<std::size_t>(note);
+        if (!keys_[i].in_range) {
+            continue;
+        }
+        lits[i] = lit_paint(note);
+        unlit[i] = lits[i].on ? 0 : (outside_scale(note) ? 2 : 1);
+    }
+    const auto white_face = [&](const KeyPx& k) {
+        return SDL_FRect{k.x + gap * 0.5f, top - white_radius, k.width - gap,
+                         bottom - top + white_radius};
+    };
+    const float black_radius_share = 0.16f;
+    const float lip_h = 0.07f * black_length;
+    const auto black_face = [&](const KeyPx& k) {
+        const float radius = black_radius_share * k.width;
+        return SDL_FRect{k.x, top - radius, k.width, black_length + radius};
+    };
+    // A lighter lip near the front edge gives the key some depth.
+    const auto black_lip = [&](const KeyPx& k) {
+        return SDL_FRect{k.x + 0.12f * k.width, top + black_length - 1.6f * lip_h, k.width * 0.76f,
+                         lip_h};
+    };
+    // The unlit faces change only when a key lights or goes dark, the overlay or the keys change;
+    // an idle keyboard reuses them. A key's own face colours never change (the look is fixed).
+    UnlitKeys& cache = unlit_keys_;
+    const std::array<float, 4> params{top, area.h, unit_, white_width_};
+    if (!cache.valid || cache.epoch != keys_epoch_ || cache.params != params ||
+        cache.state != unlit) {
+        cache.white.clear();
+        cache.black.clear();
+        for (int note = range_.lowest; note <= range_.highest; ++note) {
+            const std::size_t i = static_cast<std::size_t>(note);
+            const KeyPx& k = keys_[i];
+            if (!k.in_range || unlit[i] == 0) {
+                continue;
+            }
+            const bool dim = unlit[i] == 2;
+            if (k.black) {
+                add_unlit_black(cache.black, dim, black_face(k), black_radius_share * k.width,
+                                black_lip(k), 0.5f * lip_h);
+            } else {
+                add_unlit_white(cache.white, dim, white_face(k), white_radius);
+            }
+        }
+        cache.state = unlit;
+        cache.params = params;
+        cache.epoch = keys_epoch_;
+        cache.valid = true;
+    }
+
     // White keys first so black keys draw on top. Every key starts at the top of the key area (the
     // rounded corners sit above it and are clipped away), so the keys begin where the bed ends.
     // Each pass: unlit faces, then the lit faces in the note style, then the bands over them.
-    mesh_.clear();
     overlay_.clear();
     painter_.begin(recipe_, unit_);
     for (int note = range_.lowest; note <= range_.highest; ++note) {
-        const KeyPx& k = keys_[static_cast<std::size_t>(note)];
-        if (k.black || !k.in_range) {
+        const std::size_t i = static_cast<std::size_t>(note);
+        const KeyPx& k = keys_[i];
+        if (k.black || !k.in_range || unlit[i] != 0) {
             continue;
         }
-        const Lit lit = lit_paint(note);
-        const SDL_FRect face{k.x + gap * 0.5f, top - white_radius, k.width - gap,
-                             bottom - top + white_radius};
-        if (!lit.on) {
-            add_unlit_white(note, face, white_radius);
-            continue;
-        }
+        const Lit& lit = lits[i];
+        const SDL_FRect face = white_face(k);
         painter_.add(face, white_radius, lit.paint.base, lit.paint.lower, 1.0f,
                      see_through ? underlay_for(lit.paint) : SDL_FColor{0, 0, 0, 0});
         add_key_tip(face.x, face.w, top, bottom, tip_h, lit.paint);
         add_glow(note, lit.paint);
     }
-    mesh_.draw(renderer_, SDL_BLENDMODE_BLEND);
+    cache.white.draw(renderer_, SDL_BLENDMODE_BLEND);
     painter_.draw(renderer_, textures_);
     overlay_.draw(renderer_, SDL_BLENDMODE_BLEND);
 
     // A lit black key is painted like its block, in the style's fuller version.
-    mesh_.clear();
     overlay_.clear();
     black_painter_.begin(black_recipe_, unit_);
     for (int note = range_.lowest; note <= range_.highest; ++note) {
-        const KeyPx& k = keys_[static_cast<std::size_t>(note)];
-        if (!k.black || !k.in_range) {
+        const std::size_t i = static_cast<std::size_t>(note);
+        const KeyPx& k = keys_[i];
+        if (!k.black || !k.in_range || unlit[i] != 0) {
             continue;
         }
-        const Lit lit = lit_paint(note);
-        const float radius = 0.16f * k.width;
-        const SDL_FRect face{k.x, top - radius, k.width, black_length + radius};
-        // A lighter lip near the front edge gives the key some depth.
-        const float lip = 0.07f * black_length;
-        const SDL_FRect lip_rect{k.x + 0.12f * k.width, top + black_length - 1.6f * lip,
-                                 k.width * 0.76f, lip};
-        if (!lit.on) {
-            add_unlit_black(note, face, radius, lip_rect, 0.5f * lip);
-            continue;
-        }
-        black_painter_.add(face, radius, lit.paint.base, lit.paint.lower, 1.0f,
+        const Lit& lit = lits[i];
+        const SDL_FRect face = black_face(k);
+        const SDL_FRect lip_rect = black_lip(k);
+        black_painter_.add(face, black_radius_share * k.width, lit.paint.base, lit.paint.lower, 1.0f,
                            see_through ? underlay_for(lit.paint) : SDL_FColor{0, 0, 0, 0});
         const SDL_FColor lip_colour = with_alpha(mix(lit.paint.base, kWhite, 0.25f), 0.6f);
-        overlay_.rounded_rect(lip_rect, 0.5f * lip, with_alpha(lip_colour, 0.0f), lip_colour, 0.0f);
+        overlay_.rounded_rect(lip_rect, 0.5f * lip_h, with_alpha(lip_colour, 0.0f), lip_colour,
+                              0.0f);
         add_key_tip(k.x, k.width, top, bottom, tip_h, lit.paint);
         add_glow(note, lit.paint);
     }
     // The bed's shadow on the top of every key, so they look like they slide under it.
     const SDL_FColor shadow = with_alpha(kBlack, look_.shadow_alpha);
     overlay_.rect({0.0f, top, width_, layout_.key_shadow_h}, shadow, with_alpha(shadow, 0.0f));
-    mesh_.draw(renderer_, SDL_BLENDMODE_BLEND);
+    cache.black.draw(renderer_, SDL_BLENDMODE_BLEND);
     black_painter_.draw(renderer_, textures_);
     overlay_.draw(renderer_, SDL_BLENDMODE_BLEND);
 
@@ -208,7 +251,7 @@ void Scene::draw_keyboard(const FrameInput& in) {
                     continue; // the marker the settings now ask for is not ready: none, not the old
                 }
                 const bool middle = is_middle_c(note);
-                const Lit lit = lit_paint(note);
+                const Lit& lit = lits[i];
                 SDL_FColor colour = middle ? look_.c_marker_middle : look_.c_marker_other;
                 if (lit.on) {
                     colour = key_label_colour_for(note, lit.velocity);
@@ -232,7 +275,7 @@ void Scene::draw_keyboard(const FrameInput& in) {
                 name_stale_[i] || c_stale_[i]) {
                 continue;
             }
-            const Lit lit = lit_paint(note);
+            const Lit& lit = lits[i];
             SDL_FColor colour = k.black ? look_.key_label_black : look_.key_label_white;
             if (lit.on) {
                 colour = key_label_colour_for(note, lit.velocity);

@@ -11,9 +11,6 @@ namespace etude::helper {
 // Catches SIGTERM and SIGINT (without SA_RESTART, so a blocking call is cut short).
 void install_interrupt_handlers();
 
-// What the handler does: the next `consume_interrupt` returns true.
-void raise_interrupt();
-
 // For the checkpoints between steps: true when a signal came since the last checkpoint, including one
 // that already cut a wait short (`interrupt_in_wait`) and has not been acted on yet. Clears it, so the
 // clean-up that follows is not itself cut short.

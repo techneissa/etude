@@ -234,10 +234,6 @@ RGBA label_color_for(RGBA block) {
     return contrast_ratio(kBlack, block) >= contrast_ratio(kWhite, block) ? kBlack : kWhite;
 }
 
-RGBA note_label_color(const LookSettings& look, int note, std::uint8_t velocity, Hand hand) {
-    return label_color_for(note_color(look, note, velocity, hand));
-}
-
 NameParts note_name_parts(int note, const LookSettings& look) {
     NameParts out;
     if (look.name_mode == NameMode::Off || !is_valid_note(note)) {

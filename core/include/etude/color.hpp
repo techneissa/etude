@@ -47,12 +47,6 @@ Oklab to_oklab(RGBA c);
 // difference most people can see, and 0.1 or more reads as clearly different hues.
 double perceptual_distance(RGBA a, RGBA b);
 
-// How a colour looks to someone with a colour vision deficiency, at full strength (Machado,
-// Oliveira and Fernandes 2009, applied in linear sRGB). Typical returns the colour unchanged; alpha
-// stays.
-enum class ColourVision : std::uint8_t { Typical, Protanopia, Deuteranopia, Tritanopia };
-RGBA simulate_vision(RGBA c, ColourVision vision);
-
 // Per-channel mix in sRGB, alpha included. `t` is clamped to 0..1.
 RGBA lerp(RGBA a, RGBA b, float t);
 // Mix toward white or black by `amount` (0..1). Alpha stays.
@@ -64,15 +58,10 @@ RGBA darken(RGBA c, float amount);
 double relative_luminance(RGBA c);
 double contrast_ratio(RGBA a, RGBA b);
 
-// Moves `fg` toward white (dark `bg`) or black (light `bg`) by the smallest step that reaches
-// `min_ratio` against `bg`. Returns `fg` unchanged when it already does. Ratios above what white
-// or black can reach give white or black.
-RGBA ensure_contrast(RGBA fg, RGBA bg, double min_ratio);
-
-// Like `ensure_contrast`, but the step is in OKLCH lightness: `fg` keeps its hue and its chroma (less
-// where the sRGB gamut cannot hold it at the higher lightness) instead of fading toward white, so
-// colours that differ in hue or saturation stay different once lifted. For a dark `bg` it lightens,
-// for a light one it darkens. Returns `fg` unchanged when it already reaches `min_ratio`.
+// Lifts `fg` to `min_ratio` against `bg` in OKLCH lightness: `fg` keeps its hue and its chroma
+// (less where the sRGB gamut cannot hold it at the higher lightness) instead of fading toward
+// white, so colours that differ in hue or saturation stay different once lifted. For a dark `bg` it
+// lightens, for a light one it darkens. Returns `fg` unchanged when it already reaches `min_ratio`.
 RGBA lift_to_contrast(RGBA fg, RGBA bg, double min_ratio);
 
 // "#RRGGBB", or "#RRGGBBAA" when alpha is not 255.

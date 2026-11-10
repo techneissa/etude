@@ -138,16 +138,6 @@ bool LibraryGroups::contains(std::uint64_t id, std::uint64_t hash) const {
     return std::find(s.begin(), s.end(), hash) != s.end();
 }
 
-std::vector<std::uint64_t> LibraryGroups::groups_of(std::uint64_t hash) const {
-    std::vector<std::uint64_t> out;
-    for (const SongGroup& g : groups_) {
-        if (contains(g.id, hash)) {
-            out.push_back(g.id);
-        }
-    }
-    return out;
-}
-
 std::int32_t LibraryGroups::next_position() const {
     std::int32_t p = 0;
     for (const SongGroup& g : groups_) {

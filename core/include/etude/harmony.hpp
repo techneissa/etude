@@ -12,8 +12,8 @@
 namespace etude {
 
 // The chords of a song, named the way a musician would: one name for a stretch of music, from the
-// harmony its notes make, never from the tune. Pure, built once per song on a worker (cost: see
-// build_harmony), never per frame.
+// harmony its notes make, never from the tune. Pure, built once per song on a worker, never per
+// frame.
 //
 // The method, in short:
 //  1. The song is cut into stretches: a bar, or half a bar where the two halves clearly name
@@ -156,19 +156,8 @@ struct HarmonyTimeline {
         return scope == HarmonyScope::Left ? left : scope == HarmonyScope::Right ? right : all;
     }
 };
-HarmonyTimeline build_harmony(const Song& song);
 // The two hands' timelines only (`all` stays empty): what the chord label of the scene is made
-// from, in about two thirds of build_harmony's time.
+// from.
 HarmonyTimeline build_hand_harmony(const Song& song);
-
-// The stretch holding a time (seconds) or a tick; null before the first stretch and from the end of
-// the last. The stretch may have no chord.
-const HarmonyStretch* harmony_at_seconds(const std::vector<HarmonyStretch>& stretches,
-                                         double seconds);
-const HarmonyStretch* harmony_at_tick(const std::vector<HarmonyStretch>& stretches,
-                                      std::int64_t tick);
-
-// "F#maj7/E#": the stretch's chord with its spelling; empty without a chord.
-std::string harmony_name(const HarmonyStretch& stretch);
 
 } // namespace etude

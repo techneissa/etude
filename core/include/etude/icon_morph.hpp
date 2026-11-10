@@ -65,8 +65,6 @@ enum class PathError : std::uint8_t {
 // subpath left empty with them. On an error `out` holds what parsed before it, the subpath in
 // progress included (left open).
 PathError parse_svg_path(std::string_view d, CubicPath& out);
-// A circle as a closed subpath of four cubics.
-PathError add_circle(CubicPath& out, float cx, float cy, float r);
 // A rectangle, its corners rounded by `rx` (0: square), as a closed subpath.
 PathError add_rect(CubicPath& out, float x, float y, float w, float h, float rx);
 
@@ -102,7 +100,6 @@ struct Procrustes {
     MorphPoint ca, cb;
     float residual = 0.0f;
 };
-Procrustes procrustes(const MorphPoint* a, const MorphPoint* b, int n);
 
 // Below this global residual the whole icon is congruent and moves as one piece.
 inline constexpr float kRigidResidual = 5e-3f;

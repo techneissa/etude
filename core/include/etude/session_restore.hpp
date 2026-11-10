@@ -28,11 +28,6 @@ struct RestorePlan {
     bool loop_adjusted = false;
     bool loop_dropped = false;
 
-    // The saved song-bound state could not be used and was reset; the app says why on screen.
-    bool was_reset() const {
-        return outcome == RestoreOutcome::SongMissing ||
-               outcome == RestoreOutcome::SongUnreadable || outcome == RestoreOutcome::SongChanged;
-    }
 };
 
 // What the app found when it looked for the saved song at one of its two paths.

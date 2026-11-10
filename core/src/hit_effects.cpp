@@ -41,18 +41,6 @@ HitEffect affordable_hit_effect(HitEffect wanted, bool particles) {
     return wanted == HitEffect::Sparks && !particles ? HitEffect::Glow : wanted;
 }
 
-float hit_shape_top(const HitShape& s) {
-    switch (s.kind) {
-    case HitShapeKind::Soft:
-        return s.y - s.ry;
-    case HitShapeKind::Ring:
-        return s.y - s.ry - 0.5f * s.thickness;
-    case HitShapeKind::Streak:
-        return s.y - (std::abs(s.dy) * s.rx + std::abs(s.dx) * s.ry);
-    }
-    return s.y;
-}
-
 float HitEffects::random01() {
     rng_ = rng_ * 1664525u + 1013904223u;
     return static_cast<float>(rng_ >> 8) / 16777216.0f;

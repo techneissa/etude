@@ -198,11 +198,6 @@ struct Matcher {
 
 } // namespace
 
-Procrustes procrustes(const MorphPoint* a, const MorphPoint* b, int n) {
-    const Cloud c{a, b, n};
-    return fit(&c, 1);
-}
-
 void plan_morph(const MorphShape& a, const MorphShape& b, MorphPlan& out) {
     out.count = 0;
     out.rigid = false;

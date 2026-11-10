@@ -322,23 +322,4 @@ void fold_for_search_into(std::string_view text, std::string& out) {
     }
 }
 
-bool matches_search(std::string_view folded_title, std::string_view query) {
-    std::string folded_query = fold_for_search(query);
-    std::string_view rest = folded_query;
-    while (!rest.empty()) {
-        while (!rest.empty() && is_space_or_control(static_cast<unsigned char>(rest.front()))) {
-            rest.remove_prefix(1);
-        }
-        std::size_t end = 0;
-        while (end < rest.size() && !is_space_or_control(static_cast<unsigned char>(rest[end]))) {
-            ++end;
-        }
-        if (end > 0 && folded_title.find(rest.substr(0, end)) == std::string_view::npos) {
-            return false;
-        }
-        rest.remove_prefix(end);
-    }
-    return true;
-}
-
 } // namespace etude

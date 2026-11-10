@@ -79,8 +79,6 @@ struct StreakRule {
     std::int64_t min_practised_ms = 1;
 
     static StreakRule any_practice() { return StreakRule{}; }
-    // The daily goal must be reached. A goal of 0 means no goal, so any practice counts.
-    static StreakRule daily_goal(int goal_minutes);
 };
 
 struct Streak {
@@ -95,9 +93,6 @@ struct Streak {
     int freezes = 0;
     int frozen_days = 0;
 };
-// The strict streak: days in a row, one missed day ends it.
-Streak practice_streak(std::span<const RunRecord> runs, std::int32_t today,
-                       const StreakRule& rule = {});
 
 // Streak freezes, in one sentence: every counting day earns one freeze (five banked at most, used
 // automatically), and a missed day spends one instead of earning one, so the streak holds until a missed
@@ -136,26 +131,6 @@ struct BestEntry {
 // later one.
 std::vector<BestEntry> song_bests(std::span<const RunRecord> runs, std::uint64_t song_hash,
                                   int min_graded = kMinGradedForBest);
-
-struct HistoryFilter {
-    std::optional<RunMode> mode;
-    std::optional<HandFilter> hands;
-    int min_graded = 1; // runs with fewer graded notes are left out
-};
-
-// One point of the history graph: a run, or several runs merged when there are too many to draw.
-struct HistoryPoint {
-    std::int32_t day = 0;    // of the last run merged
-    double accuracy = 0.0;   // hit / graded over the runs merged, 0..1
-    int speed_percent = 100; // the highest speed among the runs merged
-    int runs = 1;
-    int graded_notes = 0;
-};
-// The runs of a song oldest first as points, at most `max_points` of them. When there are more
-// runs, consecutive runs are merged into `max_points` buckets of nearly equal size (the first
-// bucket is the oldest), so the series always covers the whole history and keeps its order.
-std::vector<HistoryPoint> history_series(std::span<const RunRecord> runs, std::uint64_t song_hash,
-                                         std::size_t max_points, const HistoryFilter& filter = {});
 
 // ---- Change from your last attempt
 
@@ -207,7 +182,6 @@ enum class TroubleReason : std::uint8_t {
     MissedNotes, // notes not played in time (or at all) outweigh wrong presses
     WrongNotes,  // wrong presses outweigh missed notes
 };
-std::string_view trouble_reason_text(TroubleReason reason);
 
 // One bar of the trouble-spot map.
 struct BarHeat {

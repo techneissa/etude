@@ -1,4 +1,106 @@
 include(${PROJECT_SOURCE_DIR}/cmake/EmbedFile.cmake)
+# The app code the unit tests build too: one static library, compiled once with the app's flags and
+# linked by both etude and etude_tests. It builds without SDL.
+set(upload_page_source ${CMAKE_CURRENT_BINARY_DIR}/embedded_upload_page.cpp)
+etude_embed_file(${CMAKE_CURRENT_SOURCE_DIR}/assets/upload/index.html embedded_upload_page
+                   ${upload_page_source})
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+             ${CMAKE_CURRENT_SOURCE_DIR}/assets/upload/index.html)
+# Generated (the phone page's bytes), so kept out of the warning flags.
+add_library(etude_upload_page OBJECT ${upload_page_source})
+target_compile_features(etude_upload_page PRIVATE cxx_std_20)
+find_package(Threads REQUIRED)
+add_library(etude_app_core STATIC
+  catalogue_service.cpp
+  catalogue_service_search.cpp
+  crash_handler.cpp
+  crash_notice.cpp
+  crash_screen.cpp
+  desktop_entry.cpp
+  folder_events_fsevents.cpp
+  folder_events_inotify.cpp
+  folder_watcher.cpp
+  frame_log.cpp
+  hand_split_job.cpp
+  history_journal.cpp
+  history_schema.cpp
+  history_store.cpp
+  history_store_journal.cpp
+  history_store_open.cpp
+  history_store_prefs.cpp
+  history_store_profiles.cpp
+  history_store_progress.cpp
+  history_store_runs.cpp
+  history_store_size.cpp
+  history_store_songs.cpp
+  history_store_thread.cpp
+  library_binding.cpp
+  library_binding_catalogues.cpp
+  library_binding_progress.cpp
+  library_catalogue.cpp
+  library_catalogue_shelves.cpp
+  library_files.cpp
+  library_row.cpp
+  log_ring.cpp
+  loop_wake.cpp
+  mac_relaunch_script.cpp
+  mac_update.cpp
+  mic_inbox.cpp
+  net_fetch.cpp
+  persistence.cpp
+  practice_tables_job.cpp
+  run_program.cpp
+  runs_file.cpp
+  sections_controller.cpp
+  settings_store.cpp
+  share_probe.cpp
+  song_controller.cpp
+  song_controller_load.cpp
+  song_controller_octave.cpp
+  song_controller_practice.cpp
+  song_controller_run.cpp
+  song_controller_session.cpp
+  song_controller_sound.cpp
+  song_controller_status.cpp
+  song_controller_transport.cpp
+  song_lengths.cpp
+  song_library.cpp
+  song_library_file.cpp
+  song_library_worker.cpp
+  song_opener.cpp
+  song_practice_sync.cpp
+  song_transport.cpp
+  sqlite_db.cpp
+  timed_sender.cpp
+  ui/ink_measure.cpp
+  ui/page_ids.cpp
+  ui/settings_catalogue.cpp
+  update_files.cpp
+  update_install.cpp
+  update_install_mac.cpp
+  update_service.cpp
+  update_status.cpp
+  upload_api.cpp
+  upload_connections.cpp
+  upload_controller.cpp
+  upload_page.cpp
+  upload_server.cpp
+  upload_service.cpp
+  usb_import.cpp
+  usb_scan.cpp
+  version_grouper.cpp
+  $<TARGET_OBJECTS:etude_upload_page>)
+target_include_directories(etude_app_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(etude_app_core PUBLIC etude::core Threads::Threads etude_sqlite etude_curl
+  etude_httplib PRIVATE etude_warnings)
+if(APPLE)
+  # FSEvents, for the folder watcher's native backend.
+  target_link_libraries(etude_app_core PUBLIC "-framework CoreServices")
+endif()
+if(NOT ETUDE_BUILD_APP)
+  return()
+endif()
+
 include(${PROJECT_SOURCE_DIR}/cmake/EmbedMelodies.cmake)
 set(font_source ${CMAKE_CURRENT_BINARY_DIR}/embedded_font.cpp)
 etude_embed_file(${ETUDE_FONT_FILE} embedded_font ${font_source})
@@ -26,9 +128,6 @@ etude_embed_file(${CMAKE_CURRENT_SOURCE_DIR}/assets/brands/github-mark.svg embed
 set(brand_coffee_source ${CMAKE_CURRENT_BINARY_DIR}/embedded_brand_coffee.cpp)
 etude_embed_file(${CMAKE_CURRENT_SOURCE_DIR}/assets/brands/bmc-logo-yellow.png embedded_brand_coffee
                    ${brand_coffee_source})
-set(upload_page_source ${CMAKE_CURRENT_BINARY_DIR}/embedded_upload_page.cpp)
-etude_embed_file(${CMAKE_CURRENT_SOURCE_DIR}/assets/upload/index.html embedded_upload_page
-                   ${upload_page_source})
 set(melodies_source ${CMAKE_CURRENT_BINARY_DIR}/embedded_melodies.cpp)
 etude_embed_melodies(${CMAKE_CURRENT_SOURCE_DIR}/assets/melodies ${melodies_source})
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${ETUDE_FONT_FILE}
@@ -63,7 +162,6 @@ add_executable(etude
   alloc_probe.cpp
   audio_out.cpp
   bench.cpp
-  catalogue_service.cpp
   chord_label_view.cpp
   cli_parse.cpp
   cli_parse_dev.cpp
@@ -71,72 +169,37 @@ add_executable(etude
   cli_upload.cpp
   cli_usage.cpp
   dev_script.cpp
-  crash_handler.cpp
-  crash_notice.cpp
-  crash_screen.cpp
   crash_screen_run.cpp
   crash_session.cpp
   device_check_host.cpp
   display_panel.cpp
   effects.cpp
-  folder_events_fsevents.cpp
-  folder_events_inotify.cpp
-  folder_watcher.cpp
-  frame_log.cpp
   gfx.cpp
   glow_shader.cpp
   hand_chords_job.cpp
-  hand_split_job.cpp
-  history_journal.cpp
-  history_schema.cpp
-  history_store.cpp
-  history_store_journal.cpp
-  history_store_open.cpp
-  history_store_prefs.cpp
-  history_store_profiles.cpp
-  history_store_progress.cpp
-  history_store_runs.cpp
-  history_store_size.cpp
-  history_store_songs.cpp
-  history_store_thread.cpp
   library_bench.cpp
   learn_sound.cpp
   ear_session.cpp
-  library_binding.cpp
-  library_binding_progress.cpp
-  library_catalogue.cpp
-  library_files.cpp
   library_picks.cpp
-  library_row.cpp
-  log_ring.cpp
-  loop_wake.cpp
-  mac_relaunch_script.cpp
-  mac_update.cpp
   main.cpp
   melody_book.cpp
   mesh.cpp
   mic_capture.cpp
-  mic_inbox.cpp
   mic_pipeline.cpp
   mic_source.cpp
   midi_input.cpp
   midi_log_mode.cpp
   midi_output.cpp
   music_font.cpp
-  net_fetch.cpp
   panel_drm.cpp
   panel_probe.cpp
   panel_scale.cpp
-  persistence.cpp
   port_watcher.cpp
-  practice_tables_job.cpp
   profile_looks.cpp
   qr_code.cpp
   replay_demo.cpp
   replay_session.cpp
   resume_keeper.cpp
-  run_program.cpp
-  runs_file.cpp
   scene.cpp
   scene_block_names.cpp
   scene_combo.cpp
@@ -147,35 +210,14 @@ add_executable(etude
   scene_replay.cpp
   scene_fingers.cpp
   scene_scale.cpp
-  sections_controller.cpp
   settings_check.cpp
   settings_check_taps.cpp
-  settings_store.cpp
-  share_probe.cpp
   song_board_cache.cpp
-  song_controller.cpp
-  song_controller_load.cpp
-  song_controller_octave.cpp
-  song_controller_practice.cpp
-  song_controller_run.cpp
-  song_controller_session.cpp
-  song_controller_sound.cpp
-  song_controller_status.cpp
-  song_controller_transport.cpp
-  song_lengths.cpp
-  song_library.cpp
-  song_library_file.cpp
-  song_library_worker.cpp
-  song_opener.cpp
-  song_practice_sync.cpp
   song_timing_test.cpp
-  song_transport.cpp
   sources_controller.cpp
   spike_bench.cpp
-  sqlite_db.cpp
   synth_test.cpp
   text.cpp
-  timed_sender.cpp
   ui/accompaniment.cpp
   ui/bar_dock.cpp
   ui/bar_groups.cpp
@@ -219,7 +261,6 @@ add_executable(etude
   ui/icon_audit_fit.cpp
   ui/icon_audit_write.cpp
   ui/icon_audit_tap.cpp
-  ui/ink_measure.cpp
   ui/item_probe.cpp
   ui/key_ring_demo.cpp
   ui/kit.cpp
@@ -266,7 +307,6 @@ add_executable(etude
   ui/morph_glyphs.cpp
   ui/music_glyph.cpp
   ui/osk.cpp
-  ui/page_ids.cpp
   ui/pages.cpp
   ui/pages_about.cpp
   ui/pages_about_icons.cpp
@@ -290,8 +330,8 @@ add_executable(etude
   ui/run_card.cpp
   ui/scale_pill.cpp
   ui/section_band.cpp
+  ui/section_band_popovers.cpp
   ui/sections_ui.cpp
-  ui/settings_catalogue.cpp
   ui/sheet.cpp
   ui/summary_board.cpp
   ui/summary_chart.cpp
@@ -301,20 +341,6 @@ add_executable(etude
   ui/top_menu.cpp
   ui/transport.cpp
   ui/transpose.cpp
-  update_files.cpp
-  update_install.cpp
-  update_install_mac.cpp
-  update_service.cpp
-  update_status.cpp
-  upload_api.cpp
-  upload_controller.cpp
-  upload_connections.cpp
-  upload_page.cpp
-  upload_server.cpp
-  upload_service.cpp
-  usb_import.cpp
-  usb_scan.cpp
-  version_grouper.cpp
   virtual_input.cpp
   watchdog.cpp
   wav_feeder.cpp
@@ -328,7 +354,6 @@ add_executable(etude
   window_icon.cpp
   icon_assets.cpp
   icon_service.cpp
-  desktop_entry.cpp
   window_midi_ports.cpp
   window_options.cpp
   window_profiles.cpp
@@ -356,7 +381,7 @@ target_sources(etude PRIVATE
   sheet/sheet_view_names.cpp
   sheet/sheet_view_pictures.cpp
   sheet/sheet_worker.cpp)
-target_link_libraries(etude PRIVATE etude::core etude_synth SDL3::SDL3 SDL3_ttf::SDL3_ttf
+target_link_libraries(etude PRIVATE etude_app_core etude::core etude_synth SDL3::SDL3 SDL3_ttf::SDL3_ttf
   libremidi etude_imgui etude_sqlite etude_verovio etude_lunasvg etude_warnings)
 # "Get songs" downloads over HTTPS with the system's libcurl (curl licence, GPL-compatible) and its
 # certificates: the macOS SDK's, libcurl4-openssl-dev on Linux.
@@ -404,6 +429,6 @@ endif()
 add_library(etude_font OBJECT ${font_source} ${font_regular_source} ${music_font_source}
   ${icons_source}
   ${icon_sources} ${brand_github_source} ${brand_coffee_source}
-  ${upload_page_source} ${melodies_source})
+  ${melodies_source})
 target_compile_features(etude_font PRIVATE cxx_std_20)
 target_sources(etude PRIVATE $<TARGET_OBJECTS:etude_font>)

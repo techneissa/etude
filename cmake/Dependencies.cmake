@@ -54,6 +54,10 @@ if(ETUDE_BUILD_APP)
   set(SDL_STATIC ON CACHE BOOL "" FORCE)
   set(SDL_TEST_LIBRARY OFF CACHE BOOL "" FORCE)
   set(SDL_EXAMPLES OFF CACHE BOOL "" FORCE)
+  # The app uses video, audio, render and GPU only. Gamepad and HIDAPI exist only for the joystick.
+  foreach(sdl_part CAMERA JOYSTICK HAPTIC HIDAPI DIALOG TRAY)
+    set(SDL_${sdl_part} OFF CACHE BOOL "" FORCE)
+  endforeach()
   etude_declare(SDL3
     URL https://codeload.github.com/libsdl-org/SDL/tar.gz/refs/tags/release-3.4.16
         https://github.com/libsdl-org/SDL/archive/refs/tags/release-3.4.16.tar.gz
@@ -224,11 +228,7 @@ if(ETUDE_BUILD_APP)
     target_link_libraries(etude_plutovg PUBLIC m)
   endif()
   foreach(target etude_verovio etude_plutovg etude_lunasvg)
-    if(MSVC)
-      target_compile_options(${target} PRIVATE /w)
-    else()
-      target_compile_options(${target} PRIVATE -w)
-    endif()
+    target_compile_options(${target} PRIVATE -w)
     set_target_properties(${target} PROPERTIES COMPILE_WARNING_AS_ERROR OFF)
   endforeach()
 endif()
@@ -302,13 +302,8 @@ target_include_directories(etude_miniz SYSTEM PUBLIC ${miniz_SOURCE_DIR}
   ${CMAKE_CURRENT_BINARY_DIR}/miniz_generated)
 # core reads zips from memory only: no stdio, so no file system access, and no writing.
 target_compile_definitions(etude_miniz PUBLIC MINIZ_NO_STDIO MINIZ_NO_ARCHIVE_WRITING_APIS)
-if(MSVC)
-  target_compile_options(etude_miniz PRIVATE /w)
-  target_compile_options(etude_pugixml PRIVATE /w)
-else()
-  target_compile_options(etude_miniz PRIVATE -w)
-  target_compile_options(etude_pugixml PRIVATE -w)
-endif()
+target_compile_options(etude_miniz PRIVATE -w)
+target_compile_options(etude_pugixml PRIVATE -w)
 set_target_properties(etude_miniz etude_pugixml PROPERTIES COMPILE_WARNING_AS_ERROR OFF)
 
 # KISS FFT (BSD-3-Clause), the FFT behind core's pitch detector. Only kiss_fft.c and kiss_fftr.c are
@@ -326,11 +321,7 @@ FetchContent_MakeAvailable(kissfft)
 add_library(etude_kissfft STATIC ${kissfft_SOURCE_DIR}/kiss_fft.c ${kissfft_SOURCE_DIR}/kiss_fftr.c)
 target_include_directories(etude_kissfft SYSTEM PUBLIC ${kissfft_SOURCE_DIR})
 target_compile_definitions(etude_kissfft PUBLIC kiss_fft_scalar=float)
-if(MSVC)
-  target_compile_options(etude_kissfft PRIVATE /w)
-else()
-  target_compile_options(etude_kissfft PRIVATE -w)
-endif()
+target_compile_options(etude_kissfft PRIVATE -w)
 set_target_properties(etude_kissfft PROPERTIES COMPILE_WARNING_AS_ERROR OFF)
 
 # Monocypher (BSD-2-Clause or CC0, either is GPL-3.0-compatible), the ed25519 and BLAKE2b behind the
@@ -339,18 +330,14 @@ set_target_properties(etude_kissfft PROPERTIES COMPILE_WARNING_AS_ERROR OFF)
 # rather than fetched, since a GitHub-generated tag archive can change its bytes. They are built as
 # a static library private to core: monocypher.c (BLAKE2b) and the optional monocypher-ed25519.c
 # (standard ed25519 with SHA-512, which is what minisign signs; the core file's own EdDSA uses
-# BLAKE2b and would not verify a minisign signature). The signature tests (tests/minisign_test.cpp)
+# BLAKE2b and would not verify a minisign signature). The signature tests (tests/update_test.cpp)
 # must pass after an upgrade.
 set(monocypher_dir ${PROJECT_SOURCE_DIR}/third_party/monocypher)
 add_library(etude_monocypher STATIC
   ${monocypher_dir}/monocypher.c
   ${monocypher_dir}/monocypher-ed25519.c)
 target_include_directories(etude_monocypher SYSTEM PUBLIC ${monocypher_dir})
-if(MSVC)
-  target_compile_options(etude_monocypher PRIVATE /w)
-else()
-  target_compile_options(etude_monocypher PRIVATE -w)
-endif()
+target_compile_options(etude_monocypher PRIVATE -w)
 set_target_properties(etude_monocypher PROPERTIES COMPILE_WARNING_AS_ERROR OFF)
 
 # SQLite (public domain), the practice history database. The amalgamation is one C file, built here
@@ -377,11 +364,7 @@ if(ETUDE_BUILD_APP OR ETUDE_BUILD_TESTS)
   if(UNIX AND NOT APPLE)
     target_link_libraries(etude_sqlite PUBLIC m)
   endif()
-  if(MSVC)
-    target_compile_options(etude_sqlite PRIVATE /w)
-  else()
-    target_compile_options(etude_sqlite PRIVATE -w)
-  endif()
+  target_compile_options(etude_sqlite PRIVATE -w)
   set_target_properties(etude_sqlite PROPERTIES COMPILE_WARNING_AS_ERROR OFF)
 endif()
 
@@ -422,11 +405,7 @@ if(ETUDE_BUILD_APP OR ETUDE_BUILD_TESTS)
   add_library(etude_qrcodegen STATIC ${qrcodegen_SOURCE_DIR}/cpp/qrcodegen.cpp)
   target_include_directories(etude_qrcodegen SYSTEM PUBLIC ${qrcodegen_SOURCE_DIR}/cpp)
   target_compile_features(etude_qrcodegen PUBLIC cxx_std_20)
-  if(MSVC)
-    target_compile_options(etude_qrcodegen PRIVATE /w)
-  else()
-    target_compile_options(etude_qrcodegen PRIVATE -w)
-  endif()
+  target_compile_options(etude_qrcodegen PRIVATE -w)
   set_target_properties(etude_qrcodegen PROPERTIES COMPILE_WARNING_AS_ERROR OFF)
 endif()
 

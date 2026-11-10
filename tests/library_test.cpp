@@ -1,42 +1,39 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "etude/library.hpp"
-
-#include "progress_fixtures.hpp"
-#include "smf_builder.hpp"
-
+// The song library: entries by content hash, song prefs, groups, the file mover,
+// restoring a saved song by its hash, opening a song off the frame thread, and copying songs from a
+// stick (a temporary folder) into the Inbox.
+#include "../app/library_binding.hpp"
+#include "../app/library_files.hpp"
+#include "../app/song_library.hpp"
+#include "../app/usb_import.hpp"
+#include "../app/usb_scan.hpp"
 #include "etude/content_hash.hpp"
+#include "etude/library.hpp"
+#include "etude/library_groups.hpp"
 #include "etude/midi_file.hpp"
-
-#include <doctest/doctest.h>
-
-#include <cmath>
-
+#include "etude/session_restore.hpp"
+#include "etude/song_key.hpp"
+#include "etude/song_prefs.hpp"
+#include "library_row.hpp"
+#include "song_opener.hpp"
+#include "smf_builder.hpp"
+#include "upload_test_support.hpp"
 #include <algorithm>
-#include <fstream>
-#include <functional>
-#include <iterator>
-#include <string>
-#include <vector>
+#include <chrono>
+#include <doctest/doctest.h>
+#include <future>
+#include <new>
+#include <sys/stat.h>
+#include <thread>
+#include <unistd.h>
 
 using namespace etude;
 using etude::test::Bytes;
 using etude::test::Track;
+using namespace etude::app;
+using namespace upload_test;
 
 namespace {
-
-// Pitches of a one-track file, one note every `gap` ticks, each `gap` long.
-Bytes melody_file(const std::vector<int>& pitches, int gap = 480,
-                  const char* track_name = nullptr) {
-    Track t;
-    if (track_name != nullptr) {
-        t.name(0, track_name);
-    }
-    for (int p : pitches) {
-        t.on(0, 0, p).off(static_cast<std::uint32_t>(gap), 0, p);
-    }
-    t.end();
-    return etude::test::smf({t});
-}
 
 SongEntry entry_of(const Bytes& bytes, std::string_view file_name = "song.mid") {
     LibraryLoad r = load_library_entry(bytes, file_name);
@@ -44,213 +41,99 @@ SongEntry entry_of(const Bytes& bytes, std::string_view file_name = "song.mid") 
     return r.entry;
 }
 
-Bytes read_test_file(const char* name) {
-    std::ifstream in(std::string(ETUDE_TEST_DATA_DIR) + "/" + name, std::ios::binary);
-    REQUIRE(in.good());
-    return Bytes(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+SongPrefEdit edit(std::uint64_t hash, SongPrefEdit::Field field, std::string text = {}, bool on = false) {
+    SongPrefEdit e;
+    e.hash = hash;
+    e.field = field;
+    e.text = std::move(text);
+    e.on = on;
+    return e;
 }
+
+GroupEdit group_edit(GroupEdit::Kind kind, std::uint64_t id, std::uint64_t hash, std::string name = {}, int position = 0) {
+    GroupEdit e;
+    e.kind = kind;
+    e.group.id = id;
+    e.group.name = std::move(name);
+    e.group.position = position;
+    e.hash = hash;
+    return e;
+}
+
+// A read song with the facts the sort reads.
+LibraryItem song(std::uint64_t hash, std::string title, int half_stars, bool left, int keys) {
+    LibraryItem item;
+    item.relative = title + ".mid";
+    item.stamp = hash * 7 + 1;
+    item.state = EntryState::Loaded;
+    item.entry.hash = hash;
+    item.entry.title = std::move(title);
+    item.entry.half_stars = half_stars;
+    item.entry.difficulty = level_of_half_stars(half_stars);
+    item.entry.right_notes = 20;
+    item.entry.left_notes = left ? 10 : 0;
+    item.entry.right_keys = keys;
+    item.entry.left_keys = left ? keys : 0;
+    item.entry.bar_count = 24;
+    item.entry.note_count = 40;
+    return item;
+}
+
+struct Fixture {
+    LibraryState library;
+    std::vector<RunRecord> runs;
+    LibraryCatalogue::Prefs prefs;
+    LibraryCatalogue cat;
+
+    LibraryRow row(const MelodyAdded& added = {}) {
+        cat.library_changed();
+        cat.prefs_changed();
+        cat.history_changed();
+        REQUIRE(cat.sync(library, runs, prefs));
+        cat.refresh_versions(); // the groups of versions laid over the songs, as the Melodies page asks
+        LibraryRow out;
+        build_library_row(cat, added, out);
+        return out;
+    }
+};
+
+// The answer of the opener, polled the way the frame loop does (no clock, no sleep).
+SongOpener::Opened take_answer(SongOpener& opener) {
+    for (;;) {
+        if (auto opened = opener.take()) {
+            return std::move(*opened);
+        }
+        std::this_thread::yield();
+    }
+}
+
+SongFileLoad fake_song(const fs::path& path) {
+    SongFileLoad out;
+    out.ok = true;
+    out.song.title = path.filename().string();
+    return out;
+}
+
+
+struct StickRig {
+    TempDir stick;
+    TempDir songs;
+    ImportJob job() const {
+        ImportJob j;
+        j.stick = stick.path;
+        j.songs_folder = songs.path;
+        for (const StickSong& s : scan_stick(stick.path).songs) {
+            j.songs.push_back(s.path);
+        }
+        return j;
+    }
+};
+
+std::string tune_bytes(const std::string& tag) { return midi_bytes(tag); }
 
 } // namespace
 
-// ---- Text
-
-TEST_CASE("midi text: valid UTF-8 is kept") {
-    CHECK(utf8_from_midi_text("Für Elise") == "Für Elise");
-    CHECK(utf8_from_midi_text("") == "");
-    CHECK(utf8_from_midi_text("\xE3\x82\xA2") == "\xE3\x82\xA2"); // ア
-}
-
-TEST_CASE("midi text: Latin-1 and Windows-1252 bytes become UTF-8") {
-    CHECK(utf8_from_midi_text("F\xFCr Elise") == "Für Elise");
-    CHECK(utf8_from_midi_text("Caf\xE9") == "Café");
-    CHECK(utf8_from_midi_text("It\x92s") == "It\xE2\x80\x99s"); // 0x92 is a right quote in 1252
-    CHECK(utf8_from_midi_text("a\x81z") == "a\xEF\xBF\xBDz");   // 0x81 is undefined: U+FFFD
-}
-
-TEST_CASE("midi text: Shift-JIS kana and half-width katakana are decoded, kanji are not") {
-    // "さくら" in Shift-JIS: 82 B3 82 AD 82 E7
-    CHECK(utf8_from_midi_text("\x82\xB3\x82\xAD\x82\xE7") == "さくら");
-    // "ピアノ" in Shift-JIS katakana: 83 73 83 41 83 6D
-    CHECK(utf8_from_midi_text("\x83\x73\x83\x41\x83\x6D") == "ピアノ");
-    // Half-width katakana "ﾋﾟｱﾉ": CB DF B1 C9
-    CHECK(utf8_from_midi_text("\xCB\xDF\xB1\xC9") == "ﾋﾟｱﾉ");
-    // Kana mixed with ASCII and a kanji (92 86 = 中, not in the built-in table): U+FFFD for the
-    // kanji
-    CHECK(utf8_from_midi_text("Song \x82\xB3\x92\x86") == "Song さ\xEF\xBF\xBD");
-}
-
-TEST_CASE("midi text: the result is always valid UTF-8, whatever the bytes") {
-    std::string all;
-    for (int i = 0; i < 256; ++i) {
-        all.push_back(static_cast<char>(i));
-    }
-    for (int start = 0; start < 256; start += 7) {
-        std::string slice = all.substr(static_cast<std::size_t>(start), 40);
-        CAPTURE(start);
-        CHECK(is_valid_utf8(utf8_from_midi_text(slice)));
-    }
-    CHECK(is_valid_utf8(utf8_from_midi_text(all)));
-    CHECK(is_valid_utf8(utf8_from_midi_text("\xE3\x82"))); // cut-off UTF-8
-}
-
-TEST_CASE("is_valid_utf8 refuses overlong forms, surrogates and cut-off sequences") {
-    CHECK(is_valid_utf8("plain"));
-    CHECK(is_valid_utf8("\xC3\xBC"));
-    CHECK_FALSE(is_valid_utf8("\xC0\xAF"));         // overlong '/'
-    CHECK_FALSE(is_valid_utf8("\xED\xA0\x80"));     // surrogate
-    CHECK_FALSE(is_valid_utf8("\xF4\x90\x80\x80")); // above U+10FFFF
-    CHECK_FALSE(is_valid_utf8("\xE3\x82"));         // truncated
-    CHECK_FALSE(is_valid_utf8("\xFC"));
-}
-
-TEST_CASE("title from a file name: no folder, no extension, underscores become spaces") {
-    CHECK(title_from_file_name("Fur_Elise.mid") == "Fur Elise");
-    CHECK(title_from_file_name("/usb/Songs/Moonlight__Sonata.MIDI") == "Moonlight Sonata");
-    CHECK(title_from_file_name("C:\\Music\\Gymnopedie 1.mid") == "Gymnopedie 1");
-    CHECK(title_from_file_name("  spaced   out .kar") == "Spaced Out");
-    CHECK(title_from_file_name("Op. 27 No.2") == "Op. 27 No.2"); // not an extension we know
-    CHECK(title_from_file_name("song.musicxml") == "Song");
-    CHECK(title_from_file_name("song.mxl") == "Song");
-    CHECK(title_from_file_name("no_extension") == "No Extension");
-    CHECK(title_from_file_name(".mid") == "");
-    CHECK(title_from_file_name("") == "");
-}
-
-TEST_CASE("title from a file name: control characters go and the length is capped") {
-    CHECK(title_from_file_name("a\tb\nc.mid") == "A B C");
-    std::string long_name(1000, 'x');
-    std::string t = title_from_file_name(long_name + ".mid");
-    CHECK(t.size() == kMaxRunTitleBytes);
-    // Cut at a character boundary, never inside one.
-    std::string wide;
-    for (int i = 0; i < 300; ++i) {
-        wide += "é";
-    }
-    std::string cut = title_from_file_name(wide);
-    CHECK(is_valid_utf8(cut));
-    CHECK(cut.size() <= kMaxRunTitleBytes);
-    CHECK(cut.size() >= kMaxRunTitleBytes - 1);
-}
-
-TEST_CASE("title from a file name: dashes, track numbers, copy marks and capitals") {
-    // Dashes: all of them in a name with no space, only those beside a space otherwise.
-    CHECK(title_from_file_name("fur-elise.mid") == "Fur Elise");
-    CHECK(title_from_file_name("Jean-Philippe Rameau - Tambourin.mid") ==
-          "Jean-Philippe Rameau Tambourin");
-    // A leading track number goes when a separator follows it or it starts with a zero.
-    CHECK(title_from_file_name("01 - Für Elise.mid") == "Für Elise");
-    CHECK(title_from_file_name("1. Prelude.mid") == "Prelude");
-    CHECK(title_from_file_name("03_moonlight_sonata.mid") == "Moonlight Sonata");
-    CHECK(title_from_file_name("2) Waltz.mid") == "Waltz");
-    CHECK(title_from_file_name("07-gnossienne.mid") == "Gnossienne");
-    CHECK(title_from_file_name("01 Prelude.mid") == "Prelude");
-    CHECK(title_from_file_name("12 Variations.mid") == "12 Variations"); // part of the title
-    CHECK(title_from_file_name("1984.mid") == "1984");                   // nothing left after it
-    CHECK(title_from_file_name("2001 A Space Odyssey.mid") == "2001 A Space Odyssey");
-    // The copy marks a system adds.
-    CHECK(title_from_file_name("Clair de Lune (1).mid") == "Clair de Lune");
-    CHECK(title_from_file_name("Clair de Lune(2).mid") == "Clair de Lune");
-    CHECK(title_from_file_name("Clair de Lune copy.mid") == "Clair de Lune");
-    CHECK(title_from_file_name("Clair de Lune copy 2.mid") == "Clair de Lune");
-    CHECK(title_from_file_name("Clair de Lune - Copy.mid") == "Clair de Lune");
-    CHECK(title_from_file_name("Symphony 5.mid") == "Symphony 5");
-    CHECK(title_from_file_name("(1).mid") == "(1)");
-    // Capitals: an all-small or all-capital name is tidied; a mixed one is left alone.
-    CHECK(title_from_file_name("moonlight sonata ii.mid") == "Moonlight Sonata II");
-    CHECK(title_from_file_name("PRELUDE IN C.mid") == "Prelude in C");
-    CHECK(title_from_file_name("the_entertainer.mid") == "The Entertainer");
-    CHECK(title_from_file_name("clair_de_lune.mid") == "Clair de Lune");
-    CHECK(title_from_file_name("BWV 846 Prelude.mid") == "BWV 846 Prelude");
-    CHECK(title_from_file_name("für elise.mid") == "Für Elise");
-}
-
-TEST_CASE("title: the file's own title wins, the file name fills in for a placeholder") {
-    CHECK(choose_title("Fur_Elise.mid", "control track") == "Fur Elise");
-    CHECK(choose_title("song1.mid", "Moonlight Sonata") == "Moonlight Sonata");
-    CHECK(choose_title("prelude.mid", "Piano") == "Prelude");
-    CHECK(choose_title("prelude.mid", "Acoustic Grand Piano") == "Prelude");
-    CHECK(choose_title("prelude.mid", "Right Hand") == "Prelude");
-    CHECK(choose_title("prelude.mid", "Copyright 1998 J. Smith") == "Prelude");
-    CHECK(choose_title("prelude.mid", "Created by Sibelius") == "Prelude");
-    CHECK(choose_title("prelude.mid", "www.example.com") == "Prelude");
-    CHECK(choose_title("prelude.mid", "PRELUDE.MID") == "Prelude");
-    CHECK(choose_title("prelude.mid", "Staff 2") == "Prelude");
-    CHECK(choose_title("prelude.mid", "Piano Sonata No. 14") == "Piano Sonata No. 14");
-    CHECK(choose_title("untitled.mid", "Moonlight Sonata") == "Moonlight Sonata");
-    CHECK(choose_title("0001.mid", "Moonlight Sonata") == "Moonlight Sonata");
-    CHECK(choose_title("midi.mid", "Prelude in C") == "Prelude in C");
-    CHECK(choose_title("", "Prelude in C") == "Prelude in C");
-}
-
-TEST_CASE("title: when nothing is usable it is 'Untitled', and mojibake never wins") {
-    CHECK(choose_title("", "") == "Untitled");
-    CHECK(choose_title("untitled.mid", "control track") == "Untitled");
-    CHECK(choose_title("untitled.mid", "") == "Untitled");
-    // A name of only replacement characters is not a title.
-    CHECK(choose_title("\xEF\xBF\xBD\xEF\xBF\xBD.mid", "Real Name") == "Real Name");
-    // Shift-JIS file name (bytes), decoded to kana.
-    CHECK(choose_title("\x82\xB3\x82\xAD\x82\xE7.mid", "") == "さくら");
-}
-
-TEST_CASE("sequence name: the first track's name event") {
-    Bytes file =
-        etude::test::smf({Track().name(0, "Prelude in C").end(),
-                            Track().name(0, "Right Hand").on(0, 0, 60).off(480, 0, 60).end()});
-    CHECK(midi_sequence_name(file) == "Prelude in C");
-    // Format 0: the one track's name.
-    Bytes single = melody_file({60, 62}, 480, "Waltz");
-    CHECK(midi_sequence_name(single) == "Waltz");
-    Bytes none = melody_file({60, 62});
-    CHECK(midi_sequence_name(none).empty());
-}
-
-TEST_CASE("sequence name: never reads outside a truncated or hostile file") {
-    Bytes file = etude::test::smf({Track().name(0, "Long Name Here").end()});
-    for (std::size_t cut = 0; cut <= file.size(); ++cut) {
-        Bytes part(file.begin(), file.begin() + static_cast<std::ptrdiff_t>(cut));
-        std::string name = midi_sequence_name(part);
-        CHECK(name.size() <= std::string("Long Name Here").size());
-    }
-    Bytes junk(300, 0xFF);
-    CHECK(midi_sequence_name(junk).empty());
-    CHECK(midi_sequence_name(Bytes{}).empty());
-    // A name event whose length runs past the end of the data.
-    Bytes bad = etude::test::header(0, 1, 480);
-    Bytes body = {0x00, 0xFF, 0x03, 0x7F, 'a', 'b'};
-    etude::test::put_chunk(bad, "MTrk", body);
-    CHECK(midi_sequence_name(bad).empty());
-}
-
-TEST_CASE("search: case and accents are ignored") {
-    CHECK(fold_for_search("Für Elise") == "fur elise");
-    CHECK(fold_for_search("ÉTUDE Op.10") == "etude op.10");
-    CHECK(fold_for_search("Dvořák — Largo") == "dvorak — largo");
-    CHECK(fold_for_search("Łódź") == "lodz");
-    CHECK(fold_for_search("Straße") == "strasse");
-    CHECK(fold_for_search("Ærø Œuvre") == "aero oeuvre");
-    CHECK(fold_for_search("Cre\xCC\x80me") == "creme"); // e + combining grave
-    CHECK(fold_for_search("ＡＢＣ１２３") == "abc123"); // full-width
-    CHECK(fold_for_search("Привет") == "привет");
-    CHECK(fold_for_search("ΑΒΓ") == "αβγ");
-    CHECK(fold_for_search("") == "");
-}
-
-TEST_CASE("search: every word of the query must appear in the title") {
-    std::string key = fold_for_search("Für Elise (Beethoven)");
-    CHECK(matches_search(key, ""));
-    CHECK(matches_search(key, "   "));
-    CHECK(matches_search(key, "elise"));
-    CHECK(matches_search(key, "FUR"));
-    CHECK(matches_search(key, "für elise"));
-    CHECK(matches_search(key, "beet fur"));
-    CHECK(matches_search(key, "Elíse"));
-    CHECK_FALSE(matches_search(key, "elise mozart"));
-    CHECK_FALSE(matches_search(key, "xyz"));
-}
-
-// ---- Entries
-
-TEST_CASE("entry: hash, duration, notes per hand and pitch range") {
+TEST_CASE("entry: hash, duration, notes per hand and pitch range; a file with no notes or not MIDI is refused") {
     Track right;
     right.name(0, "Right Hand").on(0, 0, 72).off(480, 0, 72).on(0, 0, 76).off(480, 0, 76).end();
     Track left;
@@ -269,382 +152,469 @@ TEST_CASE("entry: hash, duration, notes per hand and pitch range") {
     CHECK(e.lowest_pitch == 40);
     CHECK(e.highest_pitch == 76);
     CHECK(e.bar_count >= 1);
+
+    LibraryLoad empty = load_library_entry(etude::test::smf({Track().bpm(0, 120).end()}), "empty.mid");
+    CHECK_FALSE(empty.ok);
+    CHECK(empty.error == MidiFileError::NoNotes);
+    CHECK(empty.message.find("no notes") != std::string::npos);
+    LibraryLoad junk = load_library_entry(Bytes{1, 2, 3, 4}, "junk.mid"); // reported, never thrown
+    CHECK_FALSE(junk.ok);
+    CHECK(junk.error == MidiFileError::NotMidi);
 }
 
-TEST_CASE("entry: hands are counted after the split, drums are not counted") {
-    Track t;
-    t.on(0, 0, 60).off(240, 0, 60).on(0, 9, 36).off(240, 9, 36).on(0, 0, 62).off(240, 0, 62).end();
-    SongEntry e = entry_of(etude::test::smf({t}));
-    CHECK(e.note_count == 2);
-    // One unnamed line, both notes above G3: the split gives it to the right hand.
-    CHECK(e.unknown_notes == 0);
-    CHECK(e.right_notes == 2);
-    CHECK(e.left_notes == 0);
-    CHECK(e.hands_known());
-    CHECK(e.lowest_pitch == 60);
-    CHECK(e.highest_pitch == 62);
+TEST_CASE("content_hash: the FNV-1a 64 test vectors; one flipped bit, an appended byte or a swap changes it") {
+    CHECK(content_hash("") == 0xcbf29ce484222325ULL);
+    CHECK(content_hash("a") == 0xaf63dc4c8601ec8cULL);
+    CHECK(content_hash("foobar") == 0x85944171f73967e8ULL);
+    std::string song("MThd\x00\x00\x00\x06 song bytes", 20);
+    REQUIRE(song.size() == 20);
+    const std::uint64_t base = content_hash(song);
+    std::string flipped = song;
+    flipped[7] = static_cast<char>(flipped[7] ^ 0x01);
+    CHECK(content_hash(flipped) != base);
+    CHECK(content_hash(song + '\0') != base);
+    CHECK(content_hash("ab") != content_hash("ba"));
 }
 
-TEST_CASE("entry: a MIDI file with no notes is refused with a message") {
-    Track t;
-    t.bpm(0, 120).end();
-    LibraryLoad r = load_library_entry(etude::test::smf({t}), "empty.mid");
-    CHECK_FALSE(r.ok);
-    CHECK(r.error == MidiFileError::NoNotes);
-    CHECK(r.message.find("no notes") != std::string::npos);
+TEST_CASE("song prefs: edits held before the store was read keep what it holds") {
+    // A favourite tapped while the history loads must not wipe the stored name and composer.
+    const std::unordered_map<std::uint64_t, SongPrefs> stored{{7, SongPrefs{"Gymnopédie 1", "Erik Satie", "Classical", false, 500}},
+                                                              {8, SongPrefs{"", "", "", true, 600}}};
+    const std::vector<SongPrefEdit> held{edit(7, SongPrefEdit::Field::Favourite, {}, true), edit(9, SongPrefEdit::Field::Title, "New one"),
+                                         edit(7, SongPrefEdit::Field::Title, "Gymnopédie No. 1"),
+                                         edit(8, SongPrefEdit::Field::Favourite, {}, false), edit(0, SongPrefEdit::Field::Title, "no hash")};
+    const auto rows = apply_edits(stored, held);
+    REQUIRE(rows.size() == 3);
+    CHECK(rows[0].first == 7);
+    CHECK(rows[0].second == SongPrefs{"Gymnopédie No. 1", "Erik Satie", "Classical", true, 500});
+    CHECK(rows[1].first == 9);
+    CHECK(rows[1].second == SongPrefs{"New one", "", "", false, 0});
+    CHECK(rows[2].first == 8);
+    CHECK(rows[2].second == SongPrefs{"", "", "", false, 600});
 }
 
-TEST_CASE("entry: a file that is not MIDI is reported, never thrown") {
-    Bytes junk = {1, 2, 3, 4};
-    LibraryLoad r = load_library_entry(junk, "junk.mid");
-    CHECK_FALSE(r.ok);
-    CHECK(r.error == MidiFileError::NotMidi);
-}
-
-TEST_CASE("entry: the title uses the sequence name, then the file name") {
-    Bytes named = etude::test::smf(
-        {Track().name(0, "Prelude in C").end(), Track().on(0, 0, 60).off(480, 0, 60).end()});
-    CHECK(entry_of(named, "bwv846.mid").title == "Prelude in C");
-    Bytes piano = etude::test::smf(
-        {Track().name(0, "Piano").end(), Track().on(0, 0, 60).off(480, 0, 60).end()});
-    CHECK(entry_of(piano, "bwv846.mid").title == "Bwv846");
-    CHECK(entry_of(named, "untitled.mid").title == "Prelude in C");
-    CHECK(entry_of(named, "").title == "Prelude in C");
-}
-
-// ---- Keyboard fit
-
-TEST_CASE("fit: a song inside the keyboard fits with no shift") {
-    SongEntry e = entry_of(melody_file({48, 60, 72, 84}));
-    KeyboardFit f = fit_to_keyboard(e, kRange61); // 36..96
-    CHECK(f.fit == KeyFit::Fits);
-    CHECK(f.semitones == 0);
-    CHECK(f.fits());
-}
-
-TEST_CASE("fit: a song a little too low or too high needs the smallest shift that fits") {
-    {
-        SongEntry e = entry_of(melody_file({33, 60})); // 33 is 3 under 36
-        KeyboardFit f = fit_to_keyboard(e, kRange61);
-        CHECK(f.fit == KeyFit::FitsWithShift);
-        CHECK(f.semitones == 3);
-        CHECK(f.fits());
+TEST_CASE("groups: edits made before the store was read go over what it held") {
+    // One stored group with two songs. Meanwhile the player made a group, added a song to the stored one and took another out.
+    const std::vector<SongGroup> stored{{5, "Exam pieces", GroupKind::User, "", 0, 100}, {6, "Mutopia", GroupKind::Catalogue, "mutopia", 1, 90}};
+    const std::vector<LibraryGroups::Member> members{{5, 0x1, 10}, {5, 0x2, 20}, {6, 0x3, 5}, {9, 0x4, 1}}; // 9: no such group
+    std::vector<GroupEdit> edits{group_edit(GroupEdit::Kind::Create, 7, 0, "Sight reading", 2), group_edit(GroupEdit::Kind::Add, 5, 0x3),
+                                 group_edit(GroupEdit::Kind::Drop, 5, 0x1), group_edit(GroupEdit::Kind::Add, 7, 0x2)};
+    LibraryGroups g;
+    const std::uint64_t before = g.version();
+    g.replay(stored, members, edits);
+    CHECK(g.version() != before);
+    std::vector<std::string> names;
+    for (const SongGroup& s : g.groups()) {
+        names.push_back(s.name);
     }
-    {
-        SongEntry e = entry_of(melody_file({60, 100})); // 100 is 4 over 96
-        KeyboardFit f = fit_to_keyboard(e, kRange61);
-        CHECK(f.fit == KeyFit::FitsWithShift);
-        CHECK(f.semitones == -4);
+    CHECK(names == std::vector<std::string>{"Exam pieces", "Mutopia", "Sight reading"});
+    CHECK(g.find(6)->kind == GroupKind::Catalogue);
+    CHECK(g.find(6)->source == "mutopia");
+    const std::span<const std::uint64_t> exam = g.songs_of(5);
+    CHECK(std::vector<std::uint64_t>(exam.begin(), exam.end()) == std::vector<std::uint64_t>{0x2, 0x3});
+    CHECK(g.songs_of(9).empty());
+}
+
+TEST_CASE("library row: an added song whose file was edited is found by its path and follows its new hash") {
+    Fixture f;
+    f.library.items = {song(1, "A", 3, false, 8), song(44, "D", 3, false, 8)}; // D was hash 4
+    MelodyAdded added;
+    added.set(4, 2, "D.mid");
+    const LibraryRow row = f.row(added);
+    REQUIRE(row.followed.size() == 1);
+    CHECK(row.followed[0].old_hash == 4);
+    CHECK(row.followed[0].new_hash == 44);
+    CHECK(row.followed[0].path == "D.mid");
+    CHECK(row.hidden.empty());
+    REQUIRE(row.songs.size() == 2); // it keeps the step the player chose
+    CHECK(row.songs[1].hash == 44);
+    CHECK(row.songs[1].added);
+    CHECK(row.songs[1].step == 2);
+    MelodyAdded followed = added; // the list follows (what the screen does with `followed`)
+    CHECK(followed.rebind(4, 44, "D.mid"));
+    const LibraryRow again = f.row(followed);
+    CHECK(again.followed.empty());
+    REQUIRE(again.songs.size() == 2);
+    CHECK(again.songs[1].hash == 44);
+    CHECK(again.songs[1].step == 2);
+}
+
+TEST_CASE("library row: an added song with neither its hash nor its path in the library is hidden, and counts for nothing") {
+    Fixture f;
+    f.library.items = {song(1, "A", 3, false, 8)};
+    MelodyAdded added;
+    added.set(4, 2, "D.mid");
+    added.set(6, 3); // no path to find it by
+    const LibraryRow row = f.row(added);
+    CHECK(row.hidden == std::vector<std::uint64_t>{4, 6});
+    CHECK(row.songs.size() == 1); // only A
+    CHECK(hidden_added(f.cat, added) == std::vector<std::uint64_t>{4, 6});
+    f.library.items.push_back(song(4, "D", 3, false, 8)); // the file comes back under its old hash: it shows again, where it was
+    const LibraryRow back = f.row(added);
+    CHECK(back.hidden == std::vector<std::uint64_t>{6});
+    REQUIRE(back.songs.size() == 2);
+    CHECK(back.songs[1].hash == 4);
+    CHECK(back.songs[1].step == 2);
+    CHECK(back.songs[1].added);
+}
+
+TEST_CASE("move_into keeps the name, numbers it when the folder has one, and never writes over a file") {
+    TempDir t;
+    const fs::path dir = t.path;
+    write_file(dir / "a" / "song.mid", "one");
+    write_file(dir / "b" / "song.mid", "two");
+    std::string error;
+    const MoveDone moved = move_into(dir / "a" / "song.mid", dir / "b", &error);
+    CHECK(error.empty());
+    CHECK(moved.outcome == MoveOutcome::Moved);
+    CHECK(moved.now == dir / "b" / "song (2).mid");
+    CHECK_FALSE(fs::exists(dir / "a" / "song.mid"));
+    CHECK(read_file(dir / "b" / "song.mid") == "two"); // the file that was there is untouched
+    CHECK(read_file(dir / "b" / "song (2).mid") == "one");
+    CHECK(move_into(dir / "b" / "song.mid", dir / "c" / "d", &error).now == dir / "c" / "d" / "song.mid"); // a folder not there is made
+    const MoveDone gone = move_into(dir / "nothing.mid", dir / "b", &error); // a failure with a reason, nothing changes
+    CHECK(gone.outcome == MoveOutcome::Failed);
+    CHECK(gone.now.empty());
+    CHECK_FALSE(error.empty());
+    const MoveDone there = move_into(dir / "b" / "song (2).mid", dir / "b", &error); // already in the folder: not a move
+    CHECK(there.outcome == MoveOutcome::AlreadyThere);
+    CHECK(there.now == dir / "b" / "song (2).mid");
+
+    write_file(dir / "a" / "x.mid", "new");
+    for (const char* name : {"x.mid", "x (2).mid", "x (3).mid"}) {
+        write_file(dir / "b" / name, name);
     }
-    {
-        // 61-key keyboard, song 30..96: shift +6 fits exactly (36..102 no; 30..96 needs +6
-        // -> 36..102)
-        SongEntry e = entry_of(melody_file({30, 90})); // 60 wide, keyboard is 60 wide: 36..96
-        KeyboardFit f = fit_to_keyboard(e, kRange61);
-        CHECK(f.fit == KeyFit::FitsWithShift);
-        CHECK(f.semitones == 6);
+    const MoveDone done = move_into(dir / "a" / "x.mid", dir / "b", &error);
+    REQUIRE(done.outcome == MoveOutcome::Moved);
+    CHECK(done.now == dir / "b" / "x (4).mid");
+    for (const char* name : {"x.mid", "x (2).mid", "x (3).mid"}) {
+        CHECK(read_file(dir / "b" / name) == name);
     }
+    CHECK(read_file(dir / "b" / "x (4).mid") == "new");
 }
 
-TEST_CASE("fit: a song wider than the keyboard, or needing more than an octave, is too wide") {
-    SongEntry wide = entry_of(melody_file({21, 108}));
-    CHECK(fit_to_keyboard(wide, kRange61).fit == KeyFit::TooWide);
-    CHECK_FALSE(fit_to_keyboard(wide, kRange61).fits());
-    CHECK(fit_to_keyboard(wide, kRange88).fit == KeyFit::Fits);
-    // Fits the keyboard's width but sits 14 semitones away: more than the +/-12 shift allows.
-    SongEntry far = entry_of(melody_file({22, 30})); // 22..30
-    KeyboardFit f = fit_to_keyboard(far, KeyRange{44, 96});
-    CHECK(f.fit == KeyFit::TooWide);
-    CHECK(f.semitones == 0);
+TEST_CASE("the file mover runs its jobs off the caller's thread and reports each once") {
+    TempDir t;
+    const fs::path dir = t.path;
+    write_file(dir / "Songs" / "x.mid");
+    write_file(dir / "Songs" / "y.mid");
+    LibraryFiles files;
+    CHECK_FALSE(files.busy());
+    FileJob job;
+    job.kind = FileJob::Kind::Remove;
+    job.files = {{dir / "Songs" / "x.mid", dir / "Removed songs"}, {dir / "Songs" / "gone.mid", dir / "Removed songs"}};
+    files.request(job);
+    CHECK(files.busy());
+    files.wait_idle();
+    const std::optional<FileResult> r = files.take();
+    REQUIRE(r.has_value());
+    CHECK(r->kind == FileJob::Kind::Remove);
+    CHECK(r->moved == 1);
+    CHECK(r->failed == 1);
+    CHECK(r->skipped == 0);
+    CHECK_FALSE(r->error.empty());
+    CHECK(fs::exists(dir / "Removed songs" / "x.mid"));
+    CHECK_FALSE(files.take().has_value());
+    CHECK_FALSE(files.busy());
+    FileJob again; // a song already in the folder it is moved to is passed over, not counted as moved
+    again.files = {{dir / "Songs" / "y.mid", dir / "Songs"}};
+    files.request(again);
+    files.wait_idle();
+    const std::optional<FileResult> same = files.take();
+    REQUIRE(same.has_value());
+    CHECK(same->moved == 0);
+    CHECK(same->skipped == 1);
 }
 
-TEST_CASE("fit: the shift limit is exactly an octave") {
-    SongEntry low = entry_of(melody_file({36, 40}));
-    KeyboardFit f = fit_to_keyboard(low, KeyRange{48, 72});
-    CHECK(f.fit == KeyFit::FitsWithShift);
-    CHECK(f.semitones == 12);
-    SongEntry too_low = entry_of(melody_file({35, 40}));
-    CHECK(fit_to_keyboard(too_low, KeyRange{48, 72}).fit == KeyFit::TooWide);
+TEST_CASE("song key: a rename or a move is the same song, edited bytes are another") {
+    const std::string key = song_key(0x1234abcdULL, "Songs/for-elise.mid");
+    CHECK(key == "h:000000001234abcd");
+    CHECK(song_key(0x1234abcdULL, "Songs/elsewhere/elise.mid") == key);
+    CHECK(song_key(0x1234abceULL, "Songs/for-elise.mid") != key);
+    CHECK(song_key(~0ULL, "x") == "h:ffffffffffffffff"); // all 64 bits count
 }
 
-// ---- Difficulty
-
-TEST_CASE(
-    "difficulty: an entry carries the song's rating in half stars and the level they round to") {
-    // 8 quarter notes at 120 BPM, one voice: the easiest kind of song.
-    std::vector<int> pitches = {60, 62, 64, 65, 67, 69, 71, 72};
-    SongEntry slow = entry_of(melody_file(pitches, 480));
-    CHECK(slow.half_stars >= kMinHalfStars);
-    CHECK(slow.half_stars <= kMaxHalfStars);
-    CHECK(slow.difficulty == level_of_half_stars(slow.half_stars));
-    CHECK(slow.difficulty <= 2);
-    // The same notes four times as fast are no easier.
-    SongEntry fast = entry_of(melody_file(pitches, 120));
-    CHECK(fast.half_stars >= slow.half_stars);
-}
-
-TEST_CASE("difficulty: the real files, for the record") {
-    SongEntry bach = entry_of(read_test_file("bach-bwv846-prelude.mid"), "bach-bwv846-prelude.mid");
-    SongEntry satie = entry_of(read_test_file("satie-gymnopedie-1.mid"), "satie-gymnopedie-1.mid");
-    MESSAGE("bach: " << bach.half_stars / 2.0 << " stars, satie: " << satie.half_stars / 2.0);
-    CHECK(bach.difficulty >= 1);
-    CHECK(bach.difficulty <= 5);
-    CHECK(satie.difficulty >= 1);
-    CHECK(satie.difficulty <= 5);
-    // The prelude's constant sixteenth notes are harder than the Gymnopedie's slow waltz.
-    CHECK(bach.half_stars > satie.half_stars);
-    CHECK(bach.title == "Bach Bwv846 Prelude");
-    CHECK(bach.hands_known());
-    CHECK(bach.lowest_pitch == 36);
-    CHECK(bach.highest_pitch == 81);
-    CHECK(fit_to_keyboard(bach, kRange61).fit == KeyFit::Fits);
-    KeyboardFit satie_on_49 = fit_to_keyboard(satie, kRange49); // 33..81 on 36..84
-    CHECK(satie_on_49.fit == KeyFit::FitsWithShift);
-    CHECK(satie_on_49.semitones == 3);
-}
-
-// ---- History
-
-TEST_CASE("history: an entry with no runs has no best and was never played") {
-    SongEntry e = entry_of(melody_file({60, 62}));
-    attach_history(e, {});
-    CHECK_FALSE(e.has_best);
-    CHECK(e.run_count == 0);
-    CHECK(e.last_run_index == -1);
-}
-
-TEST_CASE("history: the best score is the highest accuracy, ties go to the higher speed") {
-    SongEntry e = entry_of(melody_file({60, 62}));
-    using etude::testing::make;
-    using etude::testing::RunSpec;
-    auto run = [&](std::uint64_t song, int graded, int missed, int speed, std::int32_t day) {
-        RunSpec s;
-        s.song = song;
-        s.graded = graded;
-        s.missed = missed;
-        s.speed = speed;
-        s.day = day;
-        return make(s);
+TEST_CASE("restore: the saved song is the copy whose content hash matches, else it is reported changed") {
+    TempDir t;
+    const fs::path dir = t.path;
+    fs::create_directories(dir / "library");
+    fs::create_directories(dir / "elsewhere");
+    const std::string bach = std::string(ETUDE_TEST_DATA_DIR) + "/bach-bwv846-prelude.mid";
+    const std::string satie = std::string(ETUDE_TEST_DATA_DIR) + "/satie-gymnopedie-1.mid";
+    const fs::path library = dir / "library" / "tune.mid";
+    const fs::path absolute = dir / "elsewhere" / "tune.mid";
+    const auto put = [](const std::string& from, const fs::path& to) { fs::copy_file(from, to, fs::copy_options::overwrite_existing); };
+    SessionState saved;
+    saved.song_path = "tune.mid";
+    saved.song_abs_path = absolute.generic_string();
+    saved.song_hash = load_song_file(bach).song.hash;
+    SavedSongRestore::Request request;
+    request.saved = saved;
+    request.library = SongPath{library, {}};
+    request.absolute = split_song_path(saved.song_abs_path);
+    request.options = [](const SongPath&) { return SongLoadOptions{}; };
+    const auto restore = [&] {
+        SongOpener opener;
+        SavedSongRestore r;
+        r.begin(opener, request);
+        for (int frame = 0; frame < 5000; ++frame) {
+            if (auto result = r.poll(opener)) {
+                return *result;
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+        FAIL("the restore never answered");
+        return SavedSongRestore::Result{};
     };
-    std::vector<RunRecord> runs = {
-        run(e.hash, 40, 10, 100, 10), // 75%
-        run(999, 40, 0, 100, 11),     // another song, ignored
-        run(e.hash, 40, 4, 100, 12),  // 90%
-        run(e.hash, 40, 4, 120, 13),  // 90% at a higher speed: the best
-        run(e.hash, 40, 8, 100, 14),  // 80%
-        run(999, 40, 0, 100, 15),
+    put(satie, library); // the library's file changed since it was saved
+    put(bach, absolute);
+    SavedSongRestore::Result result = restore();
+    CHECK(result.source == SongSource::Absolute);
+    CHECK(result.probe.hash_matches);
+    put(satie, absolute); // neither copy has the saved bytes
+    result = restore();
+    CHECK(result.source == SongSource::Library);
+    CHECK_FALSE(result.probe.hash_matches);
+    CHECK(plan_restore(saved, result.probe.found, result.probe.hash_matches, &result.load.song.song).outcome == RestoreOutcome::SongChanged);
+}
+
+TEST_CASE("library: the open song and a developer's song never move, '..' stays inside Songs, a delete keeps its folders") {
+    TempDir t;
+    const fs::path dir = t.path;
+    const fs::path songs = dir / "Songs";
+    const fs::path dev = dir / "dev";
+    const fs::path data(ETUDE_TEST_DATA_DIR);
+    fs::create_directories(songs);
+    fs::create_directories(dev);
+    fs::copy_file(data / "edge-pickup.mid", songs / "pickup.mid");
+    fs::copy_file(data / "satie-gymnopedie-1.mid", songs / "satie.mid");
+    fs::copy_file(data / "edge-fast-32nds.mid", dev / "fast.mid");
+    SongLibrary library({songs, dev});
+    library.scan();
+    library.load_all_now();
+    HistoryOptions options;
+    options.sync_commits = false;
+    options.log = [](std::string_view) {};
+    HistoryStore history(dir, options);
+    history.open();
+    LibraryBinding binding(library, history, dir / "Removed songs");
+    int frame = 0;
+    // Frames of the loop until `done`; the library's rescan and the file jobs finish by themselves.
+    const auto frames_until = [&](auto done) {
+        do {
+            const bool changed = library.poll();
+            history.poll();
+            binding.update(changed, 2'000'000'000);
+            binding.catalogue().update_view(20000, static_cast<double>(++frame));
+        } while (!done());
     };
-    attach_history(e, runs);
-    REQUIRE(e.has_best);
-    CHECK(e.best.accuracy == doctest::Approx(0.9));
-    CHECK(e.best.speed_percent == 120);
-    CHECK(e.run_count == 4);
-    CHECK(e.last_run_index == 4);
-    CHECK(e.last_run_day == 14);
-}
-
-TEST_CASE("history: runs too short to count are played but not a best") {
-    SongEntry e = entry_of(melody_file({60, 62}));
-    etude::testing::RunSpec s;
-    s.song = e.hash;
-    s.graded = 3; // fewer than kMinGradedForBest
-    s.missed = 0;
-    std::vector<RunRecord> runs = {etude::testing::make(s)};
-    attach_history(e, runs);
-    CHECK_FALSE(e.has_best);
-    CHECK(e.run_count == 1);
-    CHECK(e.last_run_index == 0);
-}
-
-TEST_CASE("history: attach_history replaces what an earlier call set") {
-    SongEntry e = entry_of(melody_file({60, 62}));
-    etude::testing::RunSpec s;
-    s.song = e.hash;
-    std::vector<RunRecord> runs = {etude::testing::make(s)};
-    attach_history(e, runs);
-    REQUIRE(e.run_count == 1);
-    attach_history(e, {});
-    CHECK(e.run_count == 0);
-    CHECK_FALSE(e.has_best);
-    CHECK(e.last_run_index == -1);
-}
-
-TEST_CASE("history: one pass summarises every song as attach_history does each") {
-    using etude::testing::make;
-    using etude::testing::RunSpec;
-    auto run = [&](std::uint64_t song, int graded, int missed, std::int32_t day) {
-        RunSpec s;
-        s.song = song;
-        s.graded = graded;
-        s.missed = missed;
-        s.day = day;
-        return make(s);
+    frames_until([&] { return !history.loading() && binding.catalogue().size() == 3; });
+    const auto index = [&](std::string_view relative) {
+        const std::optional<std::size_t> i = binding.catalogue().index_of(relative);
+        REQUIRE(i.has_value());
+        return *i;
     };
-    std::vector<RunRecord> runs = {run(1, 40, 10, 10), run(2, 40, 0, 11), run(1, 40, 4, 12),
-                                   run(3, 3, 0, 13), run(0, 40, 0, 14), run(1, 40, 8, 15)};
-    const auto plays = summarise_plays(runs);
-    CHECK(plays.size() == 3); // hash 0 is no song
-    for (std::uint64_t h : {1u, 2u, 3u}) {
-        SongEntry e;
-        e.hash = h;
-        attach_history(e, runs);
-        const SongPlays& p = plays.at(h);
-        CHECK(p.runs == e.run_count);
-        CHECK(p.last_run_index == e.last_run_index);
-        CHECK(p.last_day == e.last_run_day);
-        CHECK(p.best_permille ==
-              (e.has_best ? static_cast<int>(std::lround(e.best.accuracy * 1000.0)) : -1));
-    }
-    CHECK(plays.at(1).best_permille == 900);
-    CHECK(plays.at(3).best_permille == -1); // too few notes for a best
+    const std::size_t fast = index("fast.mid");
+    const std::size_t pickup = index("pickup.mid");
+    CHECK_FALSE(binding.why_not_movable(fast).empty());
+    CHECK(binding.why_not_movable(pickup).empty());
+    binding.set_current(pickup);
+    CHECK_FALSE(binding.why_not_movable(pickup).empty()); // the open song
+    binding.set_current(std::nullopt);
+
+    const std::size_t both[] = {pickup, fast};
+    binding.move_songs(both, " Book 2/../ ");
+    frames_until([&] { return binding.catalogue().index_of("Book 2/pickup.mid").has_value() && !binding.files_busy(); });
+    CHECK(fs::exists(songs / "Book 2" / "pickup.mid"));
+    CHECK(fs::exists(dev / "fast.mid"));
+    CHECK_FALSE(fs::exists(dir / "pickup.mid"));
+
+    const std::size_t moved = index("Book 2/pickup.mid");
+    binding.remove_songs(std::span(&moved, 1));
+    frames_until([&] { return binding.catalogue().size() == 2 && !binding.files_busy(); });
+    CHECK(fs::exists(dir / "Removed songs" / "Book 2" / "pickup.mid"));
+    CHECK_FALSE(fs::exists(songs / "Book 2" / "pickup.mid"));
 }
 
-// ---- Browsing
-
-namespace {
-
-struct Lib {
-    std::vector<SongEntry> entries;
-};
-
-SongEntry make_entry(std::string title, int difficulty, int lowest, int highest,
-                     int last_run_index = -1) {
-    SongEntry e;
-    e.title = title;
-    e.title_key = fold_for_search(title);
-    e.difficulty = difficulty;
-    e.lowest_pitch = lowest;
-    e.highest_pitch = highest;
-    e.note_count = 10;
-    e.hash = static_cast<std::uint64_t>(std::hash<std::string>{}(title));
-    e.run_count = last_run_index >= 0 ? 1 : 0;
-    e.last_run_index = last_run_index;
-    return e;
+TEST_CASE("opening: the answer of a load that was replaced while it ran is dropped") {
+    std::promise<void> started;
+    std::promise<void> release;
+    std::shared_future<void> released = release.get_future().share();
+    SongOpener opener([&](const fs::path& path, const SongLoadOptions&) {
+        if (path.filename() == "old.mid") {
+            started.set_value();
+            released.wait();
+        }
+        return fake_song(path);
+    });
+    opener.request("old.mid", {});
+    started.get_future().wait(); // the loader is inside the old load
+    opener.request("new.mid", {});
+    release.set_value();
+    CHECK(take_answer(opener).path == "new.mid"); // never the older song
+    CHECK_FALSE(opener.take().has_value());
 }
 
-std::vector<std::string> titles(const std::vector<SongEntry>& entries,
-                                const std::vector<std::size_t>& order) {
-    std::vector<std::string> out;
-    for (std::size_t i : order) {
-        out.push_back(entries[i].title);
-    }
-    return out;
+TEST_CASE("opening: a load that throws is reported with the file's name, and the next one still loads") {
+    SongOpener opener([](const fs::path& path, const SongLoadOptions&) -> SongFileLoad {
+        if (path.filename() == "huge.mid") {
+            throw std::bad_alloc();
+        }
+        return fake_song(path);
+    });
+    opener.request("/songs/huge.mid", {});
+    const SongOpener::Opened failed = take_answer(opener);
+    CHECK_FALSE(failed.load.ok);
+    CHECK(failed.load.error.find("huge.mid") != std::string::npos);
+    opener.request("b.mid", {});
+    CHECK(take_answer(opener).load.ok);
 }
 
-} // namespace
-
-TEST_CASE("browse: sort by title ignores case and accents, ties fall back to the hash") {
-    std::vector<SongEntry> entries = {
-        make_entry("zebra", 1, 60, 70), make_entry("Étude", 1, 60, 70),
-        make_entry("apple", 1, 60, 70), make_entry("Éclair", 1, 60, 70)};
-    LibrarySort sort;
-    sort.key = SortKey::Title;
-    auto order = browse_library(entries, {}, sort);
-    CHECK(titles(entries, order) == std::vector<std::string>{"apple", "Éclair", "Étude", "zebra"});
-    sort.descending = true;
-    order = browse_library(entries, {}, sort);
-    CHECK(titles(entries, order) == std::vector<std::string>{"zebra", "Étude", "Éclair", "apple"});
+TEST_CASE("usb import: songs from the stick land in the Inbox, names kept") {
+    StickRig rig;
+    write_file(rig.stick.path / "one.mid", tune_bytes("1"));
+    write_file(rig.stick.path / "Lessons/two.mid", tune_bytes("2"));
+    std::vector<std::string> seen;
+    ImportHooks hooks;
+    hooks.on_song = [&seen](std::size_t i, ui::SongMark mark) {
+        seen.push_back(std::to_string(i) + (mark == ui::SongMark::None ? "start" : "done"));
+    };
+    const ImportResult r = import_songs(rig.job(), hooks);
+    CHECK(r.end == ui::ImportEnd::Done);
+    CHECK(r.copied == 2);
+    CHECK(r.duplicates == 0);
+    CHECK(r.failed == 0);
+    CHECK(read_file(rig.songs.path / "Inbox/one.mid") == tune_bytes("1"));
+    CHECK(read_file(rig.songs.path / "Inbox/two.mid") == tune_bytes("2")); // the Inbox is flat
+    CHECK(seen == std::vector<std::string>{"0start", "0done", "1start", "1done"});
+    CHECK(tree(rig.songs.path / "Inbox/.incoming").empty()); // no temporary file left
 }
 
-TEST_CASE("browse: sort by difficulty, easy first, equal levels by title") {
-    std::vector<SongEntry> entries = {make_entry("c", 3, 60, 70), make_entry("a", 3, 60, 70),
-                                      make_entry("b", 1, 60, 70), make_entry("d", 5, 60, 70)};
-    LibrarySort sort;
-    sort.key = SortKey::Difficulty;
-    CHECK(titles(entries, browse_library(entries, {}, sort)) ==
-          std::vector<std::string>{"b", "a", "c", "d"});
-    sort.descending = true;
-    CHECK(titles(entries, browse_library(entries, {}, sort)) ==
-          std::vector<std::string>{"d", "a", "c", "b"});
+TEST_CASE("usb import: a song already in the library, by content, is skipped") {
+    StickRig rig;
+    write_file(rig.stick.path / "same.mid", tune_bytes("A"));
+    write_file(rig.stick.path / "renamed.mid", tune_bytes("B"));
+    write_file(rig.stick.path / "new.mid", tune_bytes("C"));
+    // The library has A under another name in a collection, and B's size with other bytes.
+    write_file(rig.songs.path / "Collection/old name.mid", tune_bytes("A"));
+    write_file(rig.songs.path / "Collection/other.mid", tune_bytes("Z"));
+    const ImportResult r = import_songs(rig.job(), {});
+    CHECK(r.copied == 2);
+    CHECK(r.duplicates == 1);
+    CHECK(r.marks[2] == ui::SongMark::Duplicate); // same.mid: new.mid, renamed.mid, same.mid
+    CHECK(tree(rig.songs.path / "Inbox") == ".incoming/\nnew.mid\nrenamed.mid\n");
 }
 
-TEST_CASE("browse: recently played puts the latest run first and never-played songs last") {
-    std::vector<SongEntry> entries = {
-        make_entry("never", 1, 60, 70), make_entry("old", 1, 60, 70, 2),
-        make_entry("new", 1, 60, 70, 40), make_entry("mid", 1, 60, 70, 10),
-        make_entry("aaa never", 1, 60, 70)};
-    LibrarySort sort;
-    sort.key = SortKey::RecentlyPlayed;
-    sort.descending = true; // the natural order for this key
-    CHECK(titles(entries, browse_library(entries, {}, sort)) ==
-          std::vector<std::string>{"new", "mid", "old", "aaa never", "never"});
-    sort.descending = false; // oldest first, never-played still last
-    CHECK(titles(entries, browse_library(entries, {}, sort)) ==
-          std::vector<std::string>{"old", "mid", "new", "aaa never", "never"});
+TEST_CASE("usb import: a taken name becomes name (2)") {
+    StickRig rig;
+    write_file(rig.stick.path / "tune.mid", tune_bytes("new"));
+    write_file(rig.songs.path / "Inbox/tune.mid", tune_bytes("old")); // another song, same name
+    const ImportResult r = import_songs(rig.job(), {});
+    CHECK(r.copied == 1);
+    CHECK(read_file(rig.songs.path / "Inbox/tune.mid") == tune_bytes("old"));
+    CHECK(read_file(rig.songs.path / "Inbox/tune (2).mid") == tune_bytes("new"));
 }
 
-TEST_CASE("browse: sort by length") {
-    std::vector<SongEntry> entries = {make_entry("long", 1, 60, 70), make_entry("short", 1, 60, 70),
-                                      make_entry("mid", 1, 60, 70)};
-    entries[0].duration_s = 300;
-    entries[1].duration_s = 30;
-    entries[2].duration_s = 120;
-    LibrarySort sort;
-    sort.key = SortKey::Length;
-    CHECK(titles(entries, browse_library(entries, {}, sort)) ==
-          std::vector<std::string>{"short", "mid", "long"});
+TEST_CASE("usb import: the stick is only read") {
+    StickRig rig;
+    write_file(rig.stick.path / "a.mid", tune_bytes("1"));
+    write_file(rig.stick.path / "sub/b.mid", tune_bytes("2"));
+    const std::string before = tree(rig.stick.path);
+    struct stat a{};
+    struct stat sub{};
+    REQUIRE(::stat((rig.stick.path / "a.mid").c_str(), &a) == 0);
+    REQUIRE(::stat((rig.stick.path / "sub").c_str(), &sub) == 0);
+    // A read-only stick: any attempt to write or make a file on it would fail the copy.
+    fs::permissions(rig.stick.path / "sub", fs::perms::owner_read | fs::perms::owner_exec);
+    fs::permissions(rig.stick.path, fs::perms::owner_read | fs::perms::owner_exec);
+    fs::permissions(rig.stick.path / "a.mid", fs::perms::owner_read);
+    const ImportResult r = import_songs(rig.job(), {});
+    fs::permissions(rig.stick.path, fs::perms::owner_all);
+    fs::permissions(rig.stick.path / "sub", fs::perms::owner_all);
+    CHECK(r.copied == 2);
+    CHECK(tree(rig.stick.path) == before);
+    struct stat a2{};
+    REQUIRE(::stat((rig.stick.path / "a.mid").c_str(), &a2) == 0);
+    CHECK(a2.st_mtime == a.st_mtime);
+    CHECK(read_file(rig.stick.path / "a.mid") == tune_bytes("1"));
 }
 
-TEST_CASE("browse: filter by difficulty range") {
-    std::vector<SongEntry> entries = {make_entry("a", 1, 60, 70), make_entry("b", 2, 60, 70),
-                                      make_entry("c", 3, 60, 70), make_entry("d", 4, 60, 70),
-                                      make_entry("e", 5, 60, 70)};
-    LibraryFilter f;
-    f.min_difficulty = 2;
-    f.max_difficulty = 4;
-    CHECK(titles(entries, browse_library(entries, f, {})) ==
-          std::vector<std::string>{"b", "c", "d"});
-    f.min_difficulty = 4;
-    f.max_difficulty = 2; // an empty range matches nothing, it does not swap
-    CHECK(browse_library(entries, f, {}).empty());
+TEST_CASE("usb import: a link on the stick is not followed") {
+    StickRig rig;
+    TempDir secret;
+    write_file(secret.path / "secret.mid", tune_bytes("S"));
+    fs::create_symlink(secret.path / "secret.mid", rig.stick.path / "linked.mid");
+    ImportJob job;
+    job.stick = rig.stick.path;
+    job.songs_folder = rig.songs.path;
+    job.songs = {"linked.mid"};
+    const ImportResult r = import_songs(job, {});
+    CHECK(r.end == ui::ImportEnd::Done); // the stick is there: the song alone failed
+    CHECK(r.copied == 0);
+    CHECK(r.failed == 1);
+    CHECK_FALSE(fs::exists(rig.songs.path / "Inbox/linked.mid"));
 }
 
-TEST_CASE("browse: filter by what fits my keyboard") {
-    std::vector<SongEntry> entries = {make_entry("fits", 1, 40, 90), make_entry("shift", 1, 33, 90),
-                                      make_entry("wide", 1, 21, 108),
-                                      make_entry("empty", 1, -1, -1)};
-    entries[3].note_count = 0;
-    LibraryFilter f;
-    f.range = kRange61; // 36..96
-    f.keyboard = KeyboardFilter::Any;
-    CHECK(browse_library(entries, f, {}).size() == 4);
-    f.keyboard = KeyboardFilter::FitsAsIs;
-    CHECK(titles(entries, browse_library(entries, f, {})) ==
-          std::vector<std::string>{"empty", "fits"});
-    f.keyboard = KeyboardFilter::FitsWithShift;
-    CHECK(titles(entries, browse_library(entries, f, {})) ==
-          std::vector<std::string>{"empty", "fits", "shift"});
+TEST_CASE("usb import: a folder swapped for a link after the scan does not lead out of the stick") {
+    StickRig rig;
+    TempDir outside;
+    write_file(outside.path / "secret.mid", tune_bytes("S"));
+    write_file(rig.stick.path / "Lessons/secret.mid", tune_bytes("L"));
+    write_file(rig.stick.path / "a/b/deep.mid", tune_bytes("D"));
+    const ImportJob job = rig.job(); // scanned: Lessons/secret.mid, a/b/deep.mid
+    fs::remove_all(rig.stick.path / "Lessons");
+    fs::create_symlink(outside.path, rig.stick.path / "Lessons"); // a link now, same name
+    fs::remove_all(rig.stick.path / "a/b");
+    fs::create_symlink(outside.path, rig.stick.path / "a/b"); // a middle folder too
+    write_file(outside.path / "deep.mid", tune_bytes("X"));
+    const ImportResult r = import_songs(job, {});
+    CHECK(r.end == ui::ImportEnd::Done);
+    CHECK(r.copied == 0);
+    CHECK(r.failed == 2);
+    CHECK(tree(rig.songs.path / "Inbox").find(".mid") == std::string::npos);
 }
 
-TEST_CASE("browse: filter by played or not") {
-    std::vector<SongEntry> entries = {make_entry("played", 1, 60, 70, 3),
-                                      make_entry("fresh", 1, 60, 70)};
-    LibraryFilter f;
-    f.played = PlayedFilter::PlayedOnly;
-    CHECK(titles(entries, browse_library(entries, f, {})) == std::vector<std::string>{"played"});
-    f.played = PlayedFilter::UnplayedOnly;
-    CHECK(titles(entries, browse_library(entries, f, {})) == std::vector<std::string>{"fresh"});
+TEST_CASE("usb import: a FIFO where a song was does not hold the copy") {
+    StickRig rig;
+    write_file(rig.stick.path / "a.mid", tune_bytes("A"));
+    write_file(rig.stick.path / "b.mid", tune_bytes("B"));
+    const ImportJob job = rig.job();
+    fs::remove(rig.stick.path / "a.mid");
+    REQUIRE(::mkfifo((rig.stick.path / "a.mid").c_str(), 0600) == 0);
+    auto done = std::async(std::launch::async, [&] { return import_songs(job, {}); });
+    REQUIRE(done.wait_for(std::chrono::seconds(10)) == std::future_status::ready);
+    const ImportResult r = done.get();
+    CHECK(r.failed == 1);
+    CHECK(r.copied == 1); // b.mid still comes in
+    CHECK(r.marks[0] == ui::SongMark::Failed);
 }
 
-TEST_CASE("browse: text search, filters and sort work together") {
-    std::vector<SongEntry> entries = {
-        make_entry("Für Elise", 3, 40, 90), make_entry("Elise Waltz", 2, 40, 90),
-        make_entry("Moonlight Sonata", 4, 40, 90), make_entry("Elise Etude", 5, 21, 108)};
-    LibraryFilter f;
-    f.text = "ELISE";
-    f.keyboard = KeyboardFilter::FitsAsIs;
-    f.range = kRange61;
-    LibrarySort sort;
-    sort.key = SortKey::Difficulty;
-    CHECK(titles(entries, browse_library(entries, f, sort)) ==
-          std::vector<std::string>{"Elise Waltz", "Für Elise"});
+TEST_CASE("usb import: two songs that the hash cannot tell apart are told apart by their bytes") {
+    StickRig rig;
+    write_file(rig.stick.path / "a.mid", tune_bytes("1234"));
+    write_file(rig.songs.path / "Collection/other.mid", tune_bytes("5678")); // same size, other bytes
+    write_file(rig.songs.path / "Collection/same.mid", tune_bytes("1234"));
+    write_file(rig.stick.path / "b.mid", tune_bytes("5679")); // same size as both, differs from both
+    ImportHooks hooks;
+    hooks.hash = [](std::uint64_t, const char*, std::size_t) { return std::uint64_t{7}; };
+    const ImportResult r = import_songs(rig.job(), hooks);
+    CHECK(r.marks[0] == ui::SongMark::Duplicate); // a.mid is in the library
+    CHECK(r.marks[1] == ui::SongMark::Copied);    // b.mid is not, though every hash matches
+    CHECK(read_file(rig.songs.path / "Inbox/b.mid") == tune_bytes("5679"));
 }
 
-TEST_CASE("browse: the result holds indices into the list that was passed") {
-    std::vector<SongEntry> entries = {make_entry("b", 1, 60, 70), make_entry("a", 1, 60, 70)};
-    LibrarySort sort;
-    auto order = browse_library(entries, {}, sort);
-    REQUIRE(order.size() == 2);
-    CHECK(order[0] == 1);
-    CHECK(order[1] == 0);
+TEST_CASE("stick scan: hidden files and folders, system folders and links are not entered") {
+    TempDir stick;
+    write_file(stick.path / ".hidden.mid", midi_bytes());
+    write_file(stick.path / "._a.mid", midi_bytes());
+    write_file(stick.path / ".Trashes/x.mid", midi_bytes());
+    write_file(stick.path / "System Volume Information/x.mid", midi_bytes());
+    write_file(stick.path / "real.mid", midi_bytes());
+    TempDir outside;
+    write_file(outside.path / "out.mid", midi_bytes());
+    fs::create_symlink(outside.path, stick.path / "link");
+    fs::create_symlink(outside.path / "out.mid", stick.path / "linked.mid");
+    const StickScan scan = scan_stick(stick.path);
+    REQUIRE(scan.songs.size() == 1);
+    CHECK(scan.songs[0].path == "real.mid");
 }

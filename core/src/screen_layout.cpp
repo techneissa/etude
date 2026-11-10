@@ -54,47 +54,10 @@ float fit_font(float max_font_px, float cell_width_px, int char_count, float min
     return font >= min_font_px ? font : 0.0f;
 }
 
-LabelPlacement place_label(const RectF& block, const RectF& clip, float max_font_px, int char_count,
-                           float min_font_px) {
-    const float values[] = {block.x, block.y, block.w, block.h, clip.x, clip.y, clip.w, clip.h};
-    for (float v : values) {
-        if (!std::isfinite(v)) {
-            return {};
-        }
-    }
-    const float x0 = std::max(block.x, clip.x);
-    const float y0 = std::max(block.y, clip.y);
-    const float x1 = std::min(block.right(), clip.right());
-    const float y1 = std::min(block.bottom(), clip.bottom());
-    if (!(x1 > x0) || !(y1 > y0)) {
-        return {};
-    }
-    const float font = fit_font(max_font_px, x1 - x0, char_count, min_font_px);
-    if (font <= 0.0f) {
-        return {};
-    }
-    const float text_w = static_cast<float>(char_count) * kLabelCharWidthEm * font;
-    const float text_h = font * kBlockLabelLineHeightEm;
-    if (y1 - y0 < text_h + 2.0f * kLabelPaddingPx) {
-        return {};
-    }
-    LabelPlacement out;
-    out.visible = true;
-    out.font_px = font;
-    out.rect =
-        RectF{x0 + ((x1 - x0) - text_w) / 2.0f, y1 - kLabelPaddingPx - text_h, text_w, text_h};
-    return out;
-}
-
 } // namespace
 
 float fit_label_font_px(float max_font_px, float cell_width_px, int char_count) {
     return fit_font(max_font_px, cell_width_px, char_count, kMinLabelFontPx);
-}
-
-LabelPlacement place_block_label(const RectF& block, const RectF& clip, float max_font_px,
-                                 int char_count) {
-    return place_label(block, clip, max_font_px, char_count, kMinLabelFontPx);
 }
 
 float min_name_font_px(float px_per_mm) {
@@ -358,19 +321,6 @@ float bar_room(const ScreenLayout& layout, float keep_status_w) {
     }
     const float gap = std::round(layout.top_row.h * kTopRowMarginShare);
     return std::max(0.0f, area.w - keep - gap);
-}
-
-HitBand scrubber_hit_band(float track_cy, float height, float row_bottom, float limit_bottom) {
-    if (!std::isfinite(track_cy) || !std::isfinite(height) || !std::isfinite(row_bottom) ||
-        !std::isfinite(limit_bottom) || !(height > 0.0f)) {
-        return {std::isfinite(row_bottom) ? row_bottom : 0.0f,
-                std::isfinite(row_bottom) ? row_bottom : 0.0f};
-    }
-    const float limit = std::max(limit_bottom, row_bottom);
-    float top = track_cy - height * 0.5f;
-    top = std::min(top, limit - height); // room below is short: move up first
-    top = std::max(top, row_bottom);     // but never into the row
-    return {top, std::min(top + height, limit)};
 }
 
 BarForm fit_bar_form(float comfy_room_w, float room_w, const BarFormWidths& widths) {

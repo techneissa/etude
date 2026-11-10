@@ -34,7 +34,8 @@
 #include "etude/section_editing.hpp"
 #include "etude/touch_gesture.hpp"
 
-#include <SDL3/SDL.h>
+#include <SDL3/SDL_events.h>
+#include <SDL3/SDL_render.h>
 
 #include <vector>
 

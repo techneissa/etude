@@ -11,10 +11,8 @@
 #include <system_error>
 #include <type_traits>
 
-#if !defined(_WIN32)
 #include <fcntl.h>
 #include <unistd.h>
-#endif
 
 namespace etude::app {
 
@@ -793,33 +791,6 @@ JournalAppend append_journal(const fs::path& path, std::span<const JournalEntry>
         result.saved = static_cast<std::size_t>(
             std::count(result.kept.begin(), result.kept.end(), true));
     };
-#if defined(_WIN32)
-    {
-        std::string head = keep == 0 ? encode_journal_header() : std::string();
-        std::ofstream out(path, std::ios::binary | (keep == 0 ? std::ios::trunc : std::ios::app));
-        if (!out) {
-            note("cannot open the file for writing");
-            finish();
-            return result;
-        }
-        out << head;
-        for (std::size_t i = 0; i < entries.size() && out; ++i) {
-            if (framed[i].empty()) {
-                note("a record is over the size cap");
-                continue;
-            }
-            out << framed[i];
-            out.flush();
-            wrote[i] = static_cast<bool>(out);
-        }
-        out.flush();
-        if (!out) {
-            note("cannot write the file");
-        }
-        finish();
-        return result;
-    }
-#else
     const int fd = ::open(path.c_str(), O_WRONLY | O_CREAT | O_CLOEXEC, 0644);
     if (fd < 0) {
         note("cannot open the file for writing (" + std::string(std::strerror(errno)) + ")");
@@ -882,7 +853,6 @@ JournalAppend append_journal(const fs::path& path, std::span<const JournalEntry>
     }
     finish();
     return result;
-#endif
 }
 
 } // namespace etude::app

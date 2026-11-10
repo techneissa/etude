@@ -148,16 +148,6 @@ std::span<const CatalogueEntry, kSettingCount> catalogue() { return kCatalogue; 
 
 const CatalogueEntry& entry_of(Setting s) { return kCatalogue[static_cast<std::size_t>(s)]; }
 
-std::vector<Setting> settings_on(Page p) {
-    std::vector<Setting> out;
-    for (const CatalogueEntry& e : kCatalogue) {
-        if (!e.home.on_bar && !e.home.in_library && e.home.page == p) {
-            out.push_back(e.id);
-        }
-    }
-    return out;
-}
-
 std::vector<std::string> check_drawn(std::span<const Drawn> drawn) {
     std::vector<std::string> problems;
     for (const CatalogueEntry& e : kCatalogue) {

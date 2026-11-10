@@ -40,7 +40,7 @@
 #include "etude/song.hpp"
 #include "etude/transpose.hpp"
 
-#include <SDL3/SDL.h>
+#include <SDL3/SDL_render.h>
 
 #include <array>
 #include <cstdint>
@@ -281,9 +281,9 @@ class Scene {
     SDL_FColor dimmed_key(SDL_FColor face, bool black) const;
     // An unlit key's face (and a black key's lip), dimmed while the overlay is on and the key is
     // outside the scale.
-    void add_unlit_white(int note, const SDL_FRect& face, float radius);
-    void add_unlit_black(int note, const SDL_FRect& face, float radius, const SDL_FRect& lip,
-                         float lip_radius);
+    void add_unlit_white(Mesh& out, bool dim, const SDL_FRect& face, float radius);
+    void add_unlit_black(Mesh& out, bool dim, const SDL_FRect& face, float radius,
+                         const SDL_FRect& lip, float lip_radius);
     // A C key shows its marker (name and octave) whatever the overlay does.
     bool has_c_marker(int note) const {
         return c_marker_px_ > 0.0f && !c_names_[static_cast<std::size_t>(note)].empty();
@@ -447,6 +447,17 @@ class Scene {
     float unit_ = 1.0f; // pixels per 1080p pixel
     float white_width_ = 0.0f;
     std::array<KeyPx, 128> keys_{};       // the keys, for drawing the keyboard
+    // The unlit key faces, built again only when a key lights or goes dark, the scale overlay
+    // changes or the keys move (`keys_epoch`), so an idle keyboard builds nothing.
+    struct UnlitKeys {
+        Mesh white;
+        Mesh black;
+        std::array<std::uint8_t, 128> state{}; // 0 lit or off, 1 unlit, 2 unlit and dimmed
+        std::array<float, 4> params{};         // top, key area height, unit, white key width
+        std::uint64_t epoch = 0;
+        bool valid = false;
+    } unlit_keys_;
+    std::uint64_t keys_epoch_ = 1; // counts every placement of `keys_`
     std::array<BlockColumn, 128> cols_{}; // the lanes and blocks above it
 
     // Per-note data from the settings: colours (all but ByVelocity, which needs the velocity),

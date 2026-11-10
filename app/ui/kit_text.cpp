@@ -49,6 +49,22 @@ LabelMetricsStore& metrics_store() {
     return store;
 }
 
+// The widths `text_width` kept: direct-mapped like the metrics store (a slot answers only for the
+// one key that last wrote it), no allocation.
+struct WidthStore {
+    struct Slot {
+        std::uint64_t key = 0; // 0: empty
+        float width = 0.0f;
+    };
+    static constexpr std::size_t kSlots = 256;
+    std::array<Slot, kSlots> slots{};
+};
+
+WidthStore& width_store() {
+    static WidthStore store;
+    return store;
+}
+
 } // namespace
 
 std::string_view screen_text(std::string_view text) {
@@ -76,6 +92,15 @@ ImVec2 text_size(ImFont* font, float size, const char* text) {
         return {0.0f, 0.0f}; // ImGui asserts on a size of 0 or NaN
     }
     return font->CalcTextSizeA(size, FLT_MAX, 0.0f, screen_text(text));
+}
+
+float text_width(ImFont* font, float size, const char* text) {
+    const std::uint64_t key = label_metrics_key(font, size, screen_text(std::string_view(text)));
+    WidthStore::Slot& slot = width_store().slots[key % WidthStore::kSlots];
+    if (slot.key != key) {
+        slot = {key, text_size(font, size, text).x};
+    }
+    return slot.width;
 }
 
 void text_at(const Kit& k, ImDrawList* dl, ImFont* font, float size, ImVec2 pos, ImVec4 colour,
@@ -447,6 +472,7 @@ void forget_fonts() {
     forget_font_ink();
     fit_cache().clear();
     metrics_store().clear();
+    width_store() = {};
 }
 
 FitText fit_unreported(ImFont* font, float size, std::string_view text, float max_w) {

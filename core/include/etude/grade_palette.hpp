@@ -11,16 +11,14 @@ namespace etude {
 // The colours of the grades, one place for every screen that shows one: the results card's counts
 // and hand figures, the check-in and the summary of a trouble-bar run, and the grade words over
 // the hit line. Perfect is green, Good teal, Early blue, Late amber, Miss red, Wrong magenta and
-// Combo gold. Each is a short gradient, light at the top of a figure to deeper at its foot, and
-// `grade_colour` is its middle where one flat colour is wanted.
+// Combo gold. Each is a short gradient, light at the top of a figure to deeper at its foot.
 //
 // The rules the tests hold:
-// - text in any of them reads at `kGradeMinContrast` (4.5:1) on the dark surface the cards and the
-//   scene's grade words sit on (and on the idle fill of the counts row over it), and at
-//   `kGradeHighContrastMinContrast` (7:1) with High contrast on, where the cards leave that fill
-//   out so the text sits on the surface itself;
+// - text in any of them reads at 4.5:1 on the dark surface the cards and the scene's grade words
+//   sit on (and on the idle fill of the counts row over it), and at 7:1 with High contrast on,
+//   where the cards leave that fill out so the text sits on the surface itself;
 // - any two grades, at the top, the middle and the foot of their gradients, are at least
-//   `kGradeMinDistance` (OKLab) apart for typical vision, protanopia and deuteranopia, High
+//   0.08 (OKLab) apart for typical vision, protanopia and deuteranopia, High
 //   contrast included (red, green, amber and gold meet in hue for those, so their lightness is
 //   what tells them apart);
 // - colour is never the only cue: `grade_name` is the word that goes with it everywhere.
@@ -29,10 +27,6 @@ inline constexpr int kGradeCount = 7;
 inline constexpr std::array<Grade, kGradeCount> kAllGrades{
     Grade::Perfect, Grade::Good,  Grade::Early, Grade::Late,
     Grade::Miss,    Grade::Wrong, Grade::Combo};
-
-inline constexpr double kGradeMinContrast = 4.5;
-inline constexpr double kGradeHighContrastMinContrast = 7.0;
-inline constexpr double kGradeMinDistance = 0.08;
 
 // The dark surface a grade colour is measured against: the results card's face (the UI's surface
 // colour, opaque).
@@ -65,8 +59,6 @@ inline constexpr GradeGradient kComboHc{{0xFF, 0xE0, 0x57, 255}, {0xEB, 0xC8, 0x
 } // namespace grade_tok
 
 GradeGradient grade_gradient(Grade grade, bool high_contrast = false);
-// The middle of the gradient.
-RGBA grade_colour(Grade grade, bool high_contrast = false);
 // The word that always goes with the colour: "Perfect", "Good", "Early", "Late", "Miss", "Wrong",
 // "Combo".
 std::string_view grade_name(Grade grade);

@@ -51,11 +51,6 @@ struct BarMarks {
     }
 };
 
-// Adds `from` into `into`: parts of one score each carry the same signs, and any of them may be the
-// one that has a sign (flags are or-ed, `times` takes the larger, a label keeps the first
-// non-empty).
-void merge_bar_marks(BarMarks& into, const BarMarks& from);
-
 // Bit n set for ending number n in text like "1", "1, 2", "1,2,3" or "1-3"; 0 for no number.
 std::uint64_t parse_ending_numbers(const char* text);
 

@@ -165,10 +165,6 @@ KeyChange key_from_signature(std::int64_t tick, int fifths, KeyMode mode) {
     return k;
 }
 
-KeyChange key_from_tonic_line(std::int64_t tick, int tonic_line, KeyMode mode) {
-    return key_from_signature(tick, tonic_line - mode_line_shift(mode), mode);
-}
-
 KeyChange key_from_pitch_class(std::int64_t tick, int tonic_pc, KeyMode mode, bool prefer_flats) {
     const int major_pc = mod12(tonic_pc - kModeSemitonesAboveMajor[static_cast<std::size_t>(mode)]);
     int fifths = kMajorFifths[major_pc];
@@ -252,24 +248,6 @@ std::string key_label_text(const KeyLabelParts& parts) {
         s += ' ';
         s += std::to_string(parts.signature_count);
         s += parts.signature_kind == AccidentalKind::Sharp ? '#' : 'b';
-    }
-    return s;
-}
-
-std::string key_label_display(const KeyLabelParts& parts) {
-    const auto sign = [](AccidentalKind kind) {
-        return kind == AccidentalKind::Sharp  ? kSharpSign
-               : kind == AccidentalKind::Flat ? kFlatSign
-                                              : std::string_view();
-    };
-    std::string s = parts.tonic;
-    s += sign(parts.accidental);
-    s += ' ';
-    s += parts.mode;
-    if (parts.signature_count > 0) {
-        s += ' ';
-        s += std::to_string(parts.signature_count);
-        s += sign(parts.signature_kind);
     }
     return s;
 }

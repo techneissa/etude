@@ -86,7 +86,6 @@ SongLibrary::Result SongLibrary::parse_entry(const std::string& relative, std::u
         if (const SongEntry* hit = cache_.find(hash, name)) {
             r.ok = true;
             r.entry = *hit;
-            ++cache_hits_;
             return r;
         }
     }

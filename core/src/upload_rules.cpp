@@ -57,7 +57,6 @@ enum class Class : std::uint8_t {
     Control,   // controls and invisible format characters
     Separator, // / \ and lookalikes
     Dot,       // a lookalike of "."
-    Reserved,  // : * ? " < > | (Windows and the network share cannot hold them)
 };
 
 bool in(char32_t cp, char32_t first, char32_t last) { return cp >= first && cp <= last; }
@@ -86,14 +85,6 @@ Class classify(char32_t cp) {
     case 0xFE52: // SMALL FULL STOP
     case 0xFF0E: // FULLWIDTH FULL STOP
         return Class::Dot;
-    case U':':
-    case U'*':
-    case U'?':
-    case U'"':
-    case U'<':
-    case U'>':
-    case U'|':
-        return Class::Reserved;
     default:
         break;
     }
@@ -106,10 +97,8 @@ Class classify(char32_t cp) {
     return Class::Plain;
 }
 
-enum class Reserved : std::uint8_t { Replace, Keep };
-
 // Checks one name (a file's or a folder's) and builds the text to use.
-NameProblem check_part(std::string_view part, Reserved reserved, std::string& out) {
+NameProblem check_part(std::string_view part, std::string& out) {
     out.clear();
     if (part.empty()) {
         return NameProblem::Empty;
@@ -131,9 +120,6 @@ NameProblem check_part(std::string_view part, Reserved reserved, std::string& ou
             return NameProblem::Separator;
         case Class::Dot:
             return NameProblem::Dots;
-        case Class::Reserved:
-            out.push_back(reserved == Reserved::Replace ? '_' : part[start]);
-            break;
         case Class::Plain:
             out.append(part.substr(start, i - start));
             break;
@@ -217,7 +203,7 @@ CleanName clean_file_name(std::string_view raw) {
         raw.remove_suffix(1);
     }
     CleanName result;
-    result.problem = check_part(raw, Reserved::Replace, result.name);
+    result.problem = check_part(raw, result.name);
     if (result.problem != NameProblem::None) {
         result.name.clear();
     }
@@ -336,7 +322,7 @@ RelPath clean_relative_path(std::string_view raw, bool allow_root) {
         const std::size_t slash = raw.find('/', start);
         const std::string_view piece =
             raw.substr(start, slash == std::string_view::npos ? slash : slash - start);
-        const NameProblem problem = check_part(piece, Reserved::Keep, part);
+        const NameProblem problem = check_part(piece, part);
         if (problem != NameProblem::None) {
             return fail(problem);
         }

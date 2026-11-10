@@ -129,37 +129,6 @@ DailyGoalProgress daily_goal_progress(std::span<const RunRecord> runs, std::int3
     return g;
 }
 
-StreakRule StreakRule::daily_goal(int goal_minutes) {
-    StreakRule rule;
-    std::int64_t ms = goal_ms(goal_minutes);
-    rule.min_practised_ms = ms > 0 ? ms : 1;
-    return rule;
-}
-
-Streak practice_streak(std::span<const RunRecord> runs, std::int32_t today,
-                       const StreakRule& rule) {
-    const std::int64_t need = std::max<std::int64_t>(1, rule.min_practised_ms);
-    Streak s;
-    std::int64_t run_length = 0;
-    std::int64_t last_day = 0;
-    bool any = false;
-    for (const DayPractice& d : day_totals(runs, today)) {
-        if (d.practised_ms < need) {
-            continue;
-        }
-        run_length = (any && d.day == last_day + 1) ? run_length + 1 : 1;
-        last_day = d.day;
-        any = true;
-        s.longest = std::max<int>(s.longest, static_cast<int>(run_length));
-    }
-    if (any && last_day >= std::int64_t{today} - 1) {
-        s.current = static_cast<int>(run_length);
-        s.today_done = last_day == today;
-        s.at_risk = !s.today_done;
-    }
-    return s;
-}
-
 Streak streak_with_freezes(std::span<const RunRecord> runs, std::int32_t today, const StreakRule& rule) {
     const std::int64_t need = std::max<std::int64_t>(1, rule.min_practised_ms);
     Streak s;
@@ -279,48 +248,6 @@ std::vector<BestEntry> song_bests(std::span<const RunRecord> runs, std::uint64_t
     return out;
 }
 
-std::vector<HistoryPoint> history_series(std::span<const RunRecord> runs, std::uint64_t song_hash,
-                                         std::size_t max_points, const HistoryFilter& filter) {
-    std::vector<HistoryPoint> out;
-    if (max_points == 0) {
-        return out;
-    }
-    const int min_graded = std::max(1, filter.min_graded);
-    std::vector<std::size_t> idx;
-    for (std::size_t i : song_runs(runs, song_hash)) {
-        const RunRecord& r = runs[i];
-        if (r.all.graded >= min_graded && (!filter.mode || *filter.mode == r.mode) &&
-            (!filter.hands || *filter.hands == r.hands)) {
-            idx.push_back(i);
-        }
-    }
-    const std::size_t n = idx.size();
-    const std::size_t buckets = std::min(n, max_points);
-    out.reserve(buckets);
-    for (std::size_t b = 0; b < buckets; ++b) {
-        // Bucket b takes runs [b * n / buckets, (b + 1) * n / buckets): sizes differ by at most
-        // one.
-        std::size_t lo = b * n / buckets;
-        std::size_t hi = (b + 1) * n / buckets;
-        HistoryPoint p;
-        p.runs = static_cast<int>(hi - lo);
-        std::int64_t graded = 0;
-        std::int64_t hit = 0;
-        p.speed_percent = 0;
-        for (std::size_t k = lo; k < hi; ++k) {
-            const RunRecord& r = runs[idx[k]];
-            graded += r.all.graded;
-            hit += r.all.hit;
-            p.speed_percent = std::max(p.speed_percent, r.speed_percent);
-            p.day = r.local_day;
-        }
-        p.graded_notes = static_cast<int>(std::min<std::int64_t>(graded, INT32_MAX));
-        p.accuracy = static_cast<double>(hit) / static_cast<double>(graded);
-        out.push_back(p);
-    }
-    return out;
-}
-
 // ---- Change from the last attempt
 
 AttemptChange compare_with_last_attempt(std::span<const RunRecord> runs, const RunRecord& current) {
@@ -364,10 +291,6 @@ AttemptChange compare_with_last_attempt(std::span<const RunRecord> runs, const R
 }
 
 // ---- Trouble spots
-
-std::string_view trouble_reason_text(TroubleReason reason) {
-    return reason == TroubleReason::WrongNotes ? "wrong notes" : "missed notes";
-}
 
 namespace {
 

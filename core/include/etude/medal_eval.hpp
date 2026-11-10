@@ -39,7 +39,6 @@ struct MedalSet {
     std::array<std::int64_t, kAchievementCount> value{}; // what each rule counted
     std::array<std::uint8_t, kAchievementCount> tier{};  // 0 .. 8 reached
 
-    int tier_of(Achievement a) const { return tier[static_cast<std::size_t>(a)]; }
     std::int64_t value_of(Achievement a) const { return value[static_cast<std::size_t>(a)]; }
     int held() const; // achievements at tier 1 or more
     int points() const; // the sum of the tiers
@@ -53,13 +52,6 @@ int category_points_possible(MedalCategory category);
 int category_points(const MedalSet& set, MedalCategory category);
 
 MedalSet evaluate_medals(std::span<const RunRecord> runs, const MedalContext& context);
-
-// The medals `after` holds beyond `before`: each achievement whose tier rose, with its new tier.
-struct MedalGain {
-    Achievement achievement = Achievement::Streak;
-    int tier = 0;
-};
-std::vector<MedalGain> new_medals(const MedalSet& before, const MedalSet& after);
 
 // The achievements nearest their next tier, the nearest first: the share of the way from the tier
 // held to the next one, 0 .. 1 (an achievement at tier 8, or with no progress at all, is left out).

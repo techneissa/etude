@@ -7,7 +7,7 @@
 #pragma once
 
 #include "sheet_engraver.hpp"
-#include "song_controller.hpp"
+#include "loaded_song.hpp"
 
 #include "etude/sheet_map.hpp"
 

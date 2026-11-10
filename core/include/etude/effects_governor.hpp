@@ -91,8 +91,6 @@ class EffectsGovernor {
     EffectsLevel level() const { return level_; }
     // The most degraded level reached since construction or reset().
     EffectsLevel lowest() const { return lowest_; }
-    double average_ns() const { return average_ns_; }
-    int up_backoff() const { return backoff_; }
     const GovernorConfig& config() const { return config_; }
 
     void reset();

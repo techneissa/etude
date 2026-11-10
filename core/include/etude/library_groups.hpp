@@ -73,8 +73,6 @@ class LibraryGroups {
     // The songs of a group, by hash, in the order they were added.
     std::span<const std::uint64_t> songs_of(std::uint64_t id) const;
     bool contains(std::uint64_t id, std::uint64_t hash) const;
-    // The groups a song is in, in the groups' order.
-    std::vector<std::uint64_t> groups_of(std::uint64_t hash) const;
     // A position after every group's, for a new one.
     std::int32_t next_position() const;
     // Bumped by every change.

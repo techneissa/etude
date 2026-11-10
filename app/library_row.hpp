@@ -48,10 +48,6 @@ struct LibraryRow {
 // What the sort reads of a song of the catalogue.
 MelodyStepFacts step_facts(const CatalogueSong& song);
 
-// The step song `song` is suggested for: the player's own choice when it is in `added`, else the
-// sort's; kMelodyNoStep for none.
-int step_for(const CatalogueSong& song, const MelodyAdded& added);
-
 // Builds the row from the catalogue's songs that are read. An added song is found by its hash, else by
 // its path (then it is in `followed`), else it is in `hidden`. A file held twice (one content hash)
 // counts once; a piece with versions shows one tile: the version the player added, else the one

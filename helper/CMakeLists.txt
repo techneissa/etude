@@ -8,6 +8,30 @@ if(NOT ETUDE_UPDATE_KEY_SOURCE STREQUAL "${PROJECT_SOURCE_DIR}/core/src/update_k
   message(WARNING "etude-update-helper is built with another update key: ${ETUDE_UPDATE_KEY_SOURCE}. Never ship this build.")
 endif()
 
+# The helper's own code except the two files that change under ETUDE_HELPER_TEST_HOOKS
+# (layout.cpp, state_store.cpp): built once, linked by the helper and by the unit tests.
+add_library(etude_helper_core STATIC
+  apply.cpp
+  backup.cpp
+  count_in_place.cpp
+  handoff_files.cpp
+  install.cpp
+  interrupt.cpp
+  process.cpp
+  safe_io.cpp
+  sandbox.cpp
+  service.cpp
+  settle.cpp
+  stream.cpp
+  tree_check.cpp
+  unpack.cpp)
+target_include_directories(etude_helper_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}
+                                                    ${PROJECT_SOURCE_DIR}/core/include)
+target_link_libraries(etude_helper_core PRIVATE etude_warnings)
+if(NOT (ETUDE_BUILD_UPDATE_HELPER AND UNIX))
+  return()
+endif()
+
 set(core_src ${PROJECT_SOURCE_DIR}/core/src)
 add_library(etude_update_pure STATIC
   ${core_src}/base64.cpp
@@ -28,21 +52,7 @@ target_link_libraries(etude_update_pure PRIVATE etude_warnings etude_miniz etude
 
 add_executable(etude-update-helper
   main.cpp
-  apply.cpp
-  backup.cpp
-  count_in_place.cpp
-  handoff_files.cpp
-  install.cpp
-  interrupt.cpp
   layout.cpp
-  process.cpp
-  safe_io.cpp
-  sandbox.cpp
-  service.cpp
-  settle.cpp
-  state_store.cpp
-  stream.cpp
-  tree_check.cpp
-  unpack.cpp)
+  state_store.cpp)
 target_include_directories(etude-update-helper PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(etude-update-helper PRIVATE etude_warnings etude_update_pure)
+target_link_libraries(etude-update-helper PRIVATE etude_helper_core etude_warnings etude_update_pure)

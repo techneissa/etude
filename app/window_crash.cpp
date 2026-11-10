@@ -6,6 +6,8 @@
 #include "crash_handler.hpp"
 #include "log_ring.hpp"
 
+#include <SDL3/SDL.h>
+
 namespace etude::app {
 
 void WindowBase::start_crash_reports() {

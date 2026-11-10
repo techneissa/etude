@@ -34,7 +34,9 @@
 #include "ui/upload_port.hpp"
 #include "ui_model.hpp"
 
-#include <SDL3/SDL.h>
+#include <SDL3/SDL_events.h>
+#include <SDL3/SDL_render.h>
+#include <SDL3/SDL_video.h>
 
 #include <array>
 #include <cstdint>
@@ -262,7 +264,6 @@ class Ui {
     void set_learn(ui::LearnPort* port);
     void open_learn();
     void open_learn_panel(PanelTab tab); // the gallery, or straight to a card
-    void close_learn();
     bool learn_open() const;
     // Learn's Listen is sounding a scale: its keys light as the notes come, so frames must be drawn.
     bool learn_listening() const;

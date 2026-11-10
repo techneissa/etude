@@ -60,12 +60,6 @@ write("edge-3-4-then-4-4.mid", smf([
         ev(960, 0x90, 62, 64), ev(480, 0x80, 62, 0),
         ev(1440, 0x90, 64, 64), ev(480, 0x80, 64, 0), EOT)]))
 
-# 4/4 from tick 0, 3/4 from tick 960 (beat 3 of the first bar). C4 at 0, D4 at 1920.
-write("edge-sig-midbar.mid", smf([
-    trk(sig(0, 4, 4), sig(960, 3, 4), EOT),
-    trk(ev(0, 0x90, 60, 64), ev(480, 0x80, 60, 0),
-        ev(1440, 0x90, 62, 64), ev(480, 0x80, 62, 0), EOT)]))
-
 # A one-beat pickup written as 1/4 at tick 0, then 4/4 from tick 480.
 # G4 at 0, C4 at 480, D4 at 2400, like edge-pickup.musicxml.
 write("edge-pickup.mid", smf([
@@ -116,10 +110,6 @@ write("edge-tie-cross-staff.musicxml", score([("Piano", [
     measure(1, attrs(1, staves=2) + note("C", 4, 4, tie=["start"], staff=1)),
     measure(2, note("C", 4, 2, tie=["stop"], staff=2) + note("D", 4, 2, staff=1)),
 ])]))
-
-# Sixteen one-note parts, all C4 on the first beat: part 16 shares MIDI channel 1 with part 1.
-write("edge-sixteen-parts.musicxml", score([
-    ("Part %d" % (i + 1), [measure(1, attrs(1) + note("C", 4, 4))]) for i in range(16)]))
 
 # No <divisions> anywhere: eight eighth notes (duration 1) fill a 4/4 bar, so the file means 2.
 write("edge-no-divisions.musicxml", score([("Piano", [

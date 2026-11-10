@@ -25,8 +25,6 @@ inline constexpr float kMinTouchTargetMm = 15.0f;  // the top row's height (a la
 // A top-row button's hit area as a share of the row: 12.2 mm of the 15, so two buttons side by side
 // are 2.8 mm apart (the share holds as the row grows with the window, as every control does).
 inline constexpr float kTopRowHitShare = 12.2f / kMinTouchTargetMm;
-inline constexpr float kMinWindowWidthPx = 800.0f; // the layout rules are promised from here up
-inline constexpr float kMinWindowHeightPx = 480.0f;
 inline constexpr float kDefaultPxPerMm = 96.0f / 25.4f; // used when the caller passes a bad value
 inline constexpr float kMinNoteAreaShare = 0.40f;       // of the window height, always
 inline constexpr float kMaxTopRowShare = 0.30f;         // the top row never takes more than this
@@ -44,7 +42,6 @@ inline constexpr float kTopRowMinHeightEm = 1.5f; // the top row is at least thi
 inline constexpr float kLabelCharWidthEm = 0.62f; // widest average advance, for fitting text
 inline constexpr float kLabelPaddingPx = 2.0f;    // each side of a label inside its cell
 inline constexpr int kChordLabelMaxChars = 14;    // longest chord text the label must fit
-inline constexpr float kBlockLabelLineHeightEm = 1.2f; // height of a block label's text box
 inline constexpr float kMinKeyBedPx = 3.0f;            // the key bed is never thinner than this
 // The smallest note name that stays legible, at 96 dpi; `min_name_font_px` scales it to the
 // screen. A name that would need a smaller font loses its octave number first.
@@ -244,45 +241,10 @@ TopRowSplit split_top_row(const ScreenLayout& layout, float bar_w, float keep_st
 // area when nothing is kept; 0 for no status area or a bad value.
 float bar_room(const ScreenLayout& layout, float keep_status_w);
 
-// A horizontal band of the screen: from `top` down to `bottom`, y down, `bottom >= top`.
-struct HitBand {
-    float top = 0.0f;
-    float bottom = 0.0f;
-    float height() const { return bottom - top; }
-};
-
-// The vertical extent of the song scrubber's touch zone, in whatever units the caller uses (all
-// four inputs share them). The zone is `height` tall and centred on the track (`track_cy`) so a
-// finger need not find the thin track, but the nearest target wins: every button of the top row
-// ends at `row_bottom`, so the zone never starts above it. Where the centred zone would reach into
-// the row it moves down instead, into the free space below the track, and keeps its full height;
-// it never extends past `limit_bottom` (the bottom of the window that holds the bar), moving up
-// as far as `row_bottom` allows before it gets shorter. Bad values (NaN, a non-positive height)
-// give an empty band at `row_bottom`.
-HitBand scrubber_hit_band(float track_cy, float height, float row_bottom, float limit_bottom);
-
 // Font size for a label of `char_count` characters inside a block or key `cell_width_px` wide:
 // `max_font_px` when it fits, smaller when it has to shrink, 0 (hide it) when the result would
 // fall under `kMinLabelFontPx`. Always a whole number of pixels.
 float fit_label_font_px(float max_font_px, float cell_width_px, int char_count);
-
-// Where a note name goes on its block.
-struct LabelPlacement {
-    bool visible = false;
-    RectF rect;           // the text box, empty when hidden
-    float font_px = 0.0f; // 0 when hidden
-};
-
-// Places the name of a falling or rising block at its bottom edge, the end that meets the
-// keyboard. `block` is the whole block in window pixels (it may run past the window); `clip` is
-// where labels may appear, normally `ScreenLayout::note_area`. Only the part of the block inside
-// `clip` counts: the label sits `kLabelPaddingPx` above the bottom of that part, centered. The font
-// is `max_font_px` shrunk by `fit_label_font_px` to the visible width. The label is hidden, never
-// clipped, when that font is unreadable or the visible part is shorter than the text box plus
-// padding top and bottom (`kBlockLabelLineHeightEm` per font pixel). `char_count` is the length of
-// the name; the text box is `char_count * kLabelCharWidthEm * font_px` wide.
-LabelPlacement place_block_label(const RectF& block, const RectF& clip, float max_font_px,
-                                 int char_count);
 
 // `kMinNameFontPx` on a screen of `px_per_mm` pixels per millimetre (96 dpi is 3.78): the same
 // physical size on a denser display. A bad value counts as 96 dpi.

@@ -93,19 +93,6 @@ class FrameLog {
     std::int64_t frames() const { return frames_; }
     std::int64_t stalls() const { return stalls_; }
     std::int64_t worst_ns() const { return worst_ns_; }
-    std::int64_t last_period_ns() const { return period_ns_; }
-    // How long the last frame spent in `phase`, and in `detail` (work inside the phases).
-    std::int64_t last_phase_ns(FramePhase phase) const {
-        return phases_[static_cast<std::size_t>(phase)];
-    }
-    std::int64_t last_detail_ns(FrameDetail detail) const {
-        return details_[static_cast<std::size_t>(detail)];
-    }
-    // The same in the frame thread's CPU time.
-    std::int64_t last_cpu_ns() const { return cpu_period_ns_; }
-    std::int64_t last_phase_cpu_ns(FramePhase phase) const {
-        return phase_cpu_[static_cast<std::size_t>(phase)];
-    }
 
   private:
     std::FILE* out_;

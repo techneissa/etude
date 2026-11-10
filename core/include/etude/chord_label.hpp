@@ -82,9 +82,6 @@ HandChordTimeline hand_chord_timeline(const std::vector<HarmonyStretch>& stretch
 HandChords hand_chords_of(const HarmonyTimeline& harmony, const std::vector<KeyChange>& keys,
                           int semitones, bool prefer_flats);
 
-// Both hands of a song, from its notes' hands: build_hand_harmony, then the labels.
-HandChords build_hand_chords(const Song& song, int semitones, bool prefer_flats);
-
 // The keys the label's line spans, on the keyboard the song is played on: the label's lowest and
 // highest pitch as the transposition shows them (shifted, and folded by whole octaves onto the
 // keyboard like the blocks), the lower first, then cut to the keys in view

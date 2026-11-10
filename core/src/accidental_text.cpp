@@ -193,12 +193,6 @@ void accidental_display_text_into(std::string_view s, std::string& out) {
     }
 }
 
-std::string accidental_display_text(std::string_view s) {
-    std::string out;
-    accidental_display_text_into(s, out);
-    return out;
-}
-
 bool has_accidental_spelling(std::string_view s) {
     for (std::size_t i = 0; i < s.size(); ++i) {
         if (is_letter_name(s[i]) && free_text_name(s, i) > 0) {
@@ -206,24 +200,6 @@ bool has_accidental_spelling(std::string_view s) {
         }
     }
     return false;
-}
-
-std::string plain_accidentals(std::string_view display) {
-    std::string out;
-    out.reserve(display.size());
-    for (std::size_t i = 0; i < display.size();) {
-        if (display.substr(i, kFlatSign.size()) == kFlatSign) {
-            out += 'b';
-            i += kFlatSign.size();
-        } else if (display.substr(i, kSharpSign.size()) == kSharpSign) {
-            out += '#';
-            i += kSharpSign.size();
-        } else {
-            out += display[i];
-            ++i;
-        }
-    }
-    return out;
 }
 
 } // namespace etude

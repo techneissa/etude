@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "song_practice_sync.hpp"
+#include "song_controller.hpp"
 
 namespace etude::app {
 

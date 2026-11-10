@@ -69,6 +69,7 @@ struct UpdateService::Shared {
     void run_install();
 
   private:
+    bool begin_install(UpdateOffer& offered, ui::UpdateView& base, ui::UpdateView& view);
     // The Mac's: the same download, then the steps of update_install_mac.cpp.
     void run_install_mac();
     bool check_mac_zip(const UpdateOffer& offer, const std::string& zip, const std::string& signature,

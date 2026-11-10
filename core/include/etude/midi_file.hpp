@@ -53,7 +53,7 @@ struct MidiLoadResult {
 // Parses a Standard MIDI File (format 0 or 1) from memory into a Song. Never throws and never
 // reads outside `data`; a bad or truncated file gives ok == false and an error.
 //
-// Rules, each with a test in tests/midi_file_test.cpp:
+// Rules, each with a test in tests/midi_test.cpp:
 // - Ticks become seconds through every tempo change of every track (format 1 puts them in track
 //   0, but any track counts). Bars come from time-signature events (build_song_measures in
 //   song_builder.hpp, the same numbering the score loaders give): a time signature that falls

@@ -105,14 +105,14 @@ void Ui::Impl::measure_status(DrawFrame& d) {
     for (std::size_t i = 0; i < status_parts.size(); ++i) {
         FitText part;
         part.assign(screen_text(status_parts[i].text));
-        status_part_w[i] = text_size(k.regular, status_size, part.c_str()).x;
+        status_part_w[i] = text_width(k.regular, status_size, part.c_str());
     }
     StatusFitInput& status_in = d.status_in;
     status_in.label_w =
-        label_text.empty() ? 0.0f : text_size(k.bold, status_size, label_text.c_str()).x;
+        label_text.empty() ? 0.0f : text_width(k.bold, status_size, label_text.c_str());
     status_in.gap = k.s(tok::kS4);
-    status_in.group_gap = text_size(k.regular, status_size, kStatusGroupGap).x;
-    status_in.dot_gap = text_size(k.regular, status_size, kStatusDotGap).x;
+    status_in.group_gap = text_width(k.regular, status_size, kStatusGroupGap);
+    status_in.dot_gap = text_width(k.regular, status_size, kStatusDotGap);
     status_in.min_cut = k.s(kStatusMinCut);
     status_in.parts = status_parts;
     status_in.part_w = std::span<const float>(status_part_w.data(), status_parts.size());

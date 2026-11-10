@@ -150,14 +150,6 @@ constexpr double kSharedShare = 0.2;    // and this share of the shorter one's
 
 } // namespace
 
-bool same_piece(const VersionSong& a, const VersionSong& b) {
-    const Prep pa = prep_of(a);
-    const Prep pb = prep_of(b);
-    Scratch scratch;
-    const double sim = pa.usable && pb.usable ? similarity_of(pa.pitch, pb.pitch, scratch) : -1.0;
-    return judge(pa, pb, sim).same;
-}
-
 bool VersionOverrides::split(std::uint64_t hash) const {
     return std::binary_search(splits.begin(), splits.end(), hash);
 }

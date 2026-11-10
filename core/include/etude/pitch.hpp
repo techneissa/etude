@@ -35,11 +35,6 @@ constexpr int octave(int note) { return (note - pitch_class(note)) / 12 - 1; }
 // Equal-tempered frequency. `a4_hz` lets the tuning reference move for acoustic pianos.
 double frequency_hz(int note, double a4_hz = 440.0);
 
-// Nearest note to a frequency, as a fractional MIDI number (69.0 for 440 Hz).
-// Any negative result means "no valid note": it is returned for <= 0, NaN and infinite `hz` or
-// `a4_hz`, and sub-audio frequencies below MIDI 0 also come out negative.
-double note_from_frequency(double hz, double a4_hz = 440.0);
-
 // "C4", "F#3", or "Gb3" when `prefer_flats` is set. Empty for invalid notes. `octave_offset` is
 // added to the octave number: 0 for scientific naming (middle C is C4), -1 for Yamaha (C3).
 std::string note_name(int note, bool prefer_flats = false, int octave_offset = 0);

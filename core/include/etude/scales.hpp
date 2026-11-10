@@ -54,8 +54,6 @@ std::vector<int> scale_pitch_classes(int root_pc, ScaleType type);
 // The same as a bit mask, bit n set when pitch class n is in the scale.
 unsigned scale_pitch_class_mask(int root_pc, ScaleType type);
 
-// True when MIDI `note` (0..127) has a pitch class of the scale; false for notes outside MIDI.
-bool is_in_scale(int note, int root_pc, ScaleType type);
 // True when MIDI `note` (0..127) has the pitch class of the root; false for notes outside MIDI.
 bool is_root(int note, int root_pc);
 
@@ -108,14 +106,5 @@ std::string spelled_name(const SpelledNote& note);
 // numbering: 0 is scientific (middle C = C4), -1 is Yamaha (middle C = C3). Empty when the
 // note is outside 0..127.
 std::string spelled_name(int midi_note, const SpelledNote& note, int octave_offset = 0);
-
-// The names of spell_scale() without octaves. Empty when spell_scale() is.
-std::vector<std::string> scale_note_names(Tonic tonic, ScaleType type);
-
-// One octave of the scale from MIDI `root_note`, named with octave numbers ("F4 G4 A4 Bb4 ..."),
-// stopping at note 127. Empty when `root_note` is not the tonic's pitch class, is outside 0..127,
-// or the scale cannot be spelled.
-std::vector<std::string> scale_note_names_with_octave(Tonic tonic, ScaleType type, int root_note,
-                                                      int octave_offset = 0);
 
 } // namespace etude

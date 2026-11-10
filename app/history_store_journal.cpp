@@ -22,11 +22,9 @@
 #include <utility>
 #include <variant>
 
-#if !defined(_WIN32)
 #include <fcntl.h>
 #include <sys/file.h>
 #include <unistd.h>
-#endif
 
 namespace etude::app {
 

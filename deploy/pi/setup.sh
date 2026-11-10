@@ -310,6 +310,12 @@ render_share_conf() {
    hide dot files = yes
    follow symlinks = no
    wide links = no
+   # Song names are kept as typed on the Pi's disk (? * " < > | : too). catia shows those to a
+   # Windows computer as the private-use characters Windows and Mac both read; fruit does the same
+   # for a Mac (its native encoding hands the mapping to catia).
+   vfs objects = catia fruit streams_xattr
+   fruit:encoding = native
+   catia:mappings = 0x22:0xf020,0x2a:0xf021,0x3a:0xf022,0x3c:0xf023,0x3e:0xf024,0x3f:0xf025,0x7c:0xf027
 CONF
 }
 
@@ -428,7 +434,7 @@ share_step() {
         mkdir -p "$smb_dir"
         [[ -f "$smb_conf" ]] || printf '[global]\n   workgroup = WORKGROUP\n' >"$smb_conf"
     else
-        install_packages REQUIRED samba avahi-daemon
+        install_packages REQUIRED samba samba-vfs-modules avahi-daemon
         [[ -f "$smb_conf" ]] || ((DRY_RUN)) || die "no $smb_conf: is samba installed?"
     fi
 

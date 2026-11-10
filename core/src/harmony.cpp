@@ -476,46 +476,11 @@ std::vector<HarmonyStretch> analyse_harmony(const Song& song, HarmonyScope scope
     return result;
 }
 
-HarmonyTimeline build_harmony(const Song& song) {
-    HarmonyTimeline timeline;
-    timeline.all = analyse_harmony(song, HarmonyScope::All);
-    timeline.left = analyse_harmony(song, HarmonyScope::Left);
-    timeline.right = analyse_harmony(song, HarmonyScope::Right);
-    return timeline;
-}
-
 HarmonyTimeline build_hand_harmony(const Song& song) {
     HarmonyTimeline timeline;
     timeline.left = analyse_harmony(song, HarmonyScope::Left);
     timeline.right = analyse_harmony(song, HarmonyScope::Right);
     return timeline;
-}
-
-const HarmonyStretch* harmony_at_tick(const std::vector<HarmonyStretch>& stretches,
-                                      std::int64_t tick) {
-    auto it =
-        std::upper_bound(stretches.begin(), stretches.end(), tick,
-                         [](std::int64_t t, const HarmonyStretch& s) { return t < s.start_tick; });
-    if (it == stretches.begin()) {
-        return nullptr;
-    }
-    --it;
-    return tick < it->end_tick ? &*it : nullptr;
-}
-
-const HarmonyStretch* harmony_at_seconds(const std::vector<HarmonyStretch>& stretches,
-                                         double seconds) {
-    auto it = std::upper_bound(stretches.begin(), stretches.end(), seconds,
-                               [](double t, const HarmonyStretch& s) { return t < s.start_s; });
-    if (it == stretches.begin()) {
-        return nullptr;
-    }
-    --it;
-    return seconds < it->end_s ? &*it : nullptr;
-}
-
-std::string harmony_name(const HarmonyStretch& stretch) {
-    return spelled_chord_name(stretch.chord, stretch.spelling);
 }
 
 } // namespace etude

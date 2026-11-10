@@ -7,7 +7,7 @@
 // does not load is left out of its path rather than stopping the screen.
 #pragma once
 
-#include "song_controller.hpp"
+#include "loaded_song.hpp"
 
 #include "etude/library.hpp"
 #include "etude/melody_manifest.hpp"

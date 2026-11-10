@@ -3,6 +3,8 @@
 
 #include "icon_assets.hpp"
 
+#include <SDL3/SDL.h>
+
 #include <span>
 
 namespace etude::app {

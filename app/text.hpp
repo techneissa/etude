@@ -4,7 +4,7 @@
 // the font cannot be opened, text falls back to SDL's built-in 8-pixel debug font, scaled up.
 #pragma once
 
-#include <SDL3/SDL.h>
+#include <SDL3/SDL_render.h>
 
 #include <cstdint>
 #include <string>
@@ -48,9 +48,6 @@ class Text {
     ~Text();
     Text(const Text&) = delete;
     Text& operator=(const Text&) = delete;
-
-    // False when the font could not be opened and the debug font is used.
-    bool has_font() const { return font_ != nullptr; }
 
     // The renderer was replaced (gfx::replace_renderer): later textures are made for `renderer`.
     void set_renderer(SDL_Renderer* renderer) { renderer_ = renderer; }

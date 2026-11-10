@@ -13,7 +13,6 @@
 
 #include "history_store.hpp"
 #include "sections_controller.hpp"
-#include "song_controller.hpp"
 #include "etude/session_restore.hpp"
 #include "etude/song_practice.hpp"
 
@@ -24,6 +23,8 @@
 #include <unordered_map>
 
 namespace etude::app {
+
+class SongController;
 
 class SongPracticeSync {
   public:
@@ -45,7 +46,7 @@ class SongPracticeSync {
     // The defaults of a song never opened: what the controller's options say for the count-in.
     SongPractice defaults() const;
 
-    // Call before a song is replaced or removed (SongController::load/unload) while the old one is
+    // Call before a song is replaced (SongController::load) while the old one is
     // still loaded: writes a change that has not been saved yet.
     void song_closing();
     // Call right after a song was loaded. Brings back its choices, or applies the defaults;

@@ -143,13 +143,6 @@ SongBoard board_of(std::span<const ProfileRuns> mine, std::uint64_t song_hash, P
 
 } // namespace
 
-SongBoard build_song_board(std::span<const ProfileRuns> household, std::uint64_t song_hash,
-                           Period period, std::int32_t today, std::int64_t active_profile,
-                           const RunRecord* run) {
-    const SongRuns mine = runs_of_song(household, song_hash);
-    return board_of(mine.profiles, song_hash, period, today, active_profile, run);
-}
-
 std::array<SongBoard, 3> build_song_boards(std::span<const ProfileRuns> household,
                                            std::uint64_t song_hash, std::int32_t today,
                                            std::int64_t active_profile, const RunRecord* run) {

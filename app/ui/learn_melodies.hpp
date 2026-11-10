@@ -68,8 +68,6 @@ class MelodiesView {
     void cancel();
     // A finger is on the page or a row, or one is coasting after a fling: frames must be drawn.
     bool moving() const;
-    // How many of the page's pieces are shown whole (not cut by the row's or the page's edge).
-    int whole_tiles() const { return whole_; }
     // How far the page is scrolled down, in design points.
     float scroll() const { return scroll_; }
 

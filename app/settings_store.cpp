@@ -4,18 +4,13 @@
 #include "etude/settings_doc.hpp"
 
 #include <algorithm>
-#include <cstdio>
 #include <fstream>
 #include <iterator>
 #include <system_error>
 #include <vector>
 
-#if defined(_WIN32)
-#include <io.h>
-#else
 #include <fcntl.h>
 #include <unistd.h>
-#endif
 
 namespace etude::app {
 
@@ -71,15 +66,6 @@ ReadStatus read_file(const fs::path& path, std::string& out) {
 
 // Writes `text` to `path` and forces it to disk. False on any failure.
 bool write_synced(const fs::path& path, std::string_view text) {
-#if defined(_WIN32)
-    std::FILE* f = std::fopen(path.string().c_str(), "wb");
-    if (f == nullptr) {
-        return false;
-    }
-    bool ok = std::fwrite(text.data(), 1, text.size(), f) == text.size() && std::fflush(f) == 0;
-    ok = ok && _commit(_fileno(f)) == 0;
-    return std::fclose(f) == 0 && ok;
-#else
     const int fd = ::open(path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
     if (fd < 0) {
         return false;
@@ -96,20 +82,15 @@ bool write_synced(const fs::path& path, std::string_view text) {
     }
     ok = ok && ::fsync(fd) == 0;
     return ::close(fd) == 0 && ok;
-#endif
 }
 
 // Makes the renames durable. Best effort: some filesystems refuse to fsync a folder.
 void sync_directory(const fs::path& dir) {
-#if !defined(_WIN32)
     const int fd = ::open(dir.c_str(), O_RDONLY);
     if (fd >= 0) {
         (void)::fsync(fd);
         ::close(fd);
     }
-#else
-    (void)dir;
-#endif
 }
 
 } // namespace

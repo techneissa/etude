@@ -145,14 +145,13 @@ struct StoredRunEvents {
 
 enum class EventsReadKind : std::uint8_t { Run, Ghost, Pin, Replay };
 
-// The answer to request_run_events() or request_ghost(), by the serial the request returned. Every
-// request is answered: `found` is empty when there is no such run, no comparable run, or the
-// database could not be read (or the store closed first).
+// The answer to request_run_events(), by the serial the request returned. Every request is
+// answered: `found` is empty when there is no such run, no comparable run, or the database could
+// not be read (or the store closed first).
 //
-// `song_hash` is the song the answer is about: the one a ghost request asked for, or the one the
-// run found belongs to (0 when none was found). An answer comes back some frames after the request,
-// by which time the player may have opened another song: a caller must check it with
-// ghost_answer_applies() before it uses the events, and drop it otherwise.
+// `song_hash` is the song the answer is about: the one the run found belongs to (0 when none was
+// found). An answer comes back some frames after the request, by which time the player may have
+// opened another song: a caller must check it before it uses the events, and drop it otherwise.
 struct EventsRead {
     std::uint64_t serial = 0;
     EventsReadKind kind = EventsReadKind::Run;
@@ -185,15 +184,6 @@ struct ReplayRequest {
     // find by its record (run id 0) is looked up under this profile.
     std::int64_t profile_id = 0;
 };
-
-// Whether `answer` is the answer to the ghost request `serial` made for the song `song_hash`, the
-// song open now. False for an answer to an older request, to a run request, or about another song
-// (a ghost for song A is never drawn over song B). A song without a hash has no ghost.
-inline bool ghost_answer_applies(const EventsRead& answer, std::uint64_t serial,
-                                 std::uint64_t song_hash) {
-    return song_hash != 0 && answer.kind == EventsReadKind::Ghost && answer.serial == serial &&
-           answer.song_hash == song_hash;
-}
 
 // A deletion the history thread finished (or could not make), reported by poll().
 struct ProfileDeleted {
@@ -321,10 +311,6 @@ class HistoryStore {
     // Returns the serial that comes back with the answer, 0 when the store takes no more work.
     // No file I/O on the calling thread.
     std::uint64_t request_run_events(std::int64_t run_id);
-    // The best run of the song (by content hash) that can stand as the ghost of a run played in
-    // `wanted` (ghost_run.hpp): complete, with its events kept, the same mode, hands and
-    // transposition, speed within the tolerance, the highest accuracy. Same delivery as above.
-    std::uint64_t request_ghost(std::uint64_t song_hash, const GhostSetup& wanted);
     // The replay of one run (`run_id` 0: the run `request.record` describes, as the database has it:
     // a run just finished, whose id only the history thread knows): its stored notes laid over the song's expected ones, and its summary,
     // both built on the history thread (core run_replay.hpp, run_summary.hpp) so the frame takes a

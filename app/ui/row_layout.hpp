@@ -18,7 +18,6 @@ namespace etude::app::ui {
 // The page the rows drawn from now on belong to (one id per page; 0 outside the sheet). The sheet
 // sets it around the page it draws, so two pages never share a column's measured label zone.
 void row_scope(int scope);
-int current_row_scope();
 
 // What a row sees of its column: its plan and the slot its reports go to.
 struct RowFrame {

@@ -101,11 +101,6 @@ StyleRecipe degraded(StyleRecipe recipe, const EffectsBudget& budget);
 // (saturated, darkened) blended at `body_alpha_bottom`, plus the inner glow.
 RGBA style_surface_color(const StyleRecipe& recipe, RGBA note, RGBA background);
 
-// Black or white for a note name on a block in the look's style: whichever reads better on
-// `style_surface_color` (with the note's own recipe, `note_recipe`) over `kBackgroundColor`. At
-// least `kLabelMinContrast`.
-RGBA style_label_color(const LookSettings& look, int note, std::uint8_t velocity, Hand hand);
-
 // A lit key under a see-through style (body less than opaque) is painted over the background
 // mixed this far toward the note colour, so it shows the style as its block does and still reads
 // as lit.
@@ -114,8 +109,6 @@ bool style_is_see_through(const StyleRecipe& recipe);
 // The colour under a lit key's body: `kBackgroundColor` tinted toward `note` for a see-through
 // style, the note itself (unused) for an opaque one.
 RGBA key_underlay_color(const StyleRecipe& recipe, RGBA note);
-// Black or white for a name on a lit key: as style_label_color, on the key's own underlay.
-RGBA style_key_label_color(const LookSettings& look, int note, std::uint8_t velocity, Hand hand);
 
 // "solid", "outline", "glass", "neon", "candy", "soft", "pixel", "ink".
 std::string_view note_style_name(NoteStyle style);

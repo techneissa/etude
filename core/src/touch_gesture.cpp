@@ -418,15 +418,6 @@ DragAxis decide_drag_axis(float total_dx, float total_dy) {
                                                                        : DragAxis::Horizontal;
 }
 
-BarSwipe classify_bar_swipe(const BarSwipeArea& area, float start_y, float total_dx,
-                            float total_dy) {
-    if (decide_drag_axis(total_dx, total_dy) != DragAxis::Vertical ||
-        std::fabs(total_dy) < travel_of(area)) {
-        return BarSwipe::None;
-    }
-    return intended_swipe(area, start_y, total_dy);
-}
-
 BarSwipe BarSwipeTracker::on_event(const GestureRecognizer::Event& event,
                                    const BarSwipeArea& area) {
     switch (event.kind) {
