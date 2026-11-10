@@ -3,7 +3,7 @@
 
 #include "etude/icon_colour.hpp"
 
-#include <SDL3/SDL.h>
+#include <SDL3/SDL_video.h>
 
 namespace etude::app {
 

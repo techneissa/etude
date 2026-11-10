@@ -334,6 +334,7 @@ void Scene::update_geometry(const KeyboardLayout& layout, const KeyViewFrame& vi
                                                  range.contains(note) && k.width > 0.0f};
         cols_[static_cast<std::size_t>(note)] = block_column(layout, view, note, width);
     }
+    ++keys_epoch_;
     if (restart) {
         name_cache_.clear();
     }

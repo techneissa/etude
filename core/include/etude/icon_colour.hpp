@@ -48,9 +48,6 @@ inline const IconColourInfo& icon_colour_info(IconColour colour) {
     return kIconColours[static_cast<std::size_t>(colour)];
 }
 
-// The colour whose key is `key`.
-std::optional<IconColour> icon_colour_from_key(std::string_view key);
-
 // Whether a player whose best title among the device's profiles is `best_title` (1 .. 8; 0: not
 // known yet) has the colour. The default one is always theirs.
 bool icon_colour_unlocked(IconColour colour, int best_title);

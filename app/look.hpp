@@ -10,7 +10,7 @@
 #include "etude/hand.hpp"
 #include "etude/press_effects.hpp"
 
-#include <SDL3/SDL.h>
+#include <SDL3/SDL_pixels.h>
 
 #include <cstdint>
 

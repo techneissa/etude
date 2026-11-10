@@ -7,7 +7,7 @@
 
 #include "picture_hash.hpp"
 
-#include <SDL3/SDL.h>
+#include <SDL3/SDL_render.h>
 
 namespace etude::app::picture {
 

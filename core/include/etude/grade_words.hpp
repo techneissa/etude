@@ -53,10 +53,6 @@ struct GradeLayoutParams {
 std::size_t place_grade_words(const GradeLayoutParams& params, std::span<const RectF> avoid,
                               std::span<const GradeWordIn> words, std::span<GradeWordOut> out);
 
-// The rectangle all rows of `params` lie in (empty when not even one row fits). Always inside the
-// note area and, for `Top`, below the chord label.
-RectF grade_band(const GradeLayoutParams& params);
-
 // Opacity of a word at `age` before the look's own opacity: a short fade in, then fading out
 // to nothing at age 1. 0 outside 0..1.
 float grade_word_alpha(float age);

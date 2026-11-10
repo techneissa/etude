@@ -27,13 +27,10 @@ class CrashSession {
     // report" leaves a marker that is taken here: the report's sheet then opens as soon as the notice
     // is there (`take_sheet_request`).
     void begin_notice(const std::filesystem::path& data_dir);
-    // A report is waiting to be told (or being told).
-    bool report_waiting() const { return waiting_report_; }
     // True once, when the sheet was asked for at this start and the notice is made.
     bool take_sheet_request();
     // `--crash-demo STATE` for the shots: "mac" (a browser) or "pi" (none).
     void demo(std::string_view state);
-    bool has_notice() const { return notice_.has_value(); }
     // What the card shows, null when there is no notice.
     const ui::CrashView* view() const { return notice_ ? &view_ : nullptr; }
     // The player's answer: Dismiss ends the notice, OpenUrl opens the issue through `open` and

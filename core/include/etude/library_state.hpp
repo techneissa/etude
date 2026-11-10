@@ -57,9 +57,6 @@ struct LibraryState {
 // whose name and stamp are unchanged keeps its Loaded or Failed result.
 LibraryState list_state(std::span<const LibraryFile> files, const LibraryState* previous = nullptr);
 
-// The first Pending item at or after `from`, or none.
-std::optional<std::size_t> next_pending(const LibraryState& state, std::size_t from = 0);
-
 // Records a parse. `stamp` is the stamp the worker read the file under; a result for an item that
 // has since changed (another stamp, or an index past the end) is dropped and false is returned.
 bool apply_loaded(LibraryState& state, std::size_t index, std::uint64_t stamp, SongEntry entry);

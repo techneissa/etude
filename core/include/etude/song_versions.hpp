@@ -48,14 +48,6 @@ struct MelodyContour {
 // than two such notes.
 MelodyContour melody_contour(const Song& song);
 
-// How alike two melodies are, 0 to 1: the two contours lined up end to end, in the key that fits
-// them best, as a share of the shorter one. A note on one side only (an ornament, a passing note)
-// costs a little, a wrong note more, and notes left over before the first match or after the last
-// more still, so a melody that matches only a stretch of a longer one scores low. 0 when either is
-// not usable. The same notes in another key score 1; one melody the other with a fifth of its
-// notes left out or ornaments added, over 0.8; two other melodies, under 0.5.
-double melody_similarity(const MelodyContour& a, const MelodyContour& b);
-
 // ---- What the file says
 
 // A level a file names for itself, in its title or its file name: "Fur Elise (Easy)", "Sonata
@@ -111,7 +103,7 @@ struct VersionSong {
 // A group's most songs: past it, a song is not added (a group that large is a false chain).
 inline constexpr std::size_t kMaxVersions = 8;
 
-// Thresholds of melody_similarity. A title and composer that match say the songs are one piece; the
+// Thresholds of the melody check. A title and composer that match say the songs are one piece; the
 // melody confirms it, or vetoes it when it is too unlike. With a title that differs, or no composer
 // to tell, the melody has to carry it alone.
 inline constexpr double kVersionVeto = 0.3; // a catalogue number matched: below this, not one piece
@@ -168,10 +160,6 @@ struct VersionMember {
 struct VersionGroup {
     std::vector<VersionMember> members; // easiest first (kMaxVersions at most, at least two)
 };
-
-// Whether two songs are one piece (by title, composer and number, then the melody; see the
-// thresholds above). Symmetric.
-bool same_piece(const VersionSong& a, const VersionSong& b);
 
 // The groups of two or more songs that are the same piece, each ordered by our rating (a file's own
 // label breaks a tie), named by the file's own label or else by its stars. A name two members share

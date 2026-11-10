@@ -74,7 +74,9 @@
 #include "etude/trouble_run.hpp"
 #include "etude/ui_grow_hold.hpp"
 
-#include <SDL3/SDL.h>
+#include <SDL3/SDL_events.h>
+#include <SDL3/SDL_render.h>
+#include <SDL3/SDL_video.h>
 
 #include <array>
 #include <chrono>

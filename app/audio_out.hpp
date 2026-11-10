@@ -9,7 +9,8 @@
 #include "etude/midi_event.hpp"
 #include "etude/spsc_queue.hpp"
 
-#include <SDL3/SDL.h>
+#include <SDL3/SDL_audio.h>
+#include <SDL3/SDL_events.h>
 
 #include <array>
 #include <atomic>

@@ -71,12 +71,6 @@ inline constexpr float mode_width(BarForm form, float cell) {
 // The song's transport: the buttons of `cell` the form keeps (replay, back, play, forward, the
 // song's sound) and the two hand toggles, each at least `hit` (a cell: a hit area and the gap).
 inline constexpr float hand_cell(float cell, float hit) { return std::max(cell * 0.9f, hit); }
-inline constexpr int transport_buttons(BarForm form) {
-    return 1 + (bar_has_skips(form) ? 2 : 0) + (bar_has_replay(form) ? 2 : 0);
-}
-inline constexpr float transport_width(float cell, float hit, BarForm form = BarForm::Full) {
-    return cell * static_cast<float>(transport_buttons(form)) + hand_cell(cell, hit) * 2.0f;
-}
 
 // Every control a bar can hold, in the order every style draws them.
 enum class Ctl : std::uint8_t {

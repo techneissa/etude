@@ -52,19 +52,6 @@ void parse_os_release(std::string_view text, MachineOsText& out) {
     }
 }
 
-std::string debian_arch(std::string_view uname_machine) {
-    if (uname_machine == "aarch64" || uname_machine == "arm64") {
-        return "arm64";
-    }
-    if (uname_machine == "x86_64" || uname_machine == "amd64") {
-        return "amd64";
-    }
-    if (uname_machine == "armv7l" || uname_machine == "armv8l") {
-        return "armhf";
-    }
-    return std::string(uname_machine);
-}
-
 std::string build_debian_arch() {
 #if defined(__aarch64__)
     return "arm64";

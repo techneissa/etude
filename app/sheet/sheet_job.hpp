@@ -3,7 +3,7 @@
 // engraver's fonts are.
 #pragma once
 
-#include "song_controller.hpp"
+#include "loaded_song.hpp"
 
 #include "etude/sheet_source.hpp"
 

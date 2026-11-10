@@ -100,9 +100,6 @@ struct HitShape {
     float whiten = 0.0f;
 };
 
-// The highest point (smallest y) the shape covers.
-float hit_shape_top(const HitShape& shape);
-
 // A fixed pool of running hit effects. Once full, a new press takes the oldest slot, so it never
 // allocates. Positions follow from each slot's age, so a frame's shapes depend only on the clock.
 class HitEffects {
@@ -169,15 +166,5 @@ inline constexpr std::array<SceneLayer, 9> kSceneLayers{
     SceneLayer::Background, SceneLayer::HitEffects, SceneLayer::Blocks,    SceneLayer::Keyboard,
     SceneLayer::KeyLabel,   SceneLayer::NoteText,   SceneLayer::Combo,     SceneLayer::ChordLabel,
     SceneLayer::Prompt};
-
-// Where `layer` falls in kSceneLayers.
-constexpr std::size_t scene_layer_index(SceneLayer layer) {
-    for (std::size_t i = 0; i < kSceneLayers.size(); ++i) {
-        if (kSceneLayers[i] == layer) {
-            return i;
-        }
-    }
-    return kSceneLayers.size();
-}
 
 } // namespace etude

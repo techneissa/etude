@@ -3,6 +3,8 @@
 
 #include "wav_file.hpp"
 
+#include <SDL3/SDL.h>
+
 #include <algorithm>
 #include <cmath>
 #include <cstdio>

@@ -79,29 +79,6 @@ std::size_t find_coda(const std::vector<BarMarks>& bars, const std::string& labe
 
 } // namespace
 
-void merge_bar_marks(BarMarks& into, const BarMarks& from) {
-    auto label = [](std::string& to, const std::string& with) {
-        if (to.empty()) {
-            to = with;
-        }
-    };
-    into.forward_repeat = into.forward_repeat || from.forward_repeat;
-    into.backward_repeat = into.backward_repeat || from.backward_repeat;
-    into.times = std::max(into.times, from.times);
-    into.endings |= from.endings;
-    into.ending_stops = into.ending_stops || from.ending_stops;
-    into.dacapo = into.dacapo || from.dacapo;
-    into.dalsegno = into.dalsegno || from.dalsegno;
-    label(into.dalsegno_label, from.dalsegno_label);
-    into.segno = into.segno || from.segno;
-    label(into.segno_label, from.segno_label);
-    into.coda = into.coda || from.coda;
-    label(into.coda_label, from.coda_label);
-    into.tocoda = into.tocoda || from.tocoda;
-    label(into.tocoda_label, from.tocoda_label);
-    into.fine = into.fine || from.fine;
-}
-
 std::uint64_t parse_ending_numbers(const char* text) {
     std::uint64_t set = 0;
     if (text == nullptr) {

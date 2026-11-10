@@ -59,9 +59,6 @@ class HandChordsJob {
     bool busy() const;
     // Blocks until nothing waits or runs (tests, and quitting).
     void wait_idle();
-    // How many times the worker analysed the notes (not counting a naming again from the kept
-    // harmony): for the tests.
-    std::uint64_t analyses() const;
 
   private:
     void run();

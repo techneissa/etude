@@ -4,6 +4,7 @@
 #include "sheet_view_internal.hpp"
 
 #include "../gfx.hpp"
+#include "../song_controller.hpp"
 #include "../touch_device.hpp"
 #include "sheet_name_fit.hpp"
 

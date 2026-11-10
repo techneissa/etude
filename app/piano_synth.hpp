@@ -106,12 +106,8 @@ class PianoSynth final : public SynthSink {
 
     // Commands dropped because the queue was full (main thread pushing faster than audio drains).
     std::uint64_t dropped_commands() const { return commands_.dropped(); }
-    // Voices sounding, as of the last render. Any thread.
-    int active_voices() const { return active_voices_.load(std::memory_order_relaxed); }
     // Voices cut to make room for new notes, in total. Any thread.
     std::uint64_t stolen_voices() const { return stolen_.load(std::memory_order_relaxed); }
-    // Voices sounding for one key. Audio thread (or tests) only.
-    int voices_for_key(int key) const;
 
   private:
     bool finish_load(tsf* font, int sample_rate);

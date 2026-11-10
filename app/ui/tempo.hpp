@@ -59,7 +59,6 @@ class TempoControls {
     }
     // A long press on the metronome toggle asked for its settings page.
     bool wants_open(Page* page);
-    void ask_settings() { want_settings_ = true; }
 
   private:
     bool open_ = false;

@@ -38,7 +38,6 @@ inline constexpr float kCalendarMaxH = 232.0f;
 inline constexpr float kGraphMinH = 104.0f;
 inline constexpr float kGraphH = 190.0f;
 inline constexpr float kBestRowH = 40.0f;
-inline constexpr float kBestRowsMin = 2.0f;
 // Right column.
 inline constexpr float kProfileH = 64.0f;      // avatar, name, streak, the pencil
 inline constexpr float kAvatar = 44.0f;
@@ -51,7 +50,6 @@ inline constexpr float kMedalsH = 92.0f;       // the medals card: the ring and 
 inline constexpr float kMedalsRing = 56.0f;
 inline constexpr float kSpotH = 52.0f;         // a "Practise today" row: its words and the play button
 inline constexpr float kContinueH = tok::kHit;
-inline constexpr float kSpotsMax = 3.0f;
 // Inside the cards (progress_charts.cpp).
 inline constexpr float kCalendarLabelW = 30.0f; // the weekday names left of the calendar
 inline constexpr float kCellMin = 6.0f;         // the calendar draws no cell smaller than this

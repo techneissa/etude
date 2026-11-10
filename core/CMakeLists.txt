@@ -54,6 +54,7 @@ add_library(etude_core
   src/gunzip_stream.cpp
   src/hand_path.cpp
   src/hand_split.cpp
+  src/hand_split_apply.cpp
   src/hands_present.cpp
   src/harmony.cpp
   src/harmony_fit.cpp
@@ -183,6 +184,7 @@ add_library(etude_core
   src/song_board.cpp
   src/song_builder.cpp
   src/song_catalogue.cpp
+  src/song_catalogue_lieder.cpp
   src/song_key.cpp
   src/song_opening.cpp
   src/song_practice.cpp

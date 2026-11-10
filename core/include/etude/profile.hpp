@@ -87,7 +87,6 @@ class ProfileSet {
     std::size_t size() const { return profiles_.size(); }
     const Profile* find(std::int64_t id) const;
     bool contains(std::int64_t id) const { return find(id) != nullptr; }
-    const Profile& default_profile() const { return *find(kDefaultProfileId); }
     // `id` when the set holds it, else the default profile's.
     std::int64_t resolve(std::int64_t id) const { return contains(id) ? id : kDefaultProfileId; }
 

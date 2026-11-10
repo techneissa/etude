@@ -99,13 +99,6 @@ MelodyStepFacts step_facts(const CatalogueSong& s) {
     return {s.half_stars, s.left, s.right, s.left_keys, s.right_keys, s.bars, s.notes};
 }
 
-int step_for(const CatalogueSong& song, const MelodyAdded& added) {
-    if (const int chosen = added.step_of(song.hash); chosen != 0) {
-        return chosen;
-    }
-    return suggest_melody_step(step_facts(song));
-}
-
 std::vector<std::uint64_t> hidden_added(const LibraryCatalogue& catalogue, const MelodyAdded& added) {
     const Found found = find_added(catalogue, added);
     std::vector<std::uint64_t> hidden;

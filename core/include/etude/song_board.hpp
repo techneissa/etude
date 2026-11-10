@@ -44,16 +44,6 @@ struct SongBoard {
     friend bool operator==(const SongBoard&, const SongBoard&) = default;
 };
 
-// The board of `song_hash` for `period` ending `today`, from every profile's runs; the chart and
-// the run's comparison are the profile `active_profile`'s (empty and not counted when `household`
-// does not hold it). Runs dated after `today` are left out. `run` is the run the page is about (a
-// results card's): its points, its comparison with the run before it and whether it is a personal
-// best are the head's, and a run that does not count (too few notes graded) leaves `has_run` false
-// whatever the profile's other runs were. Null: the profile's latest counting run of the song.
-SongBoard build_song_board(std::span<const ProfileRuns> household, std::uint64_t song_hash,
-                           Period period, std::int32_t today, std::int64_t active_profile,
-                           const RunRecord* run = nullptr);
-
 // Week, Month and All time (the order of `Period`) in one pass: the runs of the song are picked out
 // of every profile's list once, so the cost is that of the song's runs and not of the history.
 std::array<SongBoard, 3> build_song_boards(std::span<const ProfileRuns> household,

@@ -69,12 +69,6 @@ class PracticeTablesJob {
     // Holds the worker before its next build until released (tests: the frames between a tap and
     // its answer are then not a race).
     void hold(bool on);
-    // Tests: `hook` runs on the worker at every check of whether to stop, before the answer to it,
-    // so a test can park a build mid-way and ask it to stop with nothing left to the clock. Set it
-    // before the first request.
-    void set_check_hook(std::function<void()> hook);
-    // How many builds ended early because they were asked to stop (a cancel, quit), for tests.
-    std::uint64_t stopped_builds() const { return stopped_builds_.load(); }
 
   private:
     void run();
@@ -85,8 +79,6 @@ class PracticeTablesJob {
     std::optional<TablesRequest> waiting_;
     std::optional<TablesResult> done_;
     bool held_ = false;
-    std::function<void()> check_hook_;
-    std::atomic<std::uint64_t> stopped_builds_{0};
     std::atomic<bool> abort_{false}; // the running build should stop: a cancel, quit
     std::vector<FlowEvaluator::Prepared> flow_garbage_;
     std::vector<WaitEvaluator::Prepared> wait_garbage_;

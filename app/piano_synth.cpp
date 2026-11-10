@@ -55,6 +55,10 @@ constexpr float kTwoPi = 6.28318530718F;
 // velocity sits near -12 dBFS.
 constexpr float kClickGain = 0.42F;
 
+// What tsf can take: a size of 0 or over 2 GB is refused with this text.
+constexpr std::size_t kMaxSoundFontBytes = 0x7FFFFFFF;
+constexpr const char* kBadSizeText = "empty or oversized SoundFont";
+
 // How long a level takes to fall to -60 dB, as the per-sample factor.
 float decay_for(float seconds, float rate) { return std::pow(0.001F, 1.0F / (seconds * rate)); }
 
@@ -69,13 +73,23 @@ PianoSynth::~PianoSynth() {
 }
 
 bool PianoSynth::load_file(const std::string& path, int sample_rate) {
-    std::ifstream in(path, std::ios::binary);
+    std::ifstream in(path, std::ios::binary | std::ios::ate);
     if (!in) {
         error_ = "cannot open " + path;
         return false;
     }
-    const std::vector<char> data((std::istreambuf_iterator<char>(in)),
-                                 std::istreambuf_iterator<char>());
+    // One sized read: the file is about 10 MB, so growing a vector byte by byte copies it many times.
+    // A folder or an odd file gives a size of 0, -1 or something huge: refuse it before allocating.
+    const std::streamoff size = in.tellg();
+    if (size <= 0 || size > static_cast<std::streamoff>(kMaxSoundFontBytes)) {
+        error_ = path + ": " + kBadSizeText;
+        return false;
+    }
+    std::vector<char> data(static_cast<std::size_t>(size));
+    in.seekg(0);
+    if (!in.read(data.data(), size)) {
+        data.clear();
+    }
     if (!load_memory(data.data(), data.size(), sample_rate)) {
         error_ = path + ": " + error_;
         return false;
@@ -84,8 +98,8 @@ bool PianoSynth::load_file(const std::string& path, int sample_rate) {
 }
 
 bool PianoSynth::load_memory(const void* data, std::size_t size, int sample_rate) {
-    if (size == 0 || size > 0x7FFFFFFF) {
-        error_ = "empty or oversized SoundFont";
+    if (size == 0 || size > kMaxSoundFontBytes) {
+        error_ = kBadSizeText;
         return false;
     }
     tsf* font = tsf_load_memory(data, static_cast<int>(size));
@@ -459,10 +473,6 @@ void PianoSynth::render(float* out, int frames, std::int64_t block_start_ns) {
             timed_count_ = 0;
         }
     }
-}
-
-int PianoSynth::voices_for_key(int key) const {
-    return font_ != nullptr ? tsf_glue_voices_for_key(font_, key) : 0;
 }
 
 // Master volume, then a peak limiter with instant attack and a 150 ms release: the follower never

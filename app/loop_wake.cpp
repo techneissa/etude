@@ -27,66 +27,6 @@ void wake_loop(WakeSource source) noexcept {
     }
 }
 
-const char* wake_source_name(WakeSource source) noexcept {
-    switch (source) {
-    case WakeSource::Other:
-        return "other";
-    case WakeSource::SongOpen:
-        return "song opener";
-    case WakeSource::History:
-        return "history";
-    case WakeSource::Library:
-        return "library";
-    case WakeSource::HandChords:
-        return "hand chords";
-    case WakeSource::HandSplit:
-        return "hand split";
-    case WakeSource::PracticeTables:
-        return "practice tables";
-    case WakeSource::Catalogue:
-        return "catalogues";
-    case WakeSource::Mic:
-        return "microphone";
-    case WakeSource::Midi:
-        return "midi";
-    case WakeSource::Ports:
-        return "ports";
-    case WakeSource::FolderWatch:
-        return "folder watch";
-    case WakeSource::Sheet:
-        return "sheet";
-    case WakeSource::Upload:
-        return "upload";
-    case WakeSource::Sources:
-        return "network folder and usb";
-    case WakeSource::Update:
-        return "update";
-    case WakeSource::Count:
-        break;
-    }
-    return "?";
-}
-
-WakeCounts wake_counts() noexcept {
-    WakeCounts counts{};
-    for (std::size_t i = 0; i < counts.size(); ++i) {
-        counts[i] = g_by_source[i].load(std::memory_order_relaxed);
-    }
-    return counts;
-}
-
-std::string wake_report(const WakeCounts& before, const WakeCounts& after) {
-    std::string text;
-    for (std::size_t i = 0; i < before.size(); ++i) {
-        if (after[i] > before[i]) {
-            text += (text.empty() ? "" : ", ") +
-                    std::string(wake_source_name(static_cast<WakeSource>(i))) + " " +
-                    std::to_string(after[i] - before[i]);
-        }
-    }
-    return text.empty() ? "none" : text;
-}
-
 void set_wake_hook(void (*hook)()) noexcept { g_hook.store(hook); }
 
 std::uint64_t wake_requests() noexcept { return g_requests.load(); }

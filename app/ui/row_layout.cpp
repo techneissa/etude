@@ -36,7 +36,6 @@ std::vector<column_probe::Row> g_rows;
 
 void row_scope(int scope) { g_scope = scope; }
 void row_column_offset(int offset) { g_column_offset = offset; }
-int current_row_scope() { return g_scope; }
 
 RowFrame row_frame(float left, float width, float u) {
     RowFrame f;

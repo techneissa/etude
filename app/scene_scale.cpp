@@ -36,21 +36,19 @@ SDL_FColor Scene::dimmed_key(SDL_FColor face, bool black) const {
                  : mix(face, with_alpha(kDimWhite, face.a), kDimWhiteShare);
 }
 
-void Scene::add_unlit_white(int note, const SDL_FRect& face, float radius) {
-    const bool dim = outside_scale(note);
-    mesh_.rounded_rect(
+void Scene::add_unlit_white(Mesh& out, bool dim, const SDL_FRect& face, float radius) {
+    out.rounded_rect(
         face, radius, dim ? dimmed_key(look_.key_white_top, false) : look_.key_white_top,
         dim ? dimmed_key(look_.key_white_bottom, false) : look_.key_white_bottom, 0.8f * unit_);
 }
 
-void Scene::add_unlit_black(int note, const SDL_FRect& face, float radius, const SDL_FRect& lip,
-                            float lip_radius) {
-    const bool dim = outside_scale(note);
-    mesh_.rounded_rect(
+void Scene::add_unlit_black(Mesh& out, bool dim, const SDL_FRect& face, float radius,
+                            const SDL_FRect& lip, float lip_radius) {
+    out.rounded_rect(
         face, radius, dim ? dimmed_key(look_.key_black_top, true) : look_.key_black_top,
         dim ? dimmed_key(look_.key_black_bottom, true) : look_.key_black_bottom, 0.8f * unit_);
-    mesh_.rounded_rect(lip, lip_radius, with_alpha(look_.key_black_lip, 0.0f),
-                       dim ? dimmed_key(look_.key_black_lip, true) : look_.key_black_lip, 0.0f);
+    out.rounded_rect(lip, lip_radius, with_alpha(look_.key_black_lip, 0.0f),
+                     dim ? dimmed_key(look_.key_black_lip, true) : look_.key_black_lip, 0.0f);
 }
 
 void Scene::draw_scale_marks(float top, float bottom, float black_length) {

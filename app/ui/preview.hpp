@@ -21,7 +21,7 @@
 #include "etude/note_trail.hpp"
 #include "etude/song_opening.hpp"
 
-#include <SDL3/SDL.h>
+#include <SDL3/SDL_render.h>
 
 #include <array>
 #include <bitset>

@@ -82,8 +82,6 @@ inline constexpr ImVec4 kText3{0.42f, 0.455f, 0.533f, 1.0f};
 inline constexpr ImVec4 kWarning{1.0f, 0.45f, 0.45f, 1.0f};
 // The names the settings pages and the editor still use, for the roles above.
 inline constexpr ImVec4 kSurfaceHi = kRaised;
-inline constexpr ImVec4 kFillPressed = kPressed;
-inline constexpr ImVec4 kAccentSoft = kSelected;
 inline constexpr ImVec4 kDanger = kWarning;
 } // namespace col
 
@@ -245,9 +243,6 @@ struct Kit {
     // Like `say`, with an Undo chip that runs `undo` (once) while the toast shows; the next toast
     // takes the offer away. For a change that went through at once and is not a section edit.
     void say_undoable(std::string_view text, std::function<void()> undo);
-    // Like `say`, near the box `min`..`max` instead of the last item (a control that draws its own
-    // windows).
-    void say_at(std::string_view text, ImVec2 min, ImVec2 max, bool warning = false);
     // Like `say_free`, but from outside a frame: it starts on the next one. `name` is the part of
     // the text that is a song's title (see `TextSpan`).
     void say_later(std::string_view text, bool warning = false, TextSpan name = {},
@@ -361,17 +356,20 @@ bool font_ink(ImFont* font, float size, char c, ImVec2* min, ImVec2* max);
 void hand_pair(const Kit& k, ImDrawList* dl, ImVec2 centre, float size, ImVec4 colour,
                bool left = true, bool right = true);
 float hand_pair_width(float size);
-// `text` as the screen shows it: a note named in it ("Prelude in Bb", "C#4") carries the signs ♭ and
-// ♯, never the letter b or a number sign (core `accidental_display_text`). Text with no note name
-// comes back as it was (no copy); the rest is written into one of a few strings kept between
-// calls, valid until the eighth call after it. Every text the kit draws or measures goes through
-// it (`text_at`, `text_size`, `label_at`, `label_stack`, `fit`), so the same words measure and
-// draw alike; text drawn straight with `AddText` calls it first.
+// `text` as the screen shows it: a note named in it ("Prelude in Bb", "C#4") carries the signs ♭
+// and ♯, never the letter b or a number sign (core `accidental_display_text_into`). Text with no
+// note name comes back as it was (no copy); the rest is written into one of a few strings kept
+// between calls, valid until the eighth call after it. Every text the kit draws or measures goes
+// through it (`text_at`, `text_size`, `label_at`, `label_stack`, `fit`), so the same words measure
+// and draw alike; text drawn straight with `AddText` calls it first.
 const char* screen_text(const char* text);
 std::string_view screen_text(std::string_view text);
 void text_at(const Kit& k, ImDrawList* dl, ImFont* font, float size, ImVec2 pos, ImVec4 colour,
              const char* text);
 ImVec2 text_size(ImFont* font, float size, const char* text);
+// `text_size(...).x`, kept per font, size and words until the fonts are rebuilt (`forget_fonts`), for
+// text measured every frame that seldom changes.
+float text_width(ImFont* font, float size, const char* text);
 // A label placed by its ink, never by its font's line box (which holds room for descenders: a
 // word without them, "All" or a number, would sit high). Vertical: the capitals' band is centred
 // on the slot's middle. Horizontal, by `align`: `Left` starts the pen at the slot's left edge,
@@ -500,7 +498,7 @@ float chip_width(const Kit& k, const char* icon, std::string_view text,
 // The same for words at `label_pt` design points (0: the kit's size), so a chip of a larger popup
 // holds its words whole.
 float chip_width_at(const Kit& k, const char* icon, std::string_view text, float label_pt);
-// A popup's button at `wide_step` `step` (tok::popup_type, tok::wide_grow): the words a type step
+// A popup's button at `wide_step` `step` (tok::popup_type): the words a type step
 // up, the face and hit area taller, wide enough for its words; step 0 is the kit's own chip.
 ChipOpts popup_button(const Kit& k, int step, const char* icon, std::string_view text);
 bool chip(Kit& k, const char* id, std::string_view text, ImVec2 pos, const ChipOpts& o = {});

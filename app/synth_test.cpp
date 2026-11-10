@@ -3,6 +3,8 @@
 
 #include "audio_out.hpp"
 
+#include <SDL3/SDL.h>
+
 #include <chrono>
 #include <cstdio>
 #include <initializer_list>

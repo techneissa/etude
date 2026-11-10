@@ -72,10 +72,6 @@ class GameFeel {
     int combo() const { return combo_; }
     // Graded presses this run.
     int presses() const { return presses_; }
-    // Mean of every graded press this run; nullopt when none.
-    std::optional<std::int64_t> run_mean_ns() const;
-    // Set once the suggestion has fired this run.
-    std::optional<TimingDirection> calibration_suggestion() const { return suggestion_; }
 
   private:
     std::int64_t sum_ns_ = 0;

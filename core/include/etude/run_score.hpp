@@ -67,7 +67,6 @@ double difficulty_factor(int difficulty_half_stars);
 // The run's score and its parts. A context that knows the song gives the coverage; without one the
 // record's own `covered_percent` does, and a record that has none counts as a whole pass.
 ScoreParts score_parts(const RunRecord& run, const ScoreContext& context = {});
-int score_run(const RunRecord& run, const ScoreContext& context = {});
 
 // The run with its `score` and `covered_percent` set from the context.
 RunRecord scored(const RunRecord& run, const ScoreContext& context);

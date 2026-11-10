@@ -55,8 +55,8 @@ inline constexpr int kActingLockWaitS = 10;
 // The time budget, in one place: every figure is worked out from the helper's own timeouts
 // (`service_timeout_s` for a systemctl call that does something, `query_timeout_s()` for one that only
 // asks, `data_timeout_s` for the backup or restore), and the units' TimeoutStartSec and TimeoutStopSec
-// (deploy/pi) must cover them, with margin: tests/helper_apply_test.cpp reads the unit files and checks
-// it, at the defaults and at the largest values the settings file may ask for (update_conf.hpp).
+// (deploy/pi) must cover them, with margin, at the defaults and at the largest values the settings
+// file may ask for (update_conf.hpp).
 //
 // One program run with a timeout of `t` seconds: `run_program` gives it `t`, then 5 more to be reaped.
 inline int worst_case_call_seconds(double t) { return static_cast<int>(std::ceil(t)) + 5; }

@@ -9,6 +9,8 @@
 #include "shaders/neon_glow.vert.es100.h"
 #include "shaders/neon_glow.vert.gl120.h"
 
+#include <SDL3/SDL.h>
+
 #include <algorithm>
 #include <array>
 #include <cstddef>

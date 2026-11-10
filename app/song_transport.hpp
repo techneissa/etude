@@ -4,13 +4,15 @@
 // countdown length come from the controller's options (AppSettings).
 #pragma once
 
-#include "song_controller.hpp"
+#include "loaded_song.hpp"
 #include "ui/song_port.hpp"
 
 #include <cstdint>
 #include <vector>
 
 namespace etude::app {
+
+class SongController;
 
 class SongTransport final : public ui::SongPort {
   public:

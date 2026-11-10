@@ -10,7 +10,7 @@
 #include "etude/medals.hpp"
 #include "ui/icon_port.hpp"
 
-#include <SDL3/SDL.h>
+#include <SDL3/SDL_video.h>
 
 #include <algorithm>
 #include <optional>

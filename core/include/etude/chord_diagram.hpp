@@ -40,9 +40,6 @@ inline constexpr std::array<ChordQuality, 23> kChordCardQualities{
 // root's minor key, else its major key.
 bool chord_is_minor_like(ChordQuality quality);
 
-// How many notes the quality's shape has (a power chord 2, a triad 3, a seventh 4, a ninth 5).
-int chord_tone_count(ChordQuality quality);
-
 // How many inversions the card shows: the chord's notes in stacked thirds are the root, the third
 // (or the suspended note that stands for it), the fifth and the seventh (or the sixth); each of those
 // may be the bass (root position, first, second, third inversion). The ninth, eleventh, thirteenth

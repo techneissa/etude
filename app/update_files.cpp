@@ -4,43 +4,13 @@
 #include "etude/update_handoff.hpp"
 
 #include <cerrno>
-#include <fstream>
 #include <system_error>
 
-#if !defined(_WIN32)
 #include <fcntl.h>
 #include <unistd.h>
-#endif
 
 namespace etude::app {
 
-#if defined(_WIN32)
-bool write_file_atomic(const std::filesystem::path& path, const std::string& text, int* error) {
-    std::error_code ec;
-    std::filesystem::create_directories(path.parent_path(), ec);
-    std::filesystem::path tmp = path;
-    tmp += ".part";
-    {
-        std::ofstream out(tmp, std::ios::binary | std::ios::trunc);
-        out << text;
-        if (!out) {
-            if (error != nullptr) {
-                *error = EIO;
-            }
-            return false;
-        }
-    }
-    std::filesystem::rename(tmp, path, ec);
-    if (ec) {
-        if (error != nullptr) {
-            *error = ec.value();
-        }
-        std::filesystem::remove(tmp, ec);
-        return false;
-    }
-    return true;
-}
-#else
 bool write_file_atomic_with(const FileSteps& steps, const std::filesystem::path& path,
                             const std::string& text, int* error) {
     if (error != nullptr) {
@@ -94,7 +64,6 @@ bool write_file_atomic_with(const FileSteps& steps, const std::filesystem::path&
 bool write_file_atomic(const std::filesystem::path& path, const std::string& text, int* error) {
     return write_file_atomic_with(FileSteps{}, path, text, error);
 }
-#endif
 
 bool write_update_ready(const std::filesystem::path& update_dir, std::string_view version) {
     std::error_code ec;

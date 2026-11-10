@@ -201,31 +201,6 @@ LibraryLoad load_library_entry(std::span<const std::uint8_t> bytes, std::string_
     return out;
 }
 
-void attach_history(SongEntry& entry, std::span<const RunRecord> runs) {
-    entry.has_best = false;
-    entry.best = BestEntry{};
-    entry.run_count = 0;
-    entry.last_run_index = -1;
-    entry.last_run_day = 0;
-    if (entry.hash == 0) {
-        return;
-    }
-    for (std::size_t i : unique_run_indices(runs)) {
-        if (runs[i].song_hash == entry.hash) {
-            ++entry.run_count;
-            entry.last_run_index = static_cast<int>(i);
-            entry.last_run_day = runs[i].local_day;
-        }
-    }
-    for (const BestEntry& b : song_bests(runs, entry.hash)) {
-        if (!entry.has_best || b.accuracy > entry.best.accuracy ||
-            (b.accuracy == entry.best.accuracy && b.speed_percent > entry.best.speed_percent)) {
-            entry.best = b;
-            entry.has_best = true;
-        }
-    }
-}
-
 std::unordered_map<std::uint64_t, SongPlays> summarise_plays(std::span<const RunRecord> runs) {
     std::unordered_map<std::uint64_t, SongPlays> out;
     for (std::size_t i : unique_run_indices(runs)) {
@@ -247,84 +222,5 @@ std::unordered_map<std::uint64_t, SongPlays> summarise_plays(std::span<const Run
 }
 
 // ---- Browsing
-
-bool matches_filter(const SongEntry& entry, const LibraryFilter& filter) {
-    if (entry.difficulty < filter.min_difficulty || entry.difficulty > filter.max_difficulty) {
-        return false;
-    }
-    if (filter.played == PlayedFilter::PlayedOnly && !entry.played()) {
-        return false;
-    }
-    if (filter.played == PlayedFilter::UnplayedOnly && entry.played()) {
-        return false;
-    }
-    if (filter.keyboard != KeyboardFilter::Any) {
-        KeyFit fit = fit_to_keyboard(entry, filter.range).fit;
-        if (fit == KeyFit::TooWide ||
-            (filter.keyboard == KeyboardFilter::FitsAsIs && fit != KeyFit::Fits)) {
-            return false;
-        }
-    }
-    return matches_search(entry.title_key, filter.text);
-}
-
-std::vector<std::size_t> browse_library(std::span<const SongEntry> entries,
-                                        const LibraryFilter& filter, const LibrarySort& sort) {
-    std::vector<std::size_t> order;
-    for (std::size_t i = 0; i < entries.size(); ++i) {
-        if (matches_filter(entries[i], filter)) {
-            order.push_back(i);
-        }
-    }
-    auto by_title = [&](std::size_t a, std::size_t b) {
-        const SongEntry& x = entries[a];
-        const SongEntry& y = entries[b];
-        if (x.title_key != y.title_key) {
-            return x.title_key < y.title_key;
-        }
-        if (x.hash != y.hash) {
-            return x.hash < y.hash;
-        }
-        return a < b;
-    };
-    auto primary = [&](std::size_t a, std::size_t b) {
-        const SongEntry& x = entries[a];
-        const SongEntry& y = entries[b];
-        switch (sort.key) {
-        case SortKey::Title:
-            return 0;
-        case SortKey::Difficulty:
-            return x.difficulty < y.difficulty ? -1 : x.difficulty > y.difficulty ? 1 : 0;
-        case SortKey::Length:
-            return x.duration_s < y.duration_s ? -1 : x.duration_s > y.duration_s ? 1 : 0;
-        case SortKey::RecentlyPlayed:
-            return x.last_run_index < y.last_run_index   ? -1
-                   : x.last_run_index > y.last_run_index ? 1
-                                                         : 0;
-        }
-        return 0;
-    };
-    std::stable_sort(order.begin(), order.end(), [&](std::size_t a, std::size_t b) {
-        if (sort.key == SortKey::Title) {
-            return sort.descending ? by_title(b, a) : by_title(a, b);
-        }
-        if (sort.key == SortKey::RecentlyPlayed) {
-            bool a_never = entries[a].last_run_index < 0;
-            bool b_never = entries[b].last_run_index < 0;
-            if (a_never != b_never) {
-                return b_never; // played songs first
-            }
-            if (a_never) {
-                return by_title(a, b);
-            }
-        }
-        int c = primary(a, b);
-        if (c != 0) {
-            return sort.descending ? c > 0 : c < 0;
-        }
-        return by_title(a, b);
-    });
-    return order;
-}
 
 } // namespace etude

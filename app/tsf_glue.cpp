@@ -65,12 +65,4 @@ int tsf_glue_make_room(tsf* f, int preset_index, int key, float velocity) {
     return stolen;
 }
 
-int tsf_glue_voices_for_key(const tsf* f, int key) {
-    int count = 0;
-    for (const tsf_voice* v = f->voices; v != f->voices + f->voiceNum; ++v) {
-        count += v->playingPreset != -1 && v->playingKey == key ? 1 : 0;
-    }
-    return count;
-}
-
 } // namespace etude::app

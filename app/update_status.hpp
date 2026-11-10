@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // The words of the About page's Updates card and the rule for the daily check, as pure functions
-// of the view and the clock, so tests/update_status_test.cpp holds them. No SDL.
+// of the view and the clock. No SDL.
 #pragma once
 
 #include "net_fetch.hpp"

@@ -157,10 +157,6 @@ struct ColoursLayout {
     float height = 0.0f;
 
     bool split() const { return arrangement != ColoursArrangement::Whole; }
-    // The colours blocks' width: a column, or the full width when stacked.
-    float colours_w(float body_w) const {
-        return arrangement == ColoursArrangement::SplitStacked ? body_w : col_w;
-    }
 };
 
 // Where the swatches start in the whole page's left column, from the column's top: under the chips,
@@ -237,8 +233,5 @@ inline ColoursLayout colours_layout(float w, float h, float u) {
                        : l.split_stacked_h;
     return l;
 }
-
-// The tallest column of the arrangement in use: never taller than the body where the page fits.
-inline float colours_height(const ColoursLayout& l) { return l.height; }
 
 } // namespace etude::app::ui

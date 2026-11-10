@@ -50,7 +50,9 @@
 
 #include "etude/renderer_path.hpp"
 
-#include <SDL3/SDL.h>
+#include <SDL3/SDL_render.h>
+#include <SDL3/SDL_touch.h>
+#include <SDL3/SDL_video.h>
 
 #include <cstdint>
 #include <initializer_list>

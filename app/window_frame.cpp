@@ -5,6 +5,8 @@
 
 #include "etude/update_handoff.hpp"
 
+#include <SDL3/SDL.h>
+
 #include <algorithm>
 #include <array>
 #include <cstddef>

@@ -9,7 +9,7 @@
 #include "etude/hit_effects.hpp"
 #include "etude/note_style.hpp"
 
-#include <SDL3/SDL.h>
+#include <SDL3/SDL_render.h>
 
 #include <array>
 #include <cstdint>

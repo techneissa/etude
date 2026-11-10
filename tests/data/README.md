@@ -25,7 +25,7 @@ piece is for voice and piano: 716 notes, 43 bars, 80 BPM in 2/2, the piano on tw
 | `beethoven-op48-4-ehre-gottes-musescore4.mscz` | the same score saved as a MuseScore 4 file | MuseScore 4.7.3: `mscore -o out.mscz beethoven-op48-4-ehre-gottes.mxl` |
 | `beethoven-op48-4-ehre-gottes-musescore-export.mid` | MuseScore's own MIDI playback export of the `.mxl`, the independent reference for the notes | MuseScore 4.7.3: `mscore -o out.mid beethoven-op48-4-ehre-gottes.mxl` |
 
-Downloaded 2026-10-12. `tests/musicxml_real_test.cpp` checks that every note of the `.mxl` has the
+Downloaded 2026-10-12. `tests/musicxml_test.cpp` checks that every note of the `.mxl` has the
 pitch, start tick and (within MuseScore's export gate) end tick of the MIDI export, and that both
 `.mscz` files give the same notes as the `.mxl`. The MIDI export differs in two known ways: it
 ends notes early (about 5%, half for staccato) and it plays one ornament in bar 6 as extra notes.
@@ -47,33 +47,30 @@ conversions of it, run as `mscore -o OUT repeats-voltas.musicxml`:
 
 `repeats-tie-into-ending.musicxml` (also written for this repo, CC0) is a 3-bar piece whose first ending ends on a tied G and whose second ending starts on the other half of the tie.
 
-`tests/musicxml_repeats_test.cpp` checks that all three score files play the same notes, at the same
+`tests/repeats_test.cpp` checks that all three score files play the same notes, at the same
 ticks, as the MIDI export.
 
 ## ABC notation
 
-Five tunes in ABC 2.1 and four of them typed out a second time as MusicXML. All are original pieces written for this repo (CC0), not transcriptions, so they carry no licence to track; the traditional-tune idioms they use (a reel with a first and second ending, a 6/8 tune in D dorian, a jig with triplets and dotted pairs, a two-hand piece) are common to the whole repertoire. `make-abc-twins.py` writes the `.musicxml` files (`python3 -I tests/data/make-abc-twins.py` from the repo root); it types each bar again as (pitch, divisions) pairs read off the music, not off the ABC text, so `tests/abc_test.cpp` can check that the ABC loader and the MusicXML loader hear the same notes, bar numbers and play order.
+Four tunes in ABC 2.1 and two of them typed out a second time as MusicXML. All are original pieces written for this repo (CC0), not transcriptions, so they carry no licence to track; the traditional-tune idioms they use (a reel with a first and second ending, a 6/8 tune in D dorian, a two-hand piece) are common to the whole repertoire. `make-abc-twins.py` writes the `.musicxml` files (`python3 -I tests/data/make-abc-twins.py` from the repo root); it types each bar again as (pitch, divisions) pairs read off the music, not off the ABC text, so `tests/abc_test.cpp` can check that the ABC loader and the MusicXML loader hear the same notes, bar numbers and play order.
 
 | File | What it holds | MusicXML twin |
 | --- | --- | --- |
 | `abc-reel-repeats.abc` | Hillside Reel, G major, 4/4, 12 written bars: a repeat with first and second endings, then a repeated B part; chord symbols on every bar (for the left-hand option) | `abc-reel-repeats.musicxml` |
 | `abc-dorian.abc` | Dorian Dawn, D dorian (`K:Ddor`), 6/8, a one-eighth pickup, an F sharp that is carried through its bar, a tie across the last barline that completes the pickup | `abc-dorian.musicxml` |
-| `abc-triplets.abc` | Skipping Stones, F major, 4/4: `(3abc`, `(3:2:3abc`, `A>B` and `A<B` | `abc-triplets.musicxml` |
-| `abc-two-voices.abc` | Two Hands, C major, 3/4: voices `V:1` (treble, "Right hand") and `V:2` (bass, "Left hand"), chords in the left hand, the whole piece repeated | `abc-two-voices.musicxml` |
+| `abc-two-voices.abc` | Two Hands, C major, 3/4: voices `V:1` (treble, "Right hand") and `V:2` (bass, "Left hand"), chords in the left hand, the whole piece repeated (the hand split reads it) | none |
 | `abc-collection.abc` | three tunes (`X:1`, `X:2`, `X:10`) after a file header that sets the default note length | none |
 
 ## Import edge cases
 
-Small files for `tests/import_edges_test.cpp`, all written for this repo (CC0). `make-edge-cases.py` writes the `.mid` files and the generated `.musicxml` files (`python3 -I tests/data/make-edge-cases.py`); `edge-tie-cross-staff.mscx` is written by hand.
+Small files for `tests/musicxml_test.cpp`, all written for this repo (CC0). `make-edge-cases.py` writes the `.mid` files and the generated `.musicxml` files (`python3 -I tests/data/make-edge-cases.py`); `edge-tie-cross-staff.mscx` is written by hand.
 
 | File | What it holds |
 | --- | --- |
 | `edge-tie-cross-staff.musicxml`, `.mscx` | a C4 whole note on staff 1 tied into a half note on staff 2 across the barline: one held note |
 | `edge-fast-32nds.mid` | eight 32nd notes at 300 BPM, 25 ms each: real notes, not ghosts |
-| `edge-sixteen-parts.musicxml` | sixteen one-note parts, all C4 on the first beat (part 16 shares MIDI channel 1 with part 1) |
 | `edge-3-4-then-4-4.mid`, `.musicxml` | a full 3/4 bar, then 4/4: bars 1, 2, 3 in both |
 | `edge-pickup.mid`, `.musicxml` | a one-beat pickup (1/4 in the MIDI file, an implicit bar in the MusicXML file), then 4/4: bars 0, 1, 2 in both |
-| `edge-sig-midbar.mid` | 4/4 with a 3/4 signature at beat 3 of the first bar: that cut-short first bar is the pickup (bar 0), the 3/4 bar that starts there is bar 1 |
 | `edge-no-divisions.musicxml` | no `<divisions>` anywhere: eight units fill a 4/4 bar, so a unit is an eighth note |
 
 

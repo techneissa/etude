@@ -23,7 +23,10 @@ bool reset_button(Kit& k, const RowFrame& frame, float cy, bool active, const ch
     const float half = k.s(tok::kChip) * 0.5f;
     const Box face{centre.x - half, centre.y - half, centre.x + half, centre.y + half};
     // Named with its row, so a check finds the button of the row it means.
-    audit::note((std::string("##reset ") + label).c_str(), {face.x0, face.y0}, {face.x1, face.y1});
+    if (audit::on()) {
+        audit::note((std::string("##reset ") + label).c_str(), {face.x0, face.y0},
+                    {face.x1, face.y1});
+    }
     draw_state(k, dl, "##reset", face,
                {centre.x - hit * 0.5f, centre.y - hit * 0.5f, centre.x + hit * 0.5f,
                 centre.y + hit * 0.5f},

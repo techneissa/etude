@@ -132,8 +132,6 @@ template <std::size_t Capacity> class DueQueue {
 
     // Note-ons dropped because the queue was full.
     std::uint64_t dropped_note_ons() const { return dropped_note_ons_; }
-    // Other messages dropped because it was full.
-    std::uint64_t dropped_other() const { return dropped_other_; }
     // Note-offs dropped because it was full of note-offs; the owner must stop everything it
     // started when this moves, or a note could stay on.
     std::uint64_t lost_note_offs() const { return lost_note_offs_; }
@@ -170,14 +168,11 @@ template <std::size_t Capacity> class DueQueue {
         for (std::size_t i = head_; i < tail_; ++i) {
             if (!ends_note(items_[i])) {
                 erase(i);
-                ++dropped_other_;
                 return true;
             }
         }
         if (ends_note(incoming)) {
             ++lost_note_offs_;
-        } else {
-            ++dropped_other_;
         }
         return false;
     }
@@ -186,7 +181,6 @@ template <std::size_t Capacity> class DueQueue {
     std::size_t head_ = 0;
     std::size_t tail_ = 0;
     std::uint64_t dropped_note_ons_ = 0;
-    std::uint64_t dropped_other_ = 0;
     std::uint64_t lost_note_offs_ = 0;
 };
 

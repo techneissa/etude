@@ -37,8 +37,6 @@ bool is_learn_panel_tab(PanelTab tab) {
            tab == PanelTab::LearnEar || tab == PanelTab::LearnMelodies;
 }
 
-void Ui::close_learn() { impl_->learn.close(); }
-
 bool Ui::learn_open() const { return impl_->learn.is_open(); }
 
 bool Ui::learn_listening() const { return impl_->learn.listening(); }

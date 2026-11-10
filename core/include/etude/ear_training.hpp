@@ -88,12 +88,6 @@ inline int expected_pitch(const EarQuestion& q) {
 // Notes outside 0..127 are never right.
 bool check_pitch_answer(const EarQuestion& q, int played_note, bool ignore_octave = false);
 
-// True when `answered_semitones` names the interval of an interval question. Direction counts
-// (+7 is a fifth up, -7 a fifth down) unless `check_direction` is false. Always false for a note
-// question.
-bool check_interval_answer(const EarQuestion& q, int answered_semitones,
-                           bool check_direction = true);
-
 // "unison", "minor 2nd", ..., "tritone", ..., "octave" for 0..12 (the sign is ignored); anything
 // larger is "N semitones".
 std::string interval_name(int semitones);

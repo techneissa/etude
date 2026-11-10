@@ -64,15 +64,6 @@ int Song::measure_at(std::int64_t tick) const {
     return it == measures.begin() ? measures.front().number : (it - 1)->number;
 }
 
-int Song::written_measure_at(std::int64_t tick) const {
-    if (measures.empty()) {
-        return 1;
-    }
-    auto it = std::upper_bound(measures.begin(), measures.end(), tick,
-                               [](std::int64_t t, const Measure& m) { return t < m.start_tick; });
-    return it == measures.begin() ? measures.front().written_number() : (it - 1)->written_number();
-}
-
 namespace {
 
 struct NameMatch {

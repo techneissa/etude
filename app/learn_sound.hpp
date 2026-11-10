@@ -65,12 +65,6 @@ class LearnSound final : public ui::LearnPort {
     std::optional<DrillRequest> take_drill() { return std::exchange(drill_, std::nullopt); }
     KeyRange range() const { return range_; }
 
-    // For the tests: scales started, and the note messages handed over for them so far.
-    int scales_started() const { return started_; }
-    long messages_sent() const { return sent_; }
-    int questions_sounded() const { return questions_; }
-    int melodies_opened() const { return melodies_opened_; }
-
   private:
     std::int64_t now_ns_ = 0;
     KeyRange range_ = kRange61;

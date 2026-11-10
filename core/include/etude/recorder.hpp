@@ -73,8 +73,6 @@ class Recorder {
 
     // Finished notes so far (not those still sounding).
     std::size_t note_count() const { return notes_.size(); }
-    // Events held in the reorder window.
-    std::size_t buffered() const { return pending_.size(); }
 
   private:
     struct Pending {

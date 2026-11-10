@@ -52,8 +52,9 @@ struct CleanName {
     bool ok() const { return problem == NameProblem::None; }
 };
 
-// A file name from a request, made safe to create: spaces at either end are cut, and the
-// characters Windows and the network share cannot hold (: * ? " < > |) become '_'. It refuses
+// A file name from a request, made safe to create: spaces at either end are cut and the name is
+// kept as typed, including the characters only Windows cannot hold (: * ? " < > |): the Pi's disk
+// stores them and the network share maps them for the computer reading it. It refuses
 // (never repairs) a path separator or a lookalike of one, a control or invisible character, bad
 // UTF-8, a name starting or ending with a dot and one that is too long, so "../a.mid",
 // "/etc/a.mid", "a\\b.mid" and "a\0.mid" all fail whole. The file type is not judged here

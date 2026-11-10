@@ -180,24 +180,6 @@ std::string_view palette_name(Palette p) {
     return "";
 }
 
-std::string_view palette_key(Palette p) {
-    switch (p) {
-    case Palette::Classic:
-        return "classic";
-    case Palette::Vivid:
-        return "vivid";
-    case Palette::Pastel:
-        return "pastel";
-    case Palette::Ocean:
-        return "ocean";
-    case Palette::Sunset:
-        return "sunset";
-    case Palette::Mono:
-        return "mono";
-    }
-    return "";
-}
-
 int swatch_count(ColorScheme scheme) {
     switch (scheme) {
     case ColorScheme::ByHand:
@@ -358,17 +340,6 @@ std::span<const int> strip_swatches(ColorScheme scheme) {
         return kOne;
     }
     return {};
-}
-
-double min_distance_seen(std::span<const RGBA> colors, ColourVision vision) {
-    double best = 1.0;
-    for (std::size_t i = 0; i < colors.size(); ++i) {
-        const RGBA a = simulate_vision(colors[i], vision);
-        for (std::size_t j = i + 1; j < colors.size(); ++j) {
-            best = std::min(best, perceptual_distance(a, simulate_vision(colors[j], vision)));
-        }
-    }
-    return best;
 }
 
 ColourPick pick_of(RGBA c) {

@@ -20,15 +20,8 @@ namespace etude::app {
 // Seconds east of UTC here, now (for the day a run belongs to).
 std::int32_t local_utc_offset_s(std::time_t t) {
     std::tm local{};
-#if defined(_WIN32)
-    localtime_s(&local, &t);
-    long bias = 0;
-    _get_timezone(&bias);
-    return static_cast<std::int32_t>(-bias + (local.tm_isdst > 0 ? 3600 : 0));
-#else
     localtime_r(&t, &local);
     return static_cast<std::int32_t>(local.tm_gmtoff);
-#endif
 }
 
 void apply_look_options(const WindowOptions& o, etude::LookSettings& look) {

@@ -191,12 +191,6 @@ RGBA style_surface_color(const StyleRecipe& r, RGBA note, RGBA background) {
     return c;
 }
 
-RGBA style_label_color(const LookSettings& look, int note, std::uint8_t velocity, Hand hand) {
-    const RGBA surface = style_surface_color(
-        note_recipe(look, note), note_color(look, note, velocity, hand), kBackgroundColor);
-    return label_color_for(surface);
-}
-
 bool style_is_see_through(const StyleRecipe& r) {
     return std::min(r.body_alpha_top, r.body_alpha_bottom) < 0.99f;
 }
@@ -206,12 +200,6 @@ RGBA key_underlay_color(const StyleRecipe& r, RGBA note) {
         return note;
     }
     return lerp(kBackgroundColor, RGBA{note.r, note.g, note.b, 255}, kKeyUnderlayTint);
-}
-
-RGBA style_key_label_color(const LookSettings& look, int note, std::uint8_t velocity, Hand hand) {
-    const StyleRecipe r = note_recipe(look, note);
-    const RGBA c = note_color(look, note, velocity, hand);
-    return label_color_for(style_surface_color(r, c, key_underlay_color(r, c)));
 }
 
 std::string_view note_style_name(NoteStyle style) {

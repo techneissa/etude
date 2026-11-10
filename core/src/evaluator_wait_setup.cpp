@@ -222,7 +222,6 @@ std::vector<WaitEvaluator::Chord> WaitEvaluator::chords_for(const std::vector<No
 }
 
 void WaitEvaluator::build_chords() {
-    ++builds_;
     chords_ = chords_for(*notes_, options_.hands, options_.transposition, unplayable_s_, practised_,
                          bars_);
 }

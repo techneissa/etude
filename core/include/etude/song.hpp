@@ -53,9 +53,6 @@ struct TempoMap {
     double seconds_at(std::int64_t tick) const;
     // Fractional tick at a time; times before 0 map before tick 0 at the first tempo.
     double tick_at(double seconds) const;
-    double beats_at(std::int64_t tick) const {
-        return static_cast<double>(tick) / ticks_per_quarter;
-    }
 };
 
 struct TimeSignature {
@@ -156,9 +153,6 @@ struct Song {
 
     // Bar number at a tick (the bar containing it). Ticks before the first bar get its number.
     int measure_at(std::int64_t tick) const;
-    // The same bar's number in the written score (Measure::source_number): the number the printed
-    // page shows. Equal to measure_at() unless the score has repeats.
-    int written_measure_at(std::int64_t tick) const;
 };
 
 // A 64-bit fingerprint of what practice and playback read of a song: each note's start, length,

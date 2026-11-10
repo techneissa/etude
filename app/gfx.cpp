@@ -3,6 +3,8 @@
 
 #include "glow_shader.hpp"
 
+#include <SDL3/SDL.h>
+
 #include <cstdio>
 #include <cstring>
 #include <string>
@@ -148,19 +150,6 @@ bool create_window_and_renderer(const char* title, int w, int h, SDL_WindowFlags
                     std::string(renderer_path_name(path)).c_str(), SDL_GetError());
     }
     return SDL_CreateWindowAndRenderer(title, w, h, flags, window, renderer);
-}
-
-bool driver_listed(RendererPath path) {
-    const char* wanted = driver_name(path);
-    if (wanted == nullptr) {
-        return true;
-    }
-    for (int i = 0; i < SDL_GetNumRenderDrivers(); ++i) {
-        if (std::strcmp(SDL_GetRenderDriver(i), wanted) == 0) {
-            return true;
-        }
-    }
-    return false;
 }
 
 void destroy_renderer(SDL_Renderer* renderer) {

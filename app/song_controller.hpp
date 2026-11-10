@@ -28,6 +28,9 @@
 // and hands back everything still queued; after it needs_silence() is false.
 #pragma once
 
+#include "loaded_song.hpp"
+#include "prepared_song.hpp"
+#include "song_sound.hpp"
 #include "status_parts.hpp"
 
 #include "etude/accompaniment.hpp"
@@ -78,75 +81,12 @@ struct LentSong;
 class PracticeTablesJob;
 struct TablesResult;
 
-// What you hear of the song (the song sound setting). Your own playing always sounds.
-enum class SongSound : std::uint8_t {
-    Mute,      // default: nothing from the song
-    OtherHand, // the hand you are not practising; nothing when you practise both
-    BothHands, // the whole song
-};
 const char* song_sound_name(SongSound sound);
 PianoPlays to_piano_plays(SongSound sound);
 // Left and Right (an older choice) read as OtherHand.
 SongSound song_sound_from(PianoPlays plays);
 const char* hands_name(HandFilter hands);
 const char* mode_name(PracticeMode mode);
-
-// A song ready to play: hands assigned (names, else the smart split), with what identifies it.
-struct LoadedSong {
-    Song song;
-    std::string title;
-    std::uint64_t hash = 0;    // content_hash() of the file's bytes
-    std::string library_path;  // relative to a library folder, '/' separated; empty when outside
-    std::string absolute_path; // where it was opened from, absolute; empty when not known
-    std::string display_path;  // as the player named it, for messages
-    bool hands_split = false;  // the split assigned some hands
-    // The hands of the song's notes and parts as its file gave them, when the split decides the
-    // hand of some of its notes: what the player's choice of split point
-    // (SongController::set_hand_split) splits again, on a copy of the song that gets these hands
-    // back first. Null when the file names the hands, or the song was not made by the loader.
-    // `song` has the split applied, so this is the only trace of the file's own hands, a few bytes
-    // a note instead of a second copy of the notes.
-    std::shared_ptr<const HandSplit> file_hands;
-    // The sheet's staves decided the hands (hands_from_staves in core, read before the split);
-    // false when `file_hands` is null.
-    bool hands_from_staves = false;
-    // What the file is and how it was read, so sheet music can read the same score again: the
-    // format by content, and for ABC the tune's address and whether chord symbols became a left
-    // hand.
-    SongFileFormat format = SongFileFormat::Unknown;
-    // song_fingerprint(song), taken once by the loader on its own thread so load() compares two
-    // numbers instead of passing over the notes again. 0 when not taken (load() then takes it).
-    std::uint64_t fingerprint = 0;
-    std::string tune;
-    bool abc_chords = false;
-    // How hard each bar is and the song as a whole (difficulty.hpp), rated by the loader on its own
-    // thread so the frame thread only reads it. Null for a song built without a loader.
-    std::shared_ptr<const SongDifficulty> difficulty;
-};
-
-// What a loaded song's practice tables depend on besides the song: the hands asked for and the
-// transposition in force, and how far ahead the notes are shown (to size the frame's lists).
-struct SongLoadPlan {
-    HandFilter hands = HandFilter::Both; // asked for; the song's hands limit what applies
-    Transposition transposition;
-    double ahead_s = 4.0;
-};
-
-// The tables SongController::load() builds from a song, made ahead by SongController::prepare() on
-// another thread (the opener's) so the frame thread only takes them over. load() uses them when
-// they were built for the hands and transposition it ends up with, else it builds its own.
-struct PreparedSong {
-    bool valid = false;
-    std::uint64_t fingerprint = 0; // song_fingerprint of the song the tables were built from
-    HandFilter hands = HandFilter::Both; // what applies: the asked-for hands, limited to the song's
-    Transposition transposition;
-    HandsPresent present;            // the hands with notes in the whole song
-    std::size_t densest_window = 0;  // the most notes in view at once (densest_window)
-    FlowEvaluator::Prepared flow;
-    WaitEvaluator::Prepared wait;
-    NoteWindow window;
-    Playback::Prepared playback; // shared by the song's playback and its audition's
-};
 
 // A note result as it became final, for the brief grade shown where the note met the hit line.
 struct GradeMark {
@@ -250,8 +190,6 @@ class SongController {
     SongLoadPlan load_plan_for(const SessionState& state) const;
     // The most notes in view at once in the loaded song (0 for none): what a frame's lists need.
     std::size_t densest_window() const { return densest_window_; }
-    // Back to free play.
-    void unload(std::int64_t now_ns);
     bool has_song() const { return loaded_; }
     // A song with more notes than this has its evaluators' tables for another hand choice or
     // another key built on a worker and taken over by a later update() (the change is in force
@@ -259,29 +197,20 @@ class SongController {
     // builds them on the spot, a fraction of a millisecond. A frame that builds the tables of a
     // 150,000-note song takes 20 to 70 ms.
     static constexpr std::size_t kInlineTableNotes = 2000;
-    // Overrides kInlineTableNotes (tests, the bench).
-    void set_inline_table_notes(std::size_t notes) { inline_table_notes_ = notes; }
     // True when the evaluators grade for the hands asked for and the transposition asked for: no
     // table build is waiting or running.
     bool tables_settled() const { return !tables_pending(); }
-    // Blocks until the worker has no build waiting or running (tests); update() takes the answer.
-    void wait_tables();
-    // Holds the worker before its next build until released (tests).
-    void hold_tables(bool on);
     // The hands the evaluators grade for, which the notes' colouring and the song's sound follow:
     // after a change of hands on a long song it is the new hands only when their tables are in
     // (practice_hands() is the hands asked for, for the toggles).
     HandFilter applied_hands() const { return applied_hands_; }
-    // How many tables the evaluators built themselves, on whatever thread called (a load without
-    // tables made ahead, a stale plan, a small song): the frame thread's own builds, for tests.
-    std::uint64_t evaluator_builds() const { return flow_.builds() + wait_.builds(); }
     const LoadedSong& song() const { return song_; }
     // The song's notes and bars as the evaluators hold them, shared and never copied: what the
     // chord label's worker names the hands' chords from. They follow the hands of the notes the
     // moment those change (a load, a new split of the hands).
     FlowEvaluator::NoteTable note_table() const { return flow_.note_table(); }
     FlowEvaluator::MeasureTable measure_table() const { return flow_.measure_table(); }
-    // Counts up with every load() and unload(), so a screen knows its song changed even when the
+    // Counts up with every load(), so a screen knows its song changed even when the
     // new one has the same content.
     std::uint32_t load_serial() const { return load_serial_; }
     // Changes with every load and every new split of the hands taken over: what the sheet music
@@ -335,10 +264,6 @@ class SongController {
     // Exact times, as a section or the practice list sets them. False when too short.
     bool set_loop(double start_s, double end_s, std::int64_t now_ns);
     void clear_loop(std::int64_t now_ns);
-    // Loops the bar with this number (Measure::number, counting played bars) and plays it from its
-    // start, as the results card's trouble bars do. False, and nothing changed, when the song has
-    // no such bar or it is too short to loop.
-    bool loop_bar(int measure, std::int64_t now_ns);
     // Applies one step of a practice list (practice_plan.hpp): the loop, the speed and the
     // speed-up it asks for. False when the transport refused the loop.
     bool apply_plan_step(const PlanStep& step, std::int64_t now_ns);
@@ -397,12 +322,6 @@ class SongController {
     // The sheet's staves decided the hands (two or more tracks, hands_from_staves in core), rather
     // than a split of one staff's notes. False for a song with no split to choose.
     bool hands_from_staves() const { return hand_split_available() && song_.hands_from_staves; }
-    // The longest a hand split took the worker since the song was loaded, and how many were
-    // taken over, for the frame log and tests.
-    double hand_split_seconds() const { return split_seconds_; }
-    int hand_splits_applied() const { return splits_applied_; }
-    // A split is waiting for the worker or being made; false once its answer is ready (tests).
-    bool hand_split_working() const;
     // The lock a worker's copy of the song holds, and every write of the song takes (tests).
     std::shared_ptr<LentSong> lent_song() const { return lent_; }
     // Blocks until the worker is done and takes its answer over (tests, and quitting).
@@ -459,9 +378,6 @@ class SongController {
     // on: one rebuild for a drag. `options()` holds what is applied.
     void set_options(const SongOptions& options, std::int64_t now_ns, bool settling = false);
     const SongOptions& options() const { return options_; }
-    // How many times the evaluators were rebuilt from the song (every load, hand split and
-    // grading change), for tests.
-    int evaluator_rebuilds() const { return evaluator_rebuilds_; }
 
     // ---- App events
 
@@ -516,7 +432,6 @@ class SongController {
     bool loop_enabled() const { return transport_.loop_enabled(); }
     double loop_start_s() const { return transport_.loop_start_s(); }
     double loop_end_s() const { return transport_.loop_end_s(); }
-    std::optional<double> pending_loop_start() const { return loop_a_; }
     // Bar number at the position (Measure::number: counts played bars, never repeats).
     int bar() const;
     int bar_count() const;
@@ -647,7 +562,6 @@ class SongController {
     // ---- For tests
 
     bool needs_silence() const { return playback_.needs_silence() || audition_pb_.needs_silence(); }
-    std::size_t queued_events() const { return outbox_.size(); }
 
   private:
     void pump(std::int64_t now_ns);
@@ -694,7 +608,7 @@ class SongController {
     void request_tables();
     void retire_tables();
     void install_tables(TablesResult&& tables, std::int64_t now_ns);
-    // The song under the evaluators changed (a load, a split, an unload): tables built for the old
+    // The song under the evaluators changed (a load, a split): tables built for the old
     // one are never used.
     void drop_tables();
     // Takes over a finished split (HandSplitJob): the song's hands, and every table built from
@@ -797,7 +711,7 @@ class SongController {
     // after the first holds its mutex.
     std::shared_ptr<LentSong> lent_;
     // The tables for another hand choice or key of a long song (update_tables). `tables_serial_`
-    // goes up with every load, split and unload, and an answer built under another is dropped;
+    // goes up with every load and split, and an answer built under another is dropped;
     // `wanted_` is the transposition last asked for, which source_ takes with its tables.
     std::unique_ptr<PracticeTablesJob> tables_job_;
     std::uint64_t tables_serial_ = 0;
@@ -810,8 +724,6 @@ class SongController {
     std::optional<TablesAsked> tables_asked_; // the request in flight, if any
     mutable int suggested_split_ = 0; // 0: not worked out yet for these hands
     double split_seconds_ = 0.0;
-    int splits_applied_ = 0;
-    int evaluator_rebuilds_ = 0;
     HandsPresent present_;                // the hands with notes in the scope
     bool scope_loop_ = false;
     HandFilter applied_hands_ = HandFilter::Both; // what the evaluators were built with

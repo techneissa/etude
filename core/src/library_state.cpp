@@ -111,15 +111,6 @@ LibraryState list_state(std::span<const LibraryFile> files, const LibraryState* 
     return out;
 }
 
-std::optional<std::size_t> next_pending(const LibraryState& state, std::size_t from) {
-    for (std::size_t i = from; i < state.items.size(); ++i) {
-        if (state.items[i].state == EntryState::Pending) {
-            return i;
-        }
-    }
-    return std::nullopt;
-}
-
 namespace {
 LibraryItem* current_item(LibraryState& state, std::size_t index, std::uint64_t stamp) {
     if (index >= state.items.size() || state.items[index].stamp != stamp) {

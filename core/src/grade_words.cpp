@@ -62,32 +62,6 @@ RectF row_rect(const GradeLayoutParams& p, const Rows& rows, int row, float cent
 
 } // namespace
 
-RectF grade_band(const GradeLayoutParams& params) {
-    const Rows rows = rows_of(params);
-    if (!rows.valid) {
-        return {};
-    }
-    RectF band;
-    bool any = false;
-    for (int row = 0; row < kGradeWordRows; ++row) {
-        const RectF r = row_rect(params, rows, row, params.note_area.x, params.note_area.w);
-        if (r.empty()) {
-            break;
-        }
-        if (!any) {
-            band = r;
-            any = true;
-        } else {
-            const float x0 = std::min(band.x, r.x);
-            const float y0 = std::min(band.y, r.y);
-            const float x1 = std::max(band.right(), r.right());
-            const float y1 = std::max(band.bottom(), r.bottom());
-            band = RectF{x0, y0, x1 - x0, y1 - y0};
-        }
-    }
-    return band;
-}
-
 float grade_word_alpha(float age) {
     if (!(age >= 0.0f) || age > 1.0f) {
         return 0.0f;

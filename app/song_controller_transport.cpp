@@ -246,26 +246,6 @@ bool SongController::set_loop(double start_s, double end_s, std::int64_t now_ns)
     return true;
 }
 
-bool SongController::loop_bar(int measure, std::int64_t now_ns) {
-    if (!loaded_) {
-        return false;
-    }
-    const std::vector<Measure>& bars = song_.song.measures;
-    const auto it = std::find_if(bars.begin(), bars.end(),
-                                 [measure](const Measure& m) { return m.number == measure; });
-    if (it == bars.end()) {
-        return false;
-    }
-    const double start = it->start_s;
-    const double end =
-        std::next(it) != bars.end() ? std::next(it)->start_s : transport_.duration_s();
-    if (!set_loop(start, end, now_ns)) {
-        return false;
-    }
-    replay(now_ns);
-    return true;
-}
-
 void SongController::clear_loop(std::int64_t now_ns) {
     loop_a_.reset();
     loop_b_.reset();

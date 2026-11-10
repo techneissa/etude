@@ -1,6 +1,6 @@
 # Monocypher 4.0.2
 
-Vendored unmodified from https://github.com/LoupVaillant/Monocypher/archive/refs/tags/4.0.2.tar.gz (tarball SHA-256 `bc1ca30b1b2654e4e7daf2492c0d204200e55137f23fda6b7142fd7d523bd6b4`): `src/monocypher.c`, `src/monocypher.h`, `src/optional/monocypher-ed25519.c`, `src/optional/monocypher-ed25519.h` and `LICENCE.md`. BSD-2-Clause or CC0-1.0 (your choice), compatible with GPL-3.0. It is vendored, not fetched, because a GitHub-generated tag archive is not guaranteed to keep its bytes. It is the ed25519 and BLAKE2b behind the update signature check (`core/src/minisign.cpp`). To upgrade, copy the files from a new release, update this page and run the signature tests (`tests/minisign_test.cpp`).
+Vendored unmodified from https://github.com/LoupVaillant/Monocypher/archive/refs/tags/4.0.2.tar.gz (tarball SHA-256 `bc1ca30b1b2654e4e7daf2492c0d204200e55137f23fda6b7142fd7d523bd6b4`): `src/monocypher.c`, `src/monocypher.h`, `src/optional/monocypher-ed25519.c`, `src/optional/monocypher-ed25519.h` and `LICENCE.md`. BSD-2-Clause or CC0-1.0 (your choice), compatible with GPL-3.0. It is vendored, not fetched, because a GitHub-generated tag archive is not guaranteed to keep its bytes. It is the ed25519 and BLAKE2b behind the update signature check (`core/src/minisign.cpp`). To upgrade, copy the files from a new release, update this page and run the signature tests (`tests/update_test.cpp`).
 
 SHA-256 of the files here:
 

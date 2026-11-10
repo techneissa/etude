@@ -248,14 +248,6 @@ Class classify(std::string_view t, std::uint32_t t_mask, std::string_view w, std
 
 } // namespace
 
-int bounded_edit_distance(std::string_view a, std::string_view b, int max) {
-    return banded_distance(a, b, max, false);
-}
-
-int prefix_edit_distance(std::string_view query, std::string_view word, int max) {
-    return banded_distance(query, word, max, true);
-}
-
 int typos_allowed(std::size_t bytes) {
     return bytes >= kTwoTypoLetters ? 2 : bytes >= kOneTypoLetters ? 1 : 0;
 }

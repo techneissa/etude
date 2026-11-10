@@ -112,22 +112,11 @@ bool UpdateService::Shared::start_mac_relaunch(const UpdateOffer& offer, ui::Upd
 
 void UpdateService::Shared::run_install_mac() {
     UpdateOffer offered;
-    {
-        std::lock_guard lock(mutex);
-        offered = found;
-    }
-    if (!offered.valid || options.update_dir.empty()) {
+    ui::UpdateView base;
+    ui::UpdateView view;
+    if (!begin_install(offered, base, view)) {
         return;
     }
-    const ui::UpdateView base = current();
-    ui::UpdateView view = base;
-    view.phase = ui::UpdatePhase::Downloading;
-    view.version = offered.release.version;
-    view.percent = 0;
-    view.failure.clear();
-    view.detail.clear();
-    view.cancellable = true;
-    publish(view);
     const fs::path zip_file = options.update_dir / std::string(kZipFile);
     const fs::path staging = options.mac.bundle.parent_path() / mac_staging_name(offered.release.version);
     const auto clean = [&] {

@@ -58,7 +58,6 @@ class FrameAnalyzer {
 
     int length() const { return length_; }
     int max_lag() const { return max_lag_; }
-    int fft_size() const { return nfft_; }
     float rms() const { return rms_; }
 
     const float* nsdf() const { return nsdf_.data(); }

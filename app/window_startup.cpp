@@ -17,6 +17,8 @@
 #include "etude/update_key.hpp"
 #include "etude/version.hpp"
 
+#include <SDL3/SDL.h>
+
 #include <algorithm>
 #include <chrono>
 #include <cstdint>

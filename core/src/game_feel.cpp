@@ -79,11 +79,4 @@ ComboEvents GameFeel::update_combo(int combo, std::span<const int> losses) {
     return e;
 }
 
-std::optional<std::int64_t> GameFeel::run_mean_ns() const {
-    if (presses_ == 0) {
-        return std::nullopt;
-    }
-    return sum_ns_ / presses_;
-}
-
 } // namespace etude

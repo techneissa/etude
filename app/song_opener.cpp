@@ -2,6 +2,7 @@
 #include "song_opener.hpp"
 #include "crash_thread.hpp"
 #include "loop_wake.hpp"
+#include "song_controller.hpp"
 
 #include <utility>
 

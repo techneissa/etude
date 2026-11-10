@@ -80,16 +80,14 @@ class PracticePlan {
     PlanStep refresh(const SongSections& sections);
 
     // Navigation. Each skips items whose section is gone. All return None when the plan is not
-    // active (and jump_to_item / jump_to_section when the target does not exist).
+    // active (and jump_to_item when the target does not exist).
     PlanStep skip_next(const SongSections& sections);
     // To the previous item; on the first one, back to the start of it.
     PlanStep skip_previous(const SongSections& sections);
     PlanStep jump_to_item(const SongSections& sections, std::size_t index);
-    // The first item that plays this section.
-    PlanStep jump_to_section(const SongSections& sections, SectionId section);
 
-    // The saved sections were merged (SongSections::merge or remove_marker, which report the
-    // absorbed ids): running items on an absorbed section now play the survivor, as the saved
+    // The saved sections were merged (SongSections::merge, which reports the absorbed
+    // ids): running items on an absorbed section now play the survivor, as the saved
     // playlist does, and the current item gets the survivor's new loop. The running items are
     // remapped, not collapsed, so item indices and the pass count stay. None when not active.
     PlanStep sections_merged(const SongSections& sections, SectionId survivor,
@@ -99,8 +97,6 @@ class PracticePlan {
     PlanStep stop();
     // Forgets the plan without a step (the song changed).
     void reset();
-    // The speed to restore: call it when the user changes the speed by hand.
-    void set_base_speed_percent(int percent);
 
     bool active() const { return active_; }
     std::size_t item_index() const { return index_; }

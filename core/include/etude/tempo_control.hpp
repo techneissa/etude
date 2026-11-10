@@ -43,14 +43,6 @@ int speed_for_bpm(double target_bpm, double song_bpm);
 // `speed_for_bpm` for a `target_bpm` in the beat at `song_s`, against the song's main tempo.
 int speed_for_target(const Song& song, double target_bpm, double song_s);
 
-// The range a typed or dragged target can take, in the beat at `song_s`: the song's main tempo at
-// the lowest and highest speed.
-struct BpmRange {
-    double low = 0.0;
-    double high = 0.0;
-};
-BpmRange bpm_range(const Song& song, double song_s);
-
 // A tempo shown as a whole number of beats a minute, at least 1.
 int display_bpm(double bpm);
 

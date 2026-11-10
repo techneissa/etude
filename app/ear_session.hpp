@@ -94,10 +94,6 @@ class EarSession {
     // (true, Idle): the next question is asked from the keys on view.
     bool configure(const EarConfig& config);
     const EarConfig& config() const { return config_; }
-    // The keys on view: the white key the view starts on (a white key at or above `low_note`, counted
-    // in white keys from it) and the notes of its first and last key. They start at `low_note` and
-    // move only when a resize would hide a note of the question.
-    int view_first() const { return view_first_; }
     int view_low() const { return ear_white_note(config_.low_note, view_first_); }
     int view_top() const { return ear_white_note(config_.low_note, view_first_ + config_.whites - 1); }
 

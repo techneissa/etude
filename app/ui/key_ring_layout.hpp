@@ -50,8 +50,6 @@ struct KeyRingLayout {
 
 // The place of pitch class `pc` on the ring, clockwise from the top (C = 0, G = 1, ... F = 11).
 inline int key_ring_place(int pc) { return ((pc % 12 + 12) % 12 * 7) % 12; }
-// The pitch class at place `place` (the same map: 7 times 7 is 1 mod 12).
-inline int key_ring_pitch_class(int place) { return key_ring_place(place); }
 
 // The side of the square a ring of keys `key_pt` across (design points) needs, so its neighbours
 // are `kGap` apart: what a host leaves for it.

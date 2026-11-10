@@ -31,7 +31,6 @@ std::atomic<int> g_lock_signals{0};
 
 #if defined(ETUDE_HELPER_TEST_HOOKS)
 void fail_save_in_test(int nth) { g_fail_save_in = nth; }
-int lock_signals_seen_in_test() { return g_lock_signals.load(); }
 #endif
 
 Fd open_state_dir(const Context& c, std::string& error) {

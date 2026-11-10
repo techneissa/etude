@@ -13,7 +13,4 @@ namespace etude::app {
 // A stolen voice is cut at once. Returns how many voices were stolen.
 int tsf_glue_make_room(tsf* f, int preset_index, int key, float velocity);
 
-// Voices sounding for `key` (any phase). For tests and diagnostics; same thread as render.
-int tsf_glue_voices_for_key(const tsf* f, int key);
-
 } // namespace etude::app

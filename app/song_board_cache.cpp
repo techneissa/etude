@@ -17,7 +17,6 @@ void SongBoardCache::refresh(std::span<const ProfileRuns> household, std::uint64
     }
     key_ = key;
     built_ = true;
-    ++builds_;
     boards_ = build_song_boards(household, song_hash, today, active, run);
 }
 

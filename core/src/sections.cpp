@@ -503,32 +503,6 @@ EditResult SongSections::move_marker(const Song& song, std::size_t index, double
     return done(id);
 }
 
-EditResult SongSections::remove_marker(const Song& song, double near_s,
-                                       std::vector<SectionId>* absorbed) {
-    if (std::isnan(near_s)) {
-        return fail(EditError::OutOfRange);
-    }
-    if (sections.size() < 2) {
-        return fail(EditError::NotFound);
-    }
-    std::size_t best = 0;
-    for (std::size_t i = 1; i + 1 < sections.size(); ++i) {
-        if (std::abs(sections[i].end_s - near_s) < std::abs(sections[best].end_s - near_s)) {
-            best = i;
-        }
-    }
-    SongSections work = *this;
-    SectionId keep = work.sections[best].id;
-    std::vector<SectionId> gone;
-    join(work, best, best + 1, &gone);
-    refresh(work, song);
-    *this = std::move(work);
-    if (absorbed != nullptr) {
-        *absorbed = std::move(gone);
-    }
-    return done(keep);
-}
-
 EditResult SongSections::merge(const Song& song, std::span<const SectionId> ids,
                                std::vector<SectionId>* absorbed) {
     std::vector<std::size_t> picked;

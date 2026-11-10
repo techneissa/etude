@@ -123,24 +123,13 @@ bool version_in_use(const Context& c, const std::string& version) {
 
 #if defined(ETUDE_HELPER_TEST_HOOKS)
 namespace {
-int g_fail_links_from = 0;
 bool g_fail_fsync = false;
 } // namespace
-void fail_links_from_in_test(int nth) { g_fail_links_from = nth; }
 void fail_fsync_in_test(bool fail) { g_fail_fsync = fail; }
 #endif
 
 bool point_link(const Context& c, const std::string& link, const std::string& version,
                 std::string& error) {
-#if defined(ETUDE_HELPER_TEST_HOOKS)
-    if (g_fail_links_from > 0 && --g_fail_links_from == 0) {
-        g_fail_links_from = -1; // every call from here on
-    }
-    if (g_fail_links_from < 0) {
-        error = "a link that a test made fail";
-        return false;
-    }
-#endif
     const std::string path = c.conf.prefix + "/" + link;
     // The link is only as good as the folder entry that holds it: a power cut after the rename but
     // before the folder is written could bring back the old link while the state says the new one. The

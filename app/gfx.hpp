@@ -11,7 +11,8 @@
 
 #include "frame_picture.hpp"
 
-#include <SDL3/SDL.h>
+#include <SDL3/SDL_render.h>
+#include <SDL3/SDL_video.h>
 
 #include "etude/renderer_path.hpp"
 
@@ -33,9 +34,6 @@ using etude::RendererPath;
 bool create_window_and_renderer(const char* title, int w, int h, SDL_WindowFlags flags,
                                 RendererPath path, SDL_Window** window, SDL_Renderer** renderer,
                                 RendererPath* used = nullptr);
-
-// Whether SDL lists the driver `path` asks for (Basic always). Making it may still fail.
-bool driver_listed(RendererPath path);
 
 // Frees what the drawing layer made for the renderer (the glow shader), then the renderer.
 void destroy_renderer(SDL_Renderer* renderer);

@@ -245,12 +245,6 @@ struct BarSwipeArea {
     float unit = 1.0f;       // units per design point
 };
 
-// What a drag judged from where it began and its totals alone is (a flick, or a test): the axis
-// from the totals, then the zone, direction and travel. Never `Claim`. Bad numbers (NaN) are never
-// a swipe.
-BarSwipe classify_bar_swipe(const BarSwipeArea& area, float start_y, float total_dx,
-                            float total_dy);
-
 // Reads a recogniser's events for the bar's swipes, one drag at a time. It decides the axis at the
 // drag's first move, reports `Claim` once for a vertical drag that began where a swipe can, then
 // the swipe once at its travel. A pinch, a cancel or the end of the drag forgets the drag. Feed it

@@ -24,22 +24,12 @@ inline constexpr std::string_view kSharpSign = "\xE2\x99\xAF";
 std::string accidental_display(std::string_view spelled);
 
 // Display text of free text that names notes among other words, such as a song's title ("Prelude in
-// Bb major", "Sonata in C# minor", "Cm7b5 arpeggio"): only a whole word that starts with a capital
-// A to G and is a note or chord name changes: accidentals, then a quality and a number, alterations
-// ("b5", "#9", "#11", "b13") and a slash bass ("Bb7/D", "C#m/G#"). "Abbey", "Abba", "Bbq", "Bebop"
-// and "BB" are left alone. A word ends at a space, ASCII or UTF-8 punctuation (curly quotes,
-// dashes, guillemets); accented letters belong to the word ("Été", "Café").
-std::string accidental_display_text(std::string_view text);
-
-// `accidental_display_text` into `out` (cleared first), which keeps its capacity: a draw path that
-// reuses one string allocates nothing once it has grown.
+// Bb major", "Cm7b5 arpeggio"), written into `out` (cleared first), which keeps its capacity: a
+// draw path that reuses one string allocates nothing once it has grown.
 void accidental_display_text_into(std::string_view text, std::string& out);
 
-// Whether `accidental_display_text` would change `text`; no allocation, so a draw path can skip the
-// copy for the many labels that name no note.
+// Whether `accidental_display_text_into` would change `text`; no allocation, so a draw path can
+// skip the copy for the many labels that name no note.
 bool has_accidental_spelling(std::string_view text);
-
-// The reverse, for matching: "B♭" folds to "Bb" and "F♯" to "F#" (a search for "B♭" finds "Bb").
-std::string plain_accidentals(std::string_view display);
 
 } // namespace etude

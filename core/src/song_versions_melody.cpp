@@ -202,12 +202,4 @@ MelodyContour melody_contour(const Song& song) {
     return out;
 }
 
-double melody_similarity(const MelodyContour& a, const MelodyContour& b) {
-    if (!a.usable() || !b.usable()) {
-        return 0.0;
-    }
-    Scratch scratch;
-    return similarity_of(pitches_of(a), pitches_of(b), scratch);
-}
-
 } // namespace etude

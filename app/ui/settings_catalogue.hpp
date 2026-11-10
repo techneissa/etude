@@ -140,9 +140,6 @@ struct CatalogueEntry {
 std::span<const CatalogueEntry, kSettingCount> catalogue();
 const CatalogueEntry& entry_of(Setting s);
 
-// The settings whose home is `p`, in catalogue order.
-std::vector<Setting> settings_on(Page p);
-
 // A row drawn while the sweep ran: the setting, and the page being drawn, `on_bar` (the tempo
 // popover or the bar's own button) or `in_library` (the library's chips).
 struct Drawn {

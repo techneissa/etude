@@ -75,10 +75,9 @@ inline constexpr int kMaxGradeOpacity = 100;
 // WCAG ratio the high-contrast palette reaches against the backgrounds above, for white-key notes
 // (`kHighContrastTarget`) and, after the black-key darkening, for black-key notes
 // (`kHighContrastMinimum`). The lift keeps each colour's hue and chroma (`lift_to_contrast`).
-// Label text on a block always reaches `kLabelMinContrast`.
+// Label text on a block always reaches 4.5:1.
 inline constexpr double kHighContrastTarget = 7.0;
 inline constexpr double kHighContrastMinimum = 4.5;
-inline constexpr double kLabelMinContrast = 4.5;
 
 // The default 12-color pitch-class wheel, C first: evenly spaced hues at one OKLCH lightness, so
 // neighbors differ clearly and none is much brighter than another.
@@ -260,10 +259,8 @@ struct ContrastTargets {
 ContrastTargets high_contrast_targets(const LookSettings& look);
 RGBA note_color(const LookSettings& look, ContrastTargets targets, int note, std::uint8_t velocity,
                 Hand hand);
-// Black or white, whichever reads better on `block`. At least `kLabelMinContrast` on any color.
+// Black or white, whichever reads better on `block`. At least 4.5:1 on any color.
 RGBA label_color_for(RGBA block);
-// `label_color_for(note_color(...))`.
-RGBA note_label_color(const LookSettings& look, int note, std::uint8_t velocity, Hand hand);
 // The color a pressed key lights in. It is `note_color` itself, so a key and the note block above
 // it always match, under every scheme and for black keys too. A key pressed with no note to play
 // (free play, or a wrong key in practice) passes `Hand::Unknown` and the velocity it was hit with.

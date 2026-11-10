@@ -23,11 +23,6 @@ struct ChordFingering {
     std::array<int, kMostChordFingers> left{};
 };
 
-// Whether `quality` is a triad (major, minor, diminished, augmented) or a seventh chord
-// (dominant, major, minor, half-diminished, diminished and minor-major seventh): the chords that have
-// a standard fingering.
-bool chord_has_fingering(ChordQuality quality);
-
 // The standard fingering of `quality` in inversion `inversion` (0 root position, 1 first, ...);
 // none for a chord without one or an inversion the chord does not have.
 std::optional<ChordFingering> chord_fingering(ChordQuality quality, int inversion);

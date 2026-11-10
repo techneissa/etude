@@ -4,6 +4,8 @@
 #include "frame_log.hpp"
 #include "gfx.hpp"
 
+#include <SDL3/SDL.h>
+
 #include <algorithm>
 #include <cstdio>
 #include <cstdlib>

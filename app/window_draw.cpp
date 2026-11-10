@@ -4,6 +4,8 @@
 
 #include "update_start.hpp"
 
+#include <SDL3/SDL.h>
+
 #include <algorithm>
 #include <chrono>
 #include <cstddef>

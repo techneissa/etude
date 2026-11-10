@@ -266,19 +266,6 @@ std::int32_t local_day_from_utc(std::int64_t utc_s, std::int32_t utc_offset_s) {
     return static_cast<std::int32_t>(std::clamp<std::int64_t>(day, -kMaxRunDay, kMaxRunDay));
 }
 
-// Howard Hinnant's days_from_civil / civil_from_days.
-std::int32_t day_from_civil(const CivilDate& date) {
-    std::int64_t y = date.year;
-    const std::int64_t m = std::clamp(date.month, 1, 12);
-    const std::int64_t d = std::clamp(date.day, 1, 31);
-    y -= m <= 2 ? 1 : 0;
-    const std::int64_t era = (y >= 0 ? y : y - 399) / 400;
-    const std::int64_t yoe = y - era * 400;
-    const std::int64_t doy = (153 * (m > 2 ? m - 3 : m + 9) + 2) / 5 + d - 1;
-    const std::int64_t doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
-    return static_cast<std::int32_t>(era * 146'097 + doe - 719'468);
-}
-
 CivilDate civil_from_day(std::int32_t day) {
     const std::int64_t z = std::int64_t{day} + 719'468;
     const std::int64_t era = (z >= 0 ? z : z - 146'096) / 146'097;

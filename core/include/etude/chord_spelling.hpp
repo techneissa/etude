@@ -42,9 +42,6 @@ ChordSpelling spell_chord(const Chord& chord, const KeyChange* key);
 // E7 is G#); empty when the chord has no tone there or `chord.found` is false.
 std::string chord_tone_name(const Chord& chord, const ChordSpelling& spelling, int semitones);
 
-// "F#maj7/E#". Empty when `chord.found` is false. A bass equal to the root shows no slash.
-std::string spelled_chord_name(const Chord& chord, const ChordSpelling& spelling);
-
 // A diminished seventh or an augmented chord reads the same from each of its tones; this picks
 // the tone whose spelling sits nearest the key as the root (E in C major for C# E G Bb), keeping the
 // bass. Any other chord is returned as it is.

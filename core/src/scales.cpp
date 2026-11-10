@@ -195,11 +195,6 @@ unsigned scale_pitch_class_mask(int root_pc, ScaleType type) {
     return mask;
 }
 
-bool is_in_scale(int note, int root_pc, ScaleType type) {
-    return is_valid_note(note) &&
-           (scale_pitch_class_mask(root_pc, type) >> pitch_class(note) & 1u) != 0;
-}
-
 bool is_root(int note, int root_pc) {
     return is_valid_note(note) && pitch_class(note) == pitch_class(root_pc);
 }
@@ -298,32 +293,6 @@ std::string spelled_name(int midi_note, const SpelledNote& note, int octave_offs
     }
     // The octave number goes with the letter: B#3 sounds as C4 and Cb4 as B3.
     return spelled_name(note) + std::to_string(octave(midi_note - note.accidental) + octave_offset);
-}
-
-std::vector<std::string> scale_note_names(Tonic tonic, ScaleType type) {
-    std::vector<std::string> names;
-    for (const SpelledNote& n : spell_scale(tonic, type)) {
-        names.push_back(spelled_name(n));
-    }
-    return names;
-}
-
-std::vector<std::string> scale_note_names_with_octave(Tonic tonic, ScaleType type, int root_note,
-                                                      int octave_offset) {
-    std::vector<std::string> names;
-    if (!is_valid_note(root_note) || pitch_class(root_note) != tonic.pitch_class()) {
-        return names;
-    }
-    const std::vector<SpelledNote> spelled = spell_scale(tonic, type);
-    const std::span<const int> steps = scale_intervals(type);
-    for (std::size_t i = 0; i < spelled.size(); ++i) {
-        const int note = root_note + steps[i];
-        if (!is_valid_note(note)) {
-            break;
-        }
-        names.push_back(spelled_name(note, spelled[i], octave_offset));
-    }
-    return names;
 }
 
 } // namespace etude

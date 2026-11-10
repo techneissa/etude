@@ -9,6 +9,8 @@
 #include "gfx.hpp"
 #include "window_state.hpp"
 
+#include <SDL3/SDL.h>
+
 #include <array>
 #include <chrono>
 #include <cstdio>

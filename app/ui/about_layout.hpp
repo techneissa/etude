@@ -36,7 +36,6 @@
 namespace etude::app::ui {
 
 namespace about_tok {
-inline constexpr float kIconSide = 64.0f;   // the app icon
 inline constexpr float kTop = tok::kS2;     // above the icon
 inline constexpr float kNameH = tok::kTitle * phone_tok::kLineRatio;
 inline constexpr float kVersionH = tok::kBody * phone_tok::kLineRatio;

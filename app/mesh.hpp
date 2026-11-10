@@ -4,7 +4,7 @@
 // keys is a handful of draw calls instead of thousands. A textured mesh is drawn with one texture.
 #pragma once
 
-#include <SDL3/SDL.h>
+#include <SDL3/SDL_render.h>
 
 #include <cstddef>
 #include <vector>

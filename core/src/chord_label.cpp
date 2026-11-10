@@ -105,10 +105,6 @@ HandChords hand_chords_of(const HarmonyTimeline& harmony, const std::vector<KeyC
     return out;
 }
 
-HandChords build_hand_chords(const Song& song, int semitones, bool prefer_flats) {
-    return hand_chords_of(build_hand_harmony(song), song.keys, semitones, prefer_flats);
-}
-
 std::optional<ChordKeys> chord_label_keys(const HandChordLabel& label, const Transposition& shown,
                                           int first_visible, int last_visible) {
     if (label.low_pitch < 0 || label.high_pitch < label.low_pitch || first_visible > last_visible) {

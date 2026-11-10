@@ -100,7 +100,6 @@ void PitchDetector::reset() {
     d.reset_note_search();
 }
 
-std::int64_t PitchDetector::samples_processed() const { return impl_->written; }
 std::int64_t PitchDetector::dropped_events() const { return impl_->dropped; }
 
 void PitchDetector::begin_noise_calibration() {
@@ -140,7 +139,6 @@ void PitchDetector::set_a4_hz(float a4_hz) {
 }
 
 float PitchDetector::a4_hz() const { return impl_->a4; }
-void PitchDetector::set_method(PitchMethod method) { impl_->cfg.method = method; }
 
 void PitchDetector::set_expected_notes(const int* notes, int count) {
     Impl& d = *impl_;

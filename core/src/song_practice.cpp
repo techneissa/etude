@@ -122,9 +122,4 @@ SongPractice apply_changes(const SongPractice& base, const PracticeChanges& c) {
     return out;
 }
 
-SongPractice with_player_changes(const SongPractice& stored, const SongPractice& at_open,
-                                 const SongPractice& now) {
-    return apply_changes(stored, note_changes({}, at_open, now));
-}
-
 } // namespace etude

@@ -339,16 +339,6 @@ void Kit::say_undoable(std::string_view text, std::function<void()> undo) {
     toast.state.set_action(ToastAction::Undo, kUndoOwnBit | ++toast.undo_serial);
 }
 
-void Kit::say_at(std::string_view text, ImVec2 min, ImVec2 max, bool warning) {
-    if (text.empty()) {
-        return;
-    }
-    toast.state.show(text, now, warning);
-    toast.anchored = max.x > min.x && max.y > min.y;
-    toast.anchor_min = min;
-    toast.anchor_max = max;
-}
-
 void Kit::say_free(std::string_view text, bool warning) {
     if (!text.empty()) {
         toast.state.show(text, now, warning);

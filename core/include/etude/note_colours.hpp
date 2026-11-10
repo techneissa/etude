@@ -15,8 +15,7 @@ namespace etude {
 // contrast lifts each colour with a search, too dear to repeat per note per frame). The scheme
 // decides what tells two notes apart: the hand (ByHand), the pitch class, the octave, the
 // velocity (all 128) or nothing; a black key has its own colours under every scheme. Holds no
-// allocation and gives what `note_color`, `style_label_color` and `style_key_label_color` give for
-// the same look.
+// allocation and gives what `note_color` gives for the same look.
 class NoteColourTable {
   public:
     NoteColourTable() = default;

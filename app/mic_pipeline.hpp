@@ -86,8 +86,6 @@ class MicPipeline {
     // The device's rate: what a source of blocks has to deliver.
     int sample_rate() const { return config_.input_rate; }
     int input_channels() const { return config_.input_channels; }
-    // Samples the ring holds (all channels), valid after prepare().
-    std::size_t ring_capacity() const { return ring_ ? ring_->capacity() : 0; }
 
     // ---- Producer thread (the capture callback). Wait-free.
 
@@ -99,9 +97,6 @@ class MicPipeline {
 
     // Next event, with times on the steady clock. False when none is waiting.
     bool pop(MicEventIn& out) noexcept { return events_.pop(out); }
-
-    // Samples (all channels) the analysis thread has yet to read.
-    std::size_t backlog_samples() const { return ring_ ? ring_->available() : 0; }
 
     // Expected-note mode (up to kMaxChordNotes notes); count 0 returns to open detection.
     void set_expected(const int* notes, int count);

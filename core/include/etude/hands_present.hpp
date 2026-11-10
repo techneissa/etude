@@ -39,10 +39,5 @@ struct HandToggles {
     bool other_hand_sound_offered = true;
     friend bool operator==(const HandToggles&, const HandToggles&) = default;
 };
-HandToggles hand_toggles_for(HandFilter chosen, const HandsPresent& present);
-
-// The hands a tap on a toggle asks for, as the filter to practise. A tap that would turn off the
-// last practised hand, or that touches a hand with no notes, changes nothing: `chosen` comes back.
-HandFilter toggle_hand(HandFilter chosen, const HandsPresent& present, bool left_toggle);
 
 } // namespace etude

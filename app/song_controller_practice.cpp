@@ -90,8 +90,6 @@ void SongController::set_hand_split(int split_point, std::int64_t /*now_ns*/) {
     split_job_->request(std::move(request));
 }
 
-bool SongController::hand_split_working() const { return split_job_->busy(); }
-
 int SongController::hand_split_point() const {
     if (split_point_ != kAutoSplit) {
         return split_point_;
@@ -142,7 +140,6 @@ void SongController::poll_hand_split(std::int64_t now_ns) {
     drop_tables(); // built from the notes as they were
     suggested_split_ = done->suggested;
     split_seconds_ = std::max(split_seconds_, done->seconds);
-    ++splits_applied_;
     // The tables built from the old hands go, as a load() would replace them, but the transport,
     // the loop and the accompaniment stay where they are. The worker made the new ones from this
     // very song and nothing has touched it since, so its fingerprint is the song's: the pass over

@@ -16,15 +16,6 @@
 
 namespace etude::app::ui {
 
-// The width of chips `widths` side by side, `gap` apart.
-inline float strip_content_width(std::span<const float> widths, float gap) {
-    float w = 0.0f;
-    for (const float chip : widths) {
-        w += chip;
-    }
-    return widths.empty() ? 0.0f : w + gap * static_cast<float>(widths.size() - 1);
-}
-
 // The farthest the strip scrolls: its content less its view, never below 0.
 inline float strip_max_offset(float content_w, float view_w) {
     return std::max(0.0f, content_w - view_w);

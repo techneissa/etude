@@ -269,14 +269,6 @@ RunSummary summary_from_record(const RunRecord& record, const ReplaySong& song) 
 
 } // namespace
 
-RunSummary summarize_run(const RunRecord& record, const RunEvents& events, const ReplaySong& song) {
-    const GhostSetup setup{record.mode, record.hands, record.speed_percent,
-                           record.transpose_semitones};
-    const ReplayTimeline timeline = build_replay_timeline(events, setup, song);
-    return timeline.empty() ? summary_from_record(record, song)
-                            : summary_from_notes(record, timeline, song);
-}
-
 BarPractice plan_summary_practice(const RunSummary& summary, std::span<const Measure> measures,
                                   double duration_s, BarPracticeKind kind, int max_bars) {
     std::array<int, kMaxCardBars> chosen{};

@@ -216,14 +216,6 @@ void PointerKeys::release_all(std::int64_t time_ns, std::vector<MidiEvent>& out)
     }
 }
 
-std::optional<int> PointerKeys::note_of(PointerId id) const {
-    const Pointer* p = find(id);
-    if (p == nullptr || p->note < 0) {
-        return std::nullopt;
-    }
-    return p->note;
-}
-
 int PointerKeys::active_pointers() const {
     int n = 0;
     for (const Pointer& p : pointers_) {

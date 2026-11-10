@@ -8,6 +8,8 @@
 #include "window_icon.hpp"
 #include "window_state.hpp"
 
+#include <SDL3/SDL.h>
+
 #include <algorithm>
 #include <cstdint>
 #include <cstdio>
@@ -82,8 +84,8 @@ bool open_window(WindowOptions& opt, WindowHandles& handles) {
 
 // The frame loop: events, then the frame, until something asks to quit.
 void WindowState::run_frames() {
-    // While the OS runs its own loop for a window drag (macOS live resize, the Windows move and
-    // size loop), SDL_PollEvent is not called and the window would show a stretched old frame.
+    // While the OS runs its own loop for a window drag (macOS live resize), SDL_PollEvent is not
+    // called and the window would show a stretched old frame.
     // The event watch is called inside that loop, so it redraws from there: layout, keys,
     // notes, text and controls follow the new size in the same frame.
     hook.draw = [this] {

@@ -18,11 +18,6 @@ GradeGradient grade_gradient(Grade grade, bool high_contrast) {
     return high_contrast ? kHigh[i] : kNormal[i];
 }
 
-RGBA grade_colour(Grade grade, bool high_contrast) {
-    const GradeGradient g = grade_gradient(grade, high_contrast);
-    return lerp(g.top, g.bottom, 0.5f);
-}
-
 std::string_view grade_name(Grade grade) {
     switch (grade) {
     case Grade::Perfect:

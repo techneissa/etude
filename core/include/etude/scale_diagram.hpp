@@ -39,7 +39,4 @@ struct ScaleDiagram {
 // The scale from `root_pc` (0..11, wrapping) in the octave of middle C (the tonic is C4..B4).
 ScaleDiagram scale_diagram(int root_pc, ScaleType type);
 
-// "G major", "C# harmonic minor": the card's title, plain spelling ("Bb dorian").
-std::string scale_title(int root_pc, ScaleType type);
-
 } // namespace etude

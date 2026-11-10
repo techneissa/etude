@@ -49,7 +49,5 @@ std::string mac_staging_name(std::string_view version);
 // Where the bundle of the version being replaced is kept: ".etude-1.1.0.previous". Hidden, and
 // without ".app", so neither Finder nor Launch Services lists it as a second copy of the app.
 std::string mac_previous_name(std::string_view from_version);
-// The pattern for every kept previous version, which the relaunch helper clears but the newest.
-inline constexpr std::string_view kMacPreviousPattern = ".etude-*.previous";
 
 } // namespace etude

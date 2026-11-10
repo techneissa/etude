@@ -92,11 +92,6 @@ bool chord_is_minor_like(ChordQuality quality) {
     }
 }
 
-int chord_tone_count(ChordQuality quality) {
-    const Shape* shape = shape_of(quality);
-    return shape != nullptr ? shape->count : 0;
-}
-
 int chord_inversion_count(ChordQuality quality) {
     const Shape* shape = shape_of(quality);
     return shape != nullptr ? shape->inversions : 0;

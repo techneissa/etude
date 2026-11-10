@@ -148,50 +148,10 @@ def dorian():
     return score("Dorian Dawn", "Piano", out)
 
 
-# ---- Skipping Stones: F major, 4/4, quarter = 12 divisions: triplets and dotted pairs.
-def triplets():
-    T = dict(tuplet=True)
-    bars = [
-        note("C4", 4, **T) + note("D4", 4, **T) + note("E4", 4, **T) + seq([("F4", 9), ("G4", 3), ("A4", 12), ("C5", 12)]),
-        note("F5", 4, **T) + note("E5", 4, **T) + note("D5", 4, **T)
-        + seq([("C5", 3), ("A4", 9), ("F4", 12)])
-        + note("F4", 4, **T) + note("G4", 4, **T) + note("A4", 4, **T),
-        seq([("Bb4", 9), ("C5", 3), ("D5", 3), ("Bb4", 9), ("A4", 12), ("G4", 12)]),
-        note("E4", 4, **T) + note("F4", 4, **T) + note("G4", 4, **T) + note("F4", 36),
-    ]
-    out = []
-    for i, body in enumerate(bars, 1):
-        attrs = attributes(12, -1, 4, 4, tempo="100") if i == 1 else ""
-        out.append(measure(i, body, attrs=attrs))
-    return score("Skipping Stones", "Piano", out)
-
-
-# ---- Two Hands: C major, 3/4, quarter = 1 division, one part on two staves, a repeat of all four bars.
-def two_voices():
-    right = [
-        [("E5", 2), ("D5", 1)],
-        [("C5", 2), ("G4", 1)],
-        [("A4", 1), ("B4", 1), ("C5", 1)],
-        [("D5", 3)],
-    ]
-    left = [["C3", "E3", "G3"], ["C3", "E3", "G3"], ["F3", "A3", "C4"], ["G3", "B3", "D4"]]
-    out = []
-    for i in range(4):
-        body = seq(right[i], staff=1)
-        body += "<backup><duration>3</duration></backup>"
-        for k, name in enumerate(left[i]):
-            body += note(name, 3, chord=k > 0, voice=2, staff=2)
-        attrs = attributes(1, 0, 3, 4, staves=2, tempo="88") if i == 0 else ""
-        out.append(measure(i + 1, body, attrs=attrs, left=FORWARD if i == 0 else "", right=BACKWARD if i == 3 else ""))
-    return score("Two Hands", "Piano", out)
-
-
 def main():
     files = {
         "abc-reel-repeats.musicxml": reel(),
         "abc-dorian.musicxml": dorian(),
-        "abc-triplets.musicxml": triplets(),
-        "abc-two-voices.musicxml": two_voices(),
     }
     for name, text in files.items():
         with open(os.path.join(HERE, name), "w", encoding="utf-8") as f:

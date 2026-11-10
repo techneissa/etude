@@ -27,10 +27,6 @@ struct MachineOsText {
 // that start with # ignored; the last of a repeated key wins). Other keys are left alone.
 void parse_os_release(std::string_view text, MachineOsText& out);
 
-// dpkg's name for a kernel machine name ("aarch64" is "arm64", "x86_64" is "amd64", "armv7l" is
-// "armhf"); the text itself when it knows no other.
-std::string debian_arch(std::string_view uname_machine);
-
 // dpkg's name for the userland this program was built for ("arm64", "amd64", "armhf"; empty for any
 // other build). The kernel's machine name is not it: a 32-bit userland runs on a 64-bit kernel, and
 // an arm64 release must not be taken for it.

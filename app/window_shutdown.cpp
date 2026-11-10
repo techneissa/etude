@@ -4,6 +4,8 @@
 #include "window_state.hpp"
 #include "log_ring.hpp"
 
+#include <SDL3/SDL.h>
+
 #include <cstdint>
 #include <cstdio>
 #include <string>
