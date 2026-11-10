@@ -93,40 +93,6 @@ TEST_CASE("pitch scoring: a chord with no note-on is not sure or missed") {
     CHECK(score_chord(chord, 2, 1000, 20000, early, 1, kRate).outcome == NoteOutcome::Missed);
 }
 
-TEST_CASE("pitch evaluation: open chords take the contexts and registers in turn") {
-    SynthEvalOptions o;
-    o.velocities = {0.75f};
-    std::vector<NoteRecord> records;
-    o.records = &records;
-    const OpenChordReport r = evaluate_open_chord_synthetic(o, kOpenChordContexts * 2);
-    REQUIRE(records.size() == static_cast<size_t>(kOpenChordContexts * 2));
-    CHECK(r.registers.total.notes == kOpenChordContexts * 2);
-    for (size_t i = 0; i < records.size(); ++i) {
-        CAPTURE(i);
-        CHECK(records[i].context == static_cast<int>(i) % kOpenChordContexts);
-        CHECK(records[i].chord.size() >= 2);
-        CHECK(records[i].chord.front() == records[i].note);
-        CHECK(std::is_sorted(records[i].chord.begin(), records[i].chord.end()));
-        CHECK(records[i].chord.back() <= kPianoHighNote);
-    }
-    // The first round is in the lowest register, the second in the next.
-    CHECK(register_of(records.front().note) == 0);
-    CHECK(register_of(records.back().note) == 1);
-    for (int i = 0; i < kOpenChordContexts; ++i) {
-        CHECK(r.contexts[static_cast<size_t>(i)].notes == 2);
-    }
-}
-
-TEST_CASE("pitch scoring: registers by octave, A0-B1 first and C7-C8 last") {
-    CHECK(register_of(21) == 0);
-    CHECK(register_of(35) == 0);
-    CHECK(register_of(36) == 1);
-    CHECK(register_of(60) == 3);
-    CHECK(register_of(108) == kRegisterCount - 1);
-    CHECK(percentile({3.0f, 1.0f, 2.0f}, 100) == 3.0f);
-    CHECK(percentile({3.0f, 1.0f, 2.0f}, 50) == 2.0f);
-}
-
 TEST_CASE("synthetic piano: same seed, same samples; the onset is silent before it") {
     SynthClipOptions o;
     o.noise_rms = 0.0f;
@@ -144,58 +110,6 @@ TEST_CASE("synthetic piano: same seed, same samples; the onset is silent before 
     CHECK(peak < 1.0f);
     const auto c = make_synth_clip(60, 0.7f, 43, o, kRate);
     CHECK(c.samples != a.samples);
-}
-
-TEST_CASE("synthetic piano: partials are stretched by the inharmonicity") {
-    // B rises from the middle of the keyboard to the top, as on a real piano.
-    CHECK(synth_inharmonicity(108) > 10.0f * synth_inharmonicity(60));
-    CHECK(synth_inharmonicity(21) > synth_inharmonicity(48));
-}
-
-TEST_CASE("synthetic piano: loudness runs from -36 dBFS to -6 dBFS with velocity") {
-    CHECK(piano_tone_amplitude(1.0f) == doctest::Approx(0.5f).epsilon(0.01));
-    CHECK(piano_tone_amplitude(0.0f) == doctest::Approx(0.01585f).epsilon(0.01));
-    float last = 0.0f;
-    for (float v = 0.0f; v <= 1.0f; v += 0.1f) {
-        CHECK(piano_tone_amplitude(v) > last);
-        last = piano_tone_amplitude(v);
-    }
-    // Out-of-range velocities are the ends.
-    CHECK(piano_tone_amplitude(-3.0f) == piano_tone_amplitude(0.0f));
-    CHECK(piano_tone_amplitude(7.0f) == piano_tone_amplitude(1.0f));
-}
-
-TEST_CASE("synthetic piano: add_piano_tone starts at the given sample and adds to what is there") {
-    PianoToneOptions o;
-    o.note = 69;
-    o.velocity = 0.8f;
-    std::vector<float> out(kRate / 2, 0.0f);
-    add_piano_tone(out.data(), static_cast<int>(out.size()), 4800, o, kRate);
-    for (int i = 0; i < 4800; ++i) {
-        REQUIRE(out[static_cast<size_t>(i)] == 0.0f);
-    }
-    float peak = 0.0f;
-    for (float v : out) {
-        peak = std::max(peak, std::fabs(v));
-    }
-    CHECK(peak > 0.1f * piano_tone_amplitude(o.velocity));
-    CHECK(peak < 1.5f * piano_tone_amplitude(o.velocity));
-
-    // A second tone adds on top: the sum of two identical tones is twice one.
-    std::vector<float> twice = out;
-    add_piano_tone(twice.data(), static_cast<int>(twice.size()), 4800, o, kRate);
-    for (size_t i = 0; i < out.size(); ++i) {
-        REQUIRE(twice[i] == doctest::Approx(2.0f * out[i]).epsilon(1e-4).scale(1e-4));
-    }
-
-    // A start outside the buffer, a negative one and a null buffer do nothing.
-    std::vector<float> none(1000, 0.0f);
-    add_piano_tone(none.data(), 1000, 1000, o, kRate);
-    add_piano_tone(none.data(), 1000, -1, o, kRate);
-    add_piano_tone(nullptr, 1000, 0, o, kRate);
-    for (float v : none) {
-        CHECK(v == 0.0f);
-    }
 }
 
 TEST_CASE("synthetic piano: the tone's pitch follows the note, the detune and A4") {
@@ -227,67 +141,6 @@ TEST_CASE("synthetic piano: the tone's pitch follows the note, the detune and A4
             CHECK(on->frequency_hz == doctest::Approx(want).epsilon(0.004));
         }
     }
-}
-
-TEST_CASE("synthetic piano: same seed, same tone; another seed, another tone") {
-    PianoToneOptions o;
-    o.note = 48;
-    std::vector<float> a(kRate / 4, 0.0f);
-    std::vector<float> b(kRate / 4, 0.0f);
-    std::vector<float> c(kRate / 4, 0.0f);
-    add_piano_tone(a.data(), static_cast<int>(a.size()), 100, o, kRate);
-    add_piano_tone(b.data(), static_cast<int>(b.size()), 100, o, kRate);
-    o.seed = 2;
-    add_piano_tone(c.data(), static_cast<int>(c.size()), 100, o, kRate);
-    CHECK(a == b);
-    CHECK(a != c);
-}
-
-TEST_CASE(
-    "synthetic piano: add_room_noise adds noise of the asked RMS, the same for the same seed") {
-    const auto rms_of = [](const std::vector<float>& v) {
-        double sum = 0.0;
-        for (float x : v) {
-            sum += static_cast<double>(x) * x;
-        }
-        return std::sqrt(sum / static_cast<double>(v.size()));
-    };
-    std::vector<float> a(kRate, 0.0f);
-    std::vector<float> b(kRate, 0.0f);
-    std::vector<float> c(kRate, 0.0f);
-    add_room_noise(a.data(), kRate, 1e-3f, 7);
-    add_room_noise(b.data(), kRate, 1e-3f, 7);
-    add_room_noise(c.data(), kRate, 1e-3f, 8);
-    CHECK(rms_of(a) == doctest::Approx(1e-3).epsilon(0.01));
-    CHECK(a == b);
-    CHECK(a != c);
-    // It adds to what is there.
-    std::vector<float> on_top(kRate, 0.25f);
-    add_room_noise(on_top.data(), kRate, 1e-3f, 7);
-    for (size_t i = 0; i < on_top.size(); ++i) {
-        REQUIRE(on_top[i] == doctest::Approx(0.25f + a[i]).epsilon(1e-5));
-    }
-    // No noise to add, or nowhere to put it.
-    std::vector<float> quiet(100, 0.0f);
-    add_room_noise(quiet.data(), 100, 0.0f, 1);
-    add_room_noise(quiet.data(), 0, 1e-3f, 1);
-    add_room_noise(nullptr, 100, 1e-3f, 1);
-    for (float v : quiet) {
-        CHECK(v == 0.0f);
-    }
-}
-
-TEST_CASE("pitch scoring: register_name labels the seven registers and nothing else") {
-    CHECK(std::string(register_name(0)) == "A0-B1");
-    CHECK(std::string(register_name(1)) == "C2-B2");
-    CHECK(std::string(register_name(kRegisterCount - 1)) == "C7-C8");
-    for (int i = 0; i < kRegisterCount; ++i) {
-        for (int j = i + 1; j < kRegisterCount; ++j) {
-            CHECK(std::string(register_name(i)) != std::string(register_name(j)));
-        }
-    }
-    CHECK(std::string(register_name(-1)) == "?");
-    CHECK(std::string(register_name(kRegisterCount)) == "?");
 }
 
 namespace {

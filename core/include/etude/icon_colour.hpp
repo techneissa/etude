@@ -23,8 +23,7 @@ struct IconColourInfo {
     std::string_view name; // "Wine" (a view of a literal: null-terminated, for drawing)
     int title;             // the title (1 Beginner .. 8 Virtuoso) that unlocks it
     // The colour's highlight when it is the one chosen, 0xRRGGBB, taken from the icon's own palette
-    // (scripts/make-icons.py PLAIN and the gold of the clef; tests/icon_colour_test.cpp holds them
-    // together): `rim` for the rim, the tint and the glow, `ink` a lighter shade for its name.
+    // (scripts/make-icons.py PLAIN and the gold of the clef): `rim` for the rim, the tint and the glow, `ink` a lighter shade for its name.
     std::uint32_t rim;
     std::uint32_t ink;
 };

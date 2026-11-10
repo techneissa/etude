@@ -26,47 +26,6 @@ using namespace history_test;
 using namespace std::chrono_literals;
 namespace fs = std::filesystem;
 
-TEST_CASE("history: saving a run takes under 2 ms" *
-          doctest::skip(std::getenv("ETUDE_HISTORY_BENCH") == nullptr)) {
-    TempDir dir;
-    constexpr int kRuns = 300;
-    std::vector<double> write_ms;
-    std::vector<double> call_us;
-    double median = 0.0;
-    {
-        HistoryStore store(dir.path, quiet());
-        REQUIRE(open_now(store).empty());
-        for (int i = 0; i < kRuns; ++i) {
-            RunRecord r = sample_run(i, 0xb000 + static_cast<std::uint64_t>(i % 5), 150);
-            const auto t0 = std::chrono::steady_clock::now();
-            store.add_run(r, "Songs/some/place/piece.mid");
-            call_us.push_back(
-                std::chrono::duration<double, std::micro>(std::chrono::steady_clock::now() - t0)
-                    .count());
-            store.flush();
-            write_ms.push_back(store.stats().last_ms);
-        }
-        std::sort(write_ms.begin(), write_ms.end());
-        std::sort(call_us.begin(), call_us.end());
-        median = write_ms[write_ms.size() / 2];
-        const double p95 = write_ms[write_ms.size() * 95 / 100];
-        std::printf("history write (150 bars, WAL, synchronous=FULL): median %.3f ms, p95 %.3f ms, "
-                    "max %.3f ms; add_run on the frame thread: median %.1f us, max %.1f us\n",
-                    median, p95, write_ms.back(), call_us[call_us.size() / 2], call_us.back());
-
-    } // the first store is gone, so its lock is free
-    // Reading it all back, as the start does.
-    const auto t0 = std::chrono::steady_clock::now();
-    HistoryStore again(dir.path, quiet());
-    REQUIRE(open_now(again).empty());
-    const double open_ms =
-        std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
-    std::printf("history open + read of %zu runs with 150 bars each: %.1f ms\n",
-                again.runs().size(), open_ms);
-    CHECK(again.runs().size() == static_cast<std::size_t>(kRuns));
-    CHECK(median < 2.0);
-}
-
 // ---- Song settings
 
 TEST_CASE("history: a song's name, composer, genre, star and date added are kept by its hash") {

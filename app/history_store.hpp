@@ -109,6 +109,9 @@ struct HistoryOptions {
     // The profile in use from the start (the app passes the one it saved). A profile the database
     // does not hold falls back to the default one when the history is loaded.
     std::int64_t profile_id = kDefaultProfileId;
+    // Every commit is synced to the disk (`PRAGMA synchronous = FULL`); a test turns it off, since
+    // it never cuts the power and the syncs are most of its time.
+    bool sync_commits = true;
 };
 
 enum class HistoryState : std::uint8_t {
@@ -247,6 +250,9 @@ class HistoryStore {
     // Waiting because the file or its folder cannot be written by this program (not because the
     // database is busy): saving waits for the player or the system to fix that.
     bool waiting_unwritable() const { return unwritable_.load(); }
+    // How many times the history thread has tried to open or write the database and failed, each
+    // counted once its log line (if it has one) is out. For tests.
+    int failed_attempts() const { return failed_attempts_.load(); }
 
     // The active profile's runs, oldest first in the order they were saved: the list the progress
     // functions take. Until poll() reports `loaded`, only this session's runs are in it. Frame
@@ -603,6 +609,7 @@ class HistoryStore {
     }
     std::atomic<HistoryState> state_{HistoryState::Loading};
     std::atomic<bool> unwritable_{false};
+    std::atomic<int> failed_attempts_{0}; // history thread: see failed_attempts()
     std::deque<Job> queue_;
     bool busy_ = false;
     bool stop_ = false;

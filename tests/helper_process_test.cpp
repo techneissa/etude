@@ -38,6 +38,7 @@ Context context(const fs::path& root) {
     c.conf.prefix = (root / "opt").string();
     c.conf.state_dir = (root / "state").string();
     c.user = me(root / "home");
+    c.kill_nap_ms = 20;
     return c;
 }
 
@@ -46,20 +47,20 @@ Context context(const fs::path& root) {
 // is-active say nothing and fail, `hang` makes stop outlast the helper's patience.
 fs::path fake_systemctl(const fs::path& root, const std::string& environment = "") {
     const fs::path script = root / "systemctl";
-    write_file(script,
+    write_script(script,
                "#!/bin/sh\n"
-               "dir=\"" + root.string() + "\"\n"
+               "dir=${0%/*}\n"
                "echo \"$*\" >>\"$dir/calls\"\n"
                "case \"$1\" in\n"
-               "is-active) if [ -e \"$dir/bus_error\" ]; then echo 'Failed to connect to bus' >&2; exit 1;\n"
-               "  elif [ -e \"$dir/answer\" ]; then cat \"$dir/answer\"; exit 3;\n"
-               "  elif [ \"$(cat \"$dir/active\" 2>/dev/null)\" = \"$2\" ]; then echo active;\n"
+               "is-active) a=; [ -e \"$dir/active\" ] && read -r a <\"$dir/active\"\n"
+               "  if [ -e \"$dir/bus_error\" ]; then echo 'Failed to connect to bus' >&2; exit 1;\n"
+               "  elif [ -e \"$dir/answer\" ]; then while IFS= read -r w || [ -n \"$w\" ]; do echo \"$w\"; done <\"$dir/answer\"; exit 3;\n"
+               "  elif [ \"$a\" = \"$2\" ]; then echo active;\n"
                "  else echo inactive; exit 3; fi ;;\n"
                "stop) [ -e \"$dir/hang\" ] && sleep 5; [ -e \"$dir/stuck\" ] || rm -f \"$dir/active\" ;;\n"
                "start|restart) echo \"$2\" >\"$dir/active\" ;;\n"
                "show) printf '%s\\n' '" + environment + "' ;;\n"
                "esac\n");
-    ::chmod(script.c_str(), 0755);
     return script;
 }
 
@@ -71,10 +72,10 @@ TEST_CASE("process: a program runs with no shell, its output is kept and a slow 
     CHECK(echoed.exit_code == 0);
     CHECK(echoed.output == "a;b $HOME\n");
     CHECK(run_program({"/usr/bin/false"}, 10).exit_code == 1);
-    const ProgramResult slow = run_program({"/bin/sleep", "30"}, 1);
+    const ProgramResult slow = run_program({"/bin/sleep", "30"}, 0.2);
     CHECK(slow.timed_out);
     CHECK(slow.exit_code == -1);
-    CHECK_FALSE(run_program({"sleep", "1"}, 1).ran); // a program is named by its full path
+    CHECK_FALSE(run_program({"sleep", "1"}, 0.2).ran); // a program is named by its full path
     CHECK(run_program({"/nonexistent/program"}, 5).exit_code == 127);
 }
 
@@ -106,7 +107,7 @@ TEST_CASE("process: code runs in a child, and what it says comes back") {
     CHECK(error == "it threw");
     // A child that crashes or never ends is reported, and the helper goes on.
     CHECK_FALSE(run_as_user(user, 10, []() -> std::string { ::_exit(9); }, error));
-    CHECK_FALSE(run_as_user(user, 1, []() -> std::string { ::sleep(30); return {}; }, error));
+    CHECK_FALSE(run_as_user(user, 0.2, []() -> std::string { ::sleep(30); return {}; }, error));
 }
 
 TEST_CASE("process: the app's user's child starts with no environment and no inherited descriptors") {
@@ -232,7 +233,8 @@ TEST_CASE("service: a bus that does not answer, or a stop that hangs, fails clos
     TempDir t;
     Context c = context(t.path);
     c.conf.systemctl = fake_systemctl(t.path).string();
-    c.service_timeout_s = 2; // under the fake's 5 s hang below; the bus error answers at once
+    c.service_timeout_s = 0.3; // the hung stop only, under the fake's 5 s hang below; the calls that ask keep 2 s
+    c.query_floor_s = 2;
     const Service service(c);
     write_file(t.path / "bus_error", "");
     CHECK(service.state("etude.service").empty());
@@ -276,8 +278,7 @@ TEST_CASE("service: the data folder is where SDL puts it, with XDG_DATA_HOME fro
         CHECK(data_folder_for(c, service, "etude.service").empty());
     }
     // systemctl failing to answer `show` is no answer either.
-    write_file(t.path / "systemctl", "#!/bin/sh\nexit 1\n");
-    ::chmod((t.path / "systemctl").c_str(), 0755);
+    write_script(t.path / "systemctl", "#!/bin/sh\nexit 1\n");
     c.conf.systemctl = (t.path / "systemctl").string();
     const Service broken(c);
     CHECK(data_folder_for(c, broken, "etude.service").empty());

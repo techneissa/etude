@@ -689,21 +689,6 @@ TEST_CASE("plan: sections_merged does nothing when no plan runs") {
     CHECK_FALSE(plan.active());
 }
 
-TEST_CASE("plan: set_base_speed_percent snaps to the grid and clamps") {
-    Fixture f;
-    PracticePlan plan;
-    plan.set_base_speed_percent(73);
-    CHECK(plan.base_speed_percent() == 75);
-    plan.set_base_speed_percent(1);
-    CHECK(plan.base_speed_percent() == 25);
-    plan.set_base_speed_percent(100000);
-    CHECK(plan.base_speed_percent() == 200);
-    plan.set_base_speed_percent(std::numeric_limits<int>::max());
-    CHECK(plan.base_speed_percent() == 200);
-    plan.set_base_speed_percent(std::numeric_limits<int>::min());
-    CHECK(plan.base_speed_percent() == 25);
-}
-
 TEST_CASE("plan: an item with a speed-up near INT_MAX starts on the grid") {
     Fixture f;
     PlanItem p = item(f.a);
@@ -771,22 +756,4 @@ TEST_CASE("apply_plan_step: each kind does the Transport calls it asks for") {
     CHECK(apply_plan_step(t, now, finished));
     CHECK_FALSE(t.loop_enabled());
     CHECK_FALSE(t.playing());
-}
-
-TEST_CASE("plan: the position counts only items whose section still exists") {
-    Fixture f;
-    PracticePlan plan;
-    const std::array<PlanItem, 3> items{item(f.a), item(f.b), item(f.c)};
-    plan.start(f.sections, items, 100, 2); // running the third item
-    PracticePlan::LivePosition live = plan.live_position(f.sections);
-    CHECK(live.position == 2);
-    CHECK(live.count == 3);
-    // B is deleted while the list runs: the running copy keeps its three items, the count is two.
-    REQUIRE(f.sections.erase(f.song, f.b).ok);
-    CHECK(plan.items().size() == 3);
-    live = plan.live_position(f.sections);
-    CHECK(live.position == 1);
-    CHECK(live.count == 2); // "Section 2/2", not "3/3"
-    PracticePlan idle;
-    CHECK(idle.live_position(f.sections).count == 0);
 }

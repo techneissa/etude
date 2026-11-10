@@ -9,6 +9,10 @@
 
 #include "sample_looks.hpp"
 
+#include "etude/color.hpp"
+#include "etude/note_style.hpp"
+#include "etude/palette.hpp"
+
 using namespace etude;
 using namespace etude::test;
 
@@ -722,4 +726,170 @@ TEST_CASE("a saved look slot keeps its Learn shades") {
     LookSettings loaded;
     REQUIRE(back.user_presets.load_slot(1, &loaded));
     CHECK(loaded.learn_picks == mine.learn_picks);
+}
+
+TEST_CASE("palettes and the octave and velocity colours are saved and read back") {
+    LookSettings s;
+    s.color_scheme = ColorScheme::ByOctave;
+    apply_palette(s, Palette::Vivid);
+    s.color_scheme = ColorScheme::ByVelocity;
+    apply_palette(s, Palette::Mono);
+    set_swatch_color(s, ColorScheme::ByVelocity, 1, {9, 99, 199, 255});
+    const std::string text = serialize(s);
+    CHECK(text.find("palette_by_octave = vivid\n") != std::string::npos);
+    CHECK(text.find("palette_by_velocity = mono\n") != std::string::npos);
+    CHECK(text.find("palette_by_hand = classic\n") != std::string::npos);
+    CHECK(text.find("velocity_color_1 = #0963C7\n") != std::string::npos);
+    CHECK(text.find("octave_color_8 = ") != std::string::npos);
+    ParseReport report;
+    const LookSettings back = parse_look(text, &report);
+    CHECK(report.clean());
+    CHECK(back == s);
+    CHECK(matching_palette(back, ColorScheme::ByOctave) == Palette::Vivid);
+    CHECK_FALSE(matching_palette(back, ColorScheme::ByVelocity).has_value());
+    // The reset still knows which palette the changed colours came from.
+    LookSettings reset = back;
+    reset_to_palette(reset);
+    CHECK(matching_palette(reset, ColorScheme::ByVelocity) == Palette::Mono);
+}
+
+TEST_CASE("a look saved before palettes reads as the colours it had") {
+    // Default colours: Classic everywhere, and the octave and velocity ramps as they were.
+    const LookSettings plain = parse_look("version = 1\ncolor_scheme = by_octave\n");
+    CHECK(plain.octave_colors == default_octave_colors());
+    CHECK(plain.velocity_colors == default_velocity_colors());
+    for (const ColorScheme scheme : kAllColorSchemes) {
+        CHECK(plain.palettes[static_cast<std::size_t>(scheme)] == Palette::Classic);
+    }
+
+    // Own hand colours: Custom, with Classic to reset to.
+    ParseReport report;
+    const LookSettings own =
+        parse_look("version = 1\nleft_color = #112233\nright_color = #445566\n", &report);
+    CHECK(report.clean());
+    CHECK(own.left_color == RGBA{0x11, 0x22, 0x33, 255});
+    CHECK_FALSE(matching_palette(own, ColorScheme::ByHand).has_value());
+    CHECK(own.palettes[0] == Palette::Classic);
+
+    // The Pastel notes, saved before palettes: shown as Pastel.
+    LookSettings frosted = sample_look(Sample::FrostedPastel);
+    std::string old_text;
+    for (std::string_view line : {std::string_view("version = 1\n")}) {
+        old_text += line;
+    }
+    const std::string full = serialize(frosted);
+    std::size_t pos = 0;
+    while (pos < full.size()) {
+        const std::size_t eol = full.find('\n', pos);
+        const std::string line = full.substr(pos, eol - pos + 1);
+        pos = eol + 1;
+        if (line.rfind("palette_", 0) != 0 && line.rfind("octave_color_", 0) != 0 &&
+            line.rfind("velocity_color_", 0) != 0 && line.rfind("version", 0) != 0) {
+            old_text += line;
+        }
+    }
+    const LookSettings read = parse_look(old_text);
+    CHECK(read.palettes[static_cast<std::size_t>(ColorScheme::ByPitchClass)] == Palette::Pastel);
+    CHECK(read == frosted);
+}
+
+TEST_CASE("a bad palette name is reported and the palette comes from the colours") {
+    ParseReport report;
+    const LookSettings s = parse_look("version = 1\npalette_by_hand = rainbow\n", &report);
+    REQUIRE(report.issues.size() == 1);
+    CHECK(report.issues[0].kind == ParseIssue::Kind::BadValue);
+    CHECK(report.issues[0].key == "palette_by_hand");
+    CHECK(s.palettes[0] == Palette::Classic);
+    // A stray value in memory is brought back to Classic.
+    LookSettings stray;
+    stray.palettes[2] = static_cast<Palette>(99);
+    CHECK_FALSE(stray.is_valid());
+    CHECK(stray.clamped().palettes[2] == Palette::Classic);
+}
+
+TEST_CASE("a malformed octave or velocity colour keeps the default and is named in the report") {
+    const LookSettings defaults;
+    ParseReport report;
+    const LookSettings got = parse_look("version = 1\noctave_color_3 = banana\n"
+                                        "octave_color_9 = #123456\nvelocity_color_1 = #12\n",
+                                        &report);
+    CHECK(got.octave_colors == defaults.octave_colors);
+    CHECK(got.velocity_colors == defaults.velocity_colors);
+    CHECK_FALSE(report.clean());
+    const auto named = [&](const char* key) {
+        std::string all;
+        for (const auto& issue : report.issues) {
+            all += issue.key + "\n";
+        }
+        return all.find(key) != std::string::npos;
+    };
+    CHECK(named("octave_color_3"));
+    CHECK(named("octave_color_9"));
+    CHECK(named("velocity_color_1"));
+}
+
+TEST_CASE("a settings file that names the removed colour-blind palette loads as Classic") {
+    ParseReport report;
+    const LookSettings got = parse_look("version = 1\ncolor_scheme = by_pitch_class\n"
+                                        "palette_by_hand = colour_blind\n"
+                                        "palette_by_pitch_class = colour_blind\n"
+                                        "palette_single = vivid\n",
+                                        &report);
+    for (const ColorScheme scheme : {ColorScheme::ByHand, ColorScheme::ByPitchClass}) {
+        CHECK(got.palettes[static_cast<std::size_t>(scheme)] == Palette::Classic);
+    }
+    CHECK(got.palettes[static_cast<std::size_t>(ColorScheme::Single)] == Palette::Vivid);
+    CHECK(report.clean());
+    // The same in a saved look slot.
+    LookDocument doc;
+    doc.user_presets.save_slot(1, "Old", LookSettings{});
+    std::string text = serialize_document(doc);
+    const std::string key = "slot_2_palette_by_octave = classic\n";
+    const std::size_t at = text.find(key);
+    REQUIRE(at != std::string::npos);
+    text.replace(at, key.size(), "slot_2_palette_by_octave = colour_blind\n");
+    ParseReport slot_report;
+    const LookDocument back = parse_look_document(text, &slot_report);
+    CHECK(back.user_presets.slots[1].look.palettes[static_cast<std::size_t>(
+              ColorScheme::ByOctave)] == Palette::Classic);
+    CHECK(slot_report.clean());
+}
+
+TEST_CASE("names round-trip, the six older names read as their new style, unknown are refused") {
+    for (NoteStyle s : kAllNoteStyles) {
+        NoteStyle back = NoteStyle::Solid;
+        CHECK(parse_note_style(note_style_name(s), &back));
+        CHECK(back == s);
+    }
+    const struct {
+        const char* old_name;
+        NoteStyle now;
+    } kMoves[] = {{"filled", NoteStyle::Solid},  {"glassy", NoteStyle::Glass},
+                  {"frosted", NoteStyle::Glass}, {"shiny", NoteStyle::Candy},
+                  {"ghost", NoteStyle::Outline}, {"neon", NoteStyle::Neon}};
+    for (const auto& m : kMoves) {
+        CAPTURE(m.old_name);
+        NoteStyle got = NoteStyle::Ink;
+        CHECK(parse_note_style(m.old_name, &got));
+        CHECK(got == m.now);
+    }
+    NoteStyle untouched = NoteStyle::Soft;
+    CHECK_FALSE(parse_note_style("sparkly", &untouched));
+    CHECK_FALSE(legacy_note_style("solid", &untouched)); // a current name is not an old one
+    CHECK(untouched == NoteStyle::Soft);
+}
+
+TEST_CASE("hex text round-trips and rejects bad input") {
+    CHECK(to_hex(RGBA{90, 170, 255, 255}) == "#5AAAFF");
+    CHECK(to_hex(RGBA{1, 2, 3, 4}) == "#01020304");
+    RGBA out;
+    CHECK(parse_hex("#5AAAFF", &out));
+    CHECK(out == RGBA{90, 170, 255, 255});
+    CHECK(parse_hex("#5aaaff80", &out));
+    CHECK(out == RGBA{90, 170, 255, 128});
+    CHECK_FALSE(parse_hex("5AAAFF", &out));
+    CHECK_FALSE(parse_hex("#5AAAF", &out));
+    CHECK_FALSE(parse_hex("#5AAAFG", &out));
+    CHECK_FALSE(parse_hex("", &out));
+    CHECK_FALSE(parse_hex("#5AAAFF00FF", &out));
 }

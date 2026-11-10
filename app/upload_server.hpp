@@ -43,6 +43,8 @@ struct UploadServerOptions {
     // most `max_per_peer` connections at once.
     std::chrono::milliseconds request_deadline{180'000};
     std::size_t max_per_peer = 3;
+    // How often the connections are looked over for those limits (a test shortens it).
+    std::chrono::milliseconds sweep_interval{250};
     // Names the page may be reached by besides an IP address and "localhost" (the Host header).
     std::vector<std::string> host_names{"etude.local"};
 };

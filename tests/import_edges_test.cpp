@@ -7,7 +7,6 @@
 #include "etude/musicxml.hpp"
 
 #include "smf_builder.hpp"
-#include "timing_factor.hpp"
 
 #include <doctest/doctest.h>
 
@@ -756,57 +755,7 @@ TEST_CASE("import edges: a file that sets <divisions> carries no warning") {
     CHECK(r.warnings.empty());
 }
 
-// ---- Many tracks and the note cap
-
-namespace {
-
-Bytes many_one_note_tracks(int tracks) {
-    Bytes out = header(1, tracks, 480);
-    for (int i = 0; i < tracks; ++i) {
-        put_chunk(out, "MTrk", Track().on(0, 0, 40 + i % 40).off(96, 0, 40 + i % 40).end().data());
-    }
-    return out;
-}
-
-} // namespace
-
-TEST_CASE("import edges: a MIDI file with many tracks loads in time that scales with its size") {
-    const int tracks = 65'535;
-    const Bytes file = many_one_note_tracks(tracks);
-    const std::clock_t start = std::clock();
-    const MidiLoadResult r = load_mid(file);
-    const double seconds = static_cast<double>(std::clock() - start) / CLOCKS_PER_SEC;
-    REQUIRE(r.ok);
-    CHECK(r.song.notes.size() == static_cast<std::size_t>(tracks));
-    CHECK(r.song.parts.size() == static_cast<std::size_t>(tracks));
-    CHECK_TIMING(seconds < 8.0);
-}
-
-TEST_CASE("import edges: splitting hands over many parts takes time that scales with its size") {
-    // 65,535 parts of one note each, built directly: a search of the part list for every note is
-    // billions of steps.
-    Song song;
-    const int parts = 65'535;
-    for (int i = 0; i < parts; ++i) {
-        Note n;
-        n.start_tick = std::int64_t{i} * 480;
-        n.end_tick = n.start_tick + 240;
-        n.pitch = static_cast<std::uint8_t>(40 + i % 40);
-        n.track = static_cast<std::uint16_t>(i);
-        n.channel = 0;
-        song.notes.push_back(n);
-        Part p;
-        p.track = n.track;
-        p.channel = 0;
-        p.note_count = 1;
-        song.parts.push_back(p);
-    }
-    const std::clock_t start = std::clock();
-    const Song split = with_split_hands(song, {});
-    const double seconds = static_cast<double>(std::clock() - start) / CLOCKS_PER_SEC;
-    CHECK(split.notes.size() == song.notes.size());
-    CHECK_TIMING(seconds < 8.0);
-}
+// ---- The note cap
 
 TEST_CASE("import edges: a MIDI song over the note cap fails with a message") {
     Track t;

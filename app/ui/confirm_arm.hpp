@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// The two-tap rows of Settings (a slot's clear, Reset all), with no ImGui in it so
-// tests/confirm_arm_test.cpp checks the rules:
+// The two-tap rows of Settings (a slot's clear, Reset all), with no ImGui in it. Rules:
 // - the first tap only arms the row (and says so); the second, within 3 s, does the work;
 // - a press anywhere but on the armed control disarms it, so a tap elsewhere in between makes the
 //   next tap on it a first tap again;

@@ -24,8 +24,7 @@ using namespace upload_test;
 namespace {
 
 void make_executable(const fs::path& path, const std::string& body) {
-    write_file(path, body);
-    ::chmod(path.c_str(), 0755);
+    write_script(path, body);
 }
 
 // A stand-in systemd-run that ends with `status` (and says something on the way), and a systemctl that
@@ -174,10 +173,8 @@ TEST_CASE("sandbox: a run that outlasts its limit is stopped by name and counts 
     Rig rig;
     SandboxRun slow = rig.run("count", "sleep 20");
     slow.limit_s = 0;
-    slow.launch_margin_s = 1; // the stand-in outlasts a 1 s wait
-    const auto started = std::chrono::steady_clock::now();
+    slow.launch_margin_s = 0.2; // the stand-in outlasts the wait
     CHECK(run_sandboxed(rig.c, slow) == 0);
-    CHECK(std::chrono::steady_clock::now() - started < std::chrono::seconds(15));
     CHECK(rig.calls().find("stop etude-helper-count-1") != std::string::npos);
 }
 

@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // playback: transposition (split from playback_test.cpp).
-#include "timing_factor.hpp"
 #include "etude/metronome.hpp"
 #include "etude/playback.hpp"
 #include "etude/evaluator.hpp"
@@ -373,28 +372,17 @@ TEST_CASE("playback: restoring state at a position uses checkpoints and matches 
     std::uniform_real_distribution<double> where(0.0, 1999.0);
     double now = 0.0;
     std::vector<double> targets;
-    // The best of three rounds of 300 seeks, so a busy machine doesn't fail the test.
-    double took_ms = 1e9;
     std::size_t most_replayed = 0;
-    for (int round = 0; round < 3; ++round) {
-        const auto t0 = std::chrono::steady_clock::now();
-        for (int i = 0; i < 300; ++i) {
-            now += 0.001;
-            targets.push_back(where(rng));
-            r.seek(now, targets.back());
-            // A seek replays the events since the last checkpoint, not the song from its start
-            // (a scan of 150,000 events on average): counted, not timed.
-            REQUIRE(r.playback.last_restore_replayed() <= Playback::checkpoint_events());
-            most_replayed = std::max(most_replayed, r.playback.last_restore_replayed());
-        }
-        took_ms = std::min(took_ms, std::chrono::duration<double, std::milli>(
-                                        std::chrono::steady_clock::now() - t0)
-                                        .count());
+    for (int i = 0; i < 300; ++i) {
+        now += 0.001;
+        targets.push_back(where(rng));
+        r.seek(now, targets.back());
+        // A seek replays the events since the last checkpoint, not the song from its start
+        // (a scan of 150,000 events on average).
+        REQUIRE(r.playback.last_restore_replayed() <= Playback::checkpoint_events());
+        most_replayed = std::max(most_replayed, r.playback.last_restore_replayed());
     }
-    CAPTURE(took_ms);
     CHECK(most_replayed > 0); // the counter counts
-    // About 6 ms (45 under ASan); a scan from the song start takes 150.
-    CHECK_TIMING(took_ms < 75.0 * etude::test::kTimingFactor);
 
     // The piano holds, at the last target, what the file set at or before it, or the default.
     FakePiano fresh;

@@ -2,7 +2,7 @@
 // Which text fields are open, known the moment one opens (Dear ImGui's own `WantTextInput` comes
 // a frame later), so the frame that opens a field already keeps the piano's typing keys and the
 // shortcuts out of it, and a screen that reads raw finger events leaves a naming dialog's touches
-// alone. No ImGui here, so tests/library_layout_test.cpp checks it.
+// alone. No ImGui here.
 #pragma once
 
 #include <array>

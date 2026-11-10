@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Where the scale overlay's marks go on one key, in window pixels (no SDL here, so
-// tests/scale_marks_layout_test.cpp checks the real numbers at the window sizes): the root key's
+// Where the scale overlay's marks go on one key, in window pixels (no SDL here): the root key's
 // name near its front edge, the finger number clear above it in the open part of the key. A white
 // key's open part is the part below the black keys' feet; a black key's is its face above its name.
 // The number is as large as the note labels at least, bold, and is dropped (never squeezed) when

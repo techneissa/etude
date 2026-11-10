@@ -185,7 +185,7 @@ TEST_CASE("update install: the helper's refusal is shown, and what the app left 
 TEST_CASE("update install: a request nobody picks up is a failure, and is taken back") {
     InstallRig rig;
     UpdateOptions o = rig.options();
-    o.pickup_wait_ms = 300;
+    o.pickup_wait_ms = 50;
     UpdateService s(std::move(o));
     offer_update(s);
     s.update_now();

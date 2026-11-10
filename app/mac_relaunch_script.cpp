@@ -22,14 +22,17 @@ constexpr std::string_view kScript = R"SH(#!/bin/sh
 #   VERSION FROM  the new version and the one it replaces
 #   WAIT_SECONDS  how long the new version has to write READY
 #
-# ETUDE_OPEN replaces /usr/bin/open, ETUDE_QUIT_WAIT (seconds) the wait for the app to close, and
-# ETUDE_SWAP the command that exchanges two folders (a program and its arguments before the two paths).
+# ETUDE_OPEN replaces /usr/bin/open, ETUDE_QUIT_WAIT (seconds) the wait for the app to close,
+# ETUDE_SWAP the command that exchanges two folders (a program and its arguments before the two
+# paths), and, for tests only, ETUDE_TICK (seconds, default 0.2): the pause between two looks. It
+# scales every wait here, since the counts of looks assume 0.2 s.
 set -u
 [ $# -eq 9 ] || { echo "relaunch.sh: 9 arguments needed" >&2; exit 2; }
 app_pid=$1; bundle=$2; new_bundle=$3; previous=$4; ready=$5; status=$6
 version=$7; from=$8; wait_seconds=$9
 open_cmd=${ETUDE_OPEN:-/usr/bin/open}
 quit_wait=${ETUDE_QUIT_WAIT:-60}
+tick=${ETUDE_TICK:-0.2}
 parent=$(dirname "$bundle")
 staging=$(dirname "$new_bundle")
 log=$(dirname "$status")/relaunch.log
@@ -52,7 +55,7 @@ stop_new() {
     pkill -TERM -f "$bundle/Contents/MacOS/" 2>/dev/null
     n=0
     while pgrep -f "$bundle/Contents/MacOS/" >/dev/null 2>&1 && [ $n -lt 25 ]; do
-        sleep 0.2; n=$((n + 1))
+        sleep "$tick"; n=$((n + 1))
     done
     pkill -KILL -f "$bundle/Contents/MacOS/" 2>/dev/null
     return 0
@@ -67,7 +70,7 @@ while kill -0 "$app_pid" 2>/dev/null; do
         rm -rf "$staging"
         exit 1
     fi
-    sleep 0.2; n=$((n + 1))
+    sleep "$tick"; n=$((n + 1))
 done
 
 # 2. The swap is one atomic exchange of two folders (renamex_np with RENAME_SWAP, done by the new
@@ -124,7 +127,7 @@ while [ $n -lt $((wait_seconds * 5)) ]; do
         good=1
         break
     fi
-    sleep 0.2; n=$((n + 1))
+    sleep "$tick"; n=$((n + 1))
 done
 
 if [ $good -eq 1 ]; then

@@ -22,7 +22,7 @@ Two steps, each runnable alone:
 
 Usage: python3 scripts/make-icons.py [svg|render|all|sheet|compare] [--only colour,colour] [--out sheet.png]
 The colour keys, their order and the title each one needs are mirrored in core/include/etude/
-icon_colour.hpp; tests/icon_colour_test.cpp holds the two together.
+icon_colour.hpp.
 """
 import argparse
 import math

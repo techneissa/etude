@@ -33,7 +33,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            ninja-build libasound2-dev libudev-dev \
+            ninja-build ccache libasound2-dev libudev-dev \
             libdrm-dev libgbm-dev libegl-dev libgles-dev \
             libx11-dev libxext-dev libxcursor-dev libxi-dev libxfixes-dev libxrandr-dev \
             libxss-dev libxtst-dev libwayland-dev libxkbcommon-dev wayland-protocols \
@@ -41,7 +41,7 @@ jobs:
 
       - name: Install macOS packages
         if: runner.os == 'macOS'
-        run: brew install ninja
+        run: brew install ninja ccache
 
       - name: Cache dependency downloads
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -50,11 +50,43 @@ jobs:
           key: deps-${{ hashFiles('cmake/Dependencies.cmake') }}
           restore-keys: deps-
 
+      # ccache keeps the compiled objects between runs: a run compiles only what changed. Every
+      # run saves its own copy under a new key and starts from the newest one of its OS and CPU (a
+      # branch reads its own caches and main's). The check is the compiler's content, not its
+      # time, so a runner image update does not empty the cache.
+      - name: Restore ccache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.ccache
+          key: ccache-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
+          restore-keys: ccache-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Configure ccache
+        run: |
+          {
+            echo "CCACHE_DIR=$HOME/.ccache"
+            echo "CCACHE_MAXSIZE=1G"
+            echo "CCACHE_COMPILERCHECK=content"
+          } >> "$GITHUB_ENV"
+
       - name: Configure
         run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_COMPILE_WARNING_AS_ERROR=ON -DETUDE_PIANO_FROM_SOURCE=OFF
 
       - name: Build
-        run: cmake --build build -- -k 0
+        run: |
+          ccache --zero-stats
+          cmake --build build -- -k 0
+
+      - name: ccache statistics
+        if: always()
+        run: ccache --show-stats
+
+      - name: Save ccache
+        if: always()
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.ccache
+          key: ccache-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
 
       - name: Test
         run: ctest --test-dir build --output-on-failure

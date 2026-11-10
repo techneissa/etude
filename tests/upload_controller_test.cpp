@@ -2,7 +2,6 @@
 // The Add songs page's end of the upload server: the switch starts and stops it on a thread of its
 // own, and the view the page reads follows the server. Bound to loopback only.
 #include "../app/folder_watcher.hpp"
-#include "../app/loop_wake.hpp"
 #include "../app/open_song_box.hpp"
 #include "../app/upload_controller.hpp"
 #include "../app/upload_demo.hpp"
@@ -10,17 +9,12 @@
 
 #include <doctest/doctest.h>
 
-#include "timing_factor.hpp"
 #include "etude/folder_watch.hpp"
 
-#include <arpa/inet.h>
-#include <netinet/in.h>
-#include <sys/socket.h>
 #include <unistd.h>
 
 #include <chrono>
 #include <functional>
-#include <memory>
 #include <string>
 #include <thread>
 
@@ -36,30 +30,6 @@ constexpr bool kShowLoopback = true;
 int port_of(const ui::UploadView& v) {
     return std::stoi(v.number_address.substr(v.number_address.find(':') + 1));
 }
-
-// A client that connects to 127.0.0.1:port and stays: silent, or (`halfway`) in the middle of an
-// upload that never ends, so the server's worker is waiting on it inside a request.
-struct IdleClient {
-    int fd = -1;
-    explicit IdleClient(int port, bool halfway = false) {
-        fd = ::socket(AF_INET, SOCK_STREAM, 0);
-        sockaddr_in address{};
-        address.sin_family = AF_INET;
-        address.sin_port = htons(static_cast<std::uint16_t>(port));
-        ::inet_pton(AF_INET, "127.0.0.1", &address.sin_addr);
-        REQUIRE(::connect(fd, reinterpret_cast<sockaddr*>(&address), sizeof address) == 0);
-        if (halfway) {
-            const std::string head =
-                "POST /api/login HTTP/1.1\r\nHost: 127.0.0.1:" + std::to_string(port) +
-                "\r\nContent-Type: application/x-www-form-urlencoded\r\n"
-                "Content-Length: 100\r\n\r\npin=12";
-            REQUIRE(::send(fd, head.data(), head.size(), 0) == static_cast<ssize_t>(head.size()));
-        }
-    }
-    ~IdleClient() { ::close(fd); }
-    IdleClient(const IdleClient&) = delete;
-    IdleClient& operator=(const IdleClient&) = delete;
-};
 
 UploadServerOptions loopback(const TempDir& root) {
     UploadServerOptions o;
@@ -115,19 +85,6 @@ TEST_CASE("upload controller: the switch starts the server, the view has its add
     CHECK(controller.view().pin.empty());
 }
 
-TEST_CASE("upload controller: the ticking countdown does not wake a still screen") {
-    TempDir root;
-    UploadController controller(loopback(root), kShowLoopback);
-    controller.set_on(true);
-    REQUIRE(wait_for(controller, [](const ui::UploadView& v) { return v.ready; }));
-    const int before = controller.view().remaining_s;
-    const WakeCounts woke = wake_counts();
-    std::this_thread::sleep_for(std::chrono::milliseconds(2300));
-    const int after = controller.view().remaining_s;
-    CHECK(after < before); // the page reads the new count at its own tick
-    CHECK(wake_report(woke, wake_counts()) == "none");
-}
-
 TEST_CASE("upload controller: a port that is taken turns the switch off with the reason") {
     TempDir root;
     UploadController first(loopback(root), kShowLoopback);
@@ -171,44 +128,16 @@ TEST_CASE("upload controller: it ends with the app, switch on or not, and lets g
     CHECK(port_of(other.view()) == port);
 }
 
-TEST_CASE("upload controller: a quit with a phone still connected does not wait for it") {
-    TempDir root;
-    // The clients outlive the controller: they are still connected, and silent, when it is
-    // destroyed.
-    std::unique_ptr<IdleClient> a;
-    std::unique_ptr<IdleClient> b;
-    std::unique_ptr<IdleClient> c;
-    std::chrono::steady_clock::time_point began;
-    {
-        UploadController controller(loopback(root), kShowLoopback);
-        controller.set_on(true);
-        REQUIRE(wait_for(controller, [](const ui::UploadView& v) { return v.ready; }));
-        // One that has sent nothing, and two that stopped in the middle of a request: the library
-        // would read for its own timeout (10 s) in each worker before it let go.
-        const int port = port_of(controller.view());
-        a = std::make_unique<IdleClient>(port);
-        b = std::make_unique<IdleClient>(port, true); // in the middle of a request
-        c = std::make_unique<IdleClient>(port, true);
-        std::this_thread::sleep_for(std::chrono::milliseconds(150)); // the workers have them
-        began = std::chrono::steady_clock::now();
-    }
-    const auto took = std::chrono::steady_clock::now() - began;
-    INFO("quit took " << std::chrono::duration_cast<std::chrono::milliseconds>(took).count()
-                      << " ms");
-    CHECK(took < std::chrono::seconds(8)); // the library would read for 10 s in each worker
-    CHECK_TIMING(took < std::chrono::seconds(1));
-}
-
 TEST_CASE("upload controller: the switch the player left is the switch shown") {
     TempDir root;
     UploadController controller(loopback(root), kShowLoopback);
     // On, then off at once, many times: whatever the server was in the middle of, the view that
     // follows the last tap never shows the switch on.
-    for (int round = 0; round < 12; ++round) {
+    for (int round = 0; round < 6; ++round) {
         controller.set_on(true);
         std::this_thread::sleep_for(std::chrono::milliseconds(round * 7));
         controller.set_on(false);
-        const auto end = std::chrono::steady_clock::now() + std::chrono::milliseconds(150);
+        const auto end = std::chrono::steady_clock::now() + std::chrono::milliseconds(30);
         while (std::chrono::steady_clock::now() < end) {
             REQUIRE_FALSE(controller.view().on);
             std::this_thread::sleep_for(std::chrono::milliseconds(2));

@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # The batch gate (`just gate`): the checks that prove what a batch changed on main, in order: the
 # icon audit of the scenarios named with --audit (none named: skipped), the shot determinism check
-# (`just shots-check`) when --shots is given (default: skipped), ci-linux and the publish leak guard
-# (`just publish-check`), the last two always. Everything that will run is built first, in parallel with whatever else runs; then the
+# (`just shots-check`) when --shots is given (default: skipped), ci-linux when --ci-linux is given
+# (default: skipped) and the publish leak guard (`just publish-check`), always. Everything that will run is built first, in parallel with whatever else runs; then the
 # checks run one after the other holding the heavy-check lock (scripts/heavy-lock.sh) the whole
 # time, so no other checkout's audit or bench slips in between. All that were asked for run
 # even when one fails. Each prints nothing while it runs; the gate prints one line per check (PASS
@@ -11,16 +11,18 @@
 # keeps the full output in build/gate/<check>.log, with the last lines of a failed one printed
 # under its line. Exit status 1 when any check failed.
 #
-#   scripts/gate.sh [--audit "SCENARIO SCENARIO ..."] [--shots]
+#   scripts/gate.sh [--audit "SCENARIO SCENARIO ..."] [--shots] [--ci-linux]
 #     --audit  the icon audit's scenarios (spaces or commas between names), at every size and
 #              scale: the screens the batch changed. A name that is no scenario, or a scenario that
 #              measured nothing, fails the audit.
 #     --shots  also run the shot determinism check (about 2.5 minutes)
+#     --ci-linux  also run the Linux CI job: when the batch changed CMake, a dependency or platform code
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
 AUDIT=""
 SHOTS=0
+CI_LINUX=0
 ARGS=("$@")
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -28,7 +30,8 @@ while [ $# -gt 0 ]; do
             [ $# -ge 2 ] && [ -n "${2// /}" ] || { echo "gate: --audit wants the scenarios to run, e.g. --audit \"page-view dock\"" >&2; exit 2; }
             AUDIT=$2; shift 2 ;;
         --shots) SHOTS=1; shift ;;
-        *) echo "usage: scripts/gate.sh [--audit \"SCENARIO ...\"] [--shots]  (unknown option: $1)" >&2; exit 2 ;;
+        --ci-linux) CI_LINUX=1; shift ;;
+        *) echo "usage: scripts/gate.sh [--audit \"SCENARIO ...\"] [--shots] [--ci-linux]  (unknown option: $1)" >&2; exit 2 ;;
     esac
 done
 
@@ -84,9 +87,14 @@ if [ "$SHOTS" = 1 ]; then
 else
     gate_skip shots "no --shots (no drawing code changed)"
 fi
-ran+=(ci-linux publish-check)
-# ctest runs the whole unit suite here; a PR's `just test` runs only the tests its edit touches.
-GATE_NOTE="the full unit suite" gate_check ci-linux 'tests passed|tests failed' scripts/ci-linux.sh
+if [ "$CI_LINUX" = 1 ]; then
+    ran+=(ci-linux)
+    # ctest runs the whole unit suite here; a PR's `just test` runs only the tests its edit touches.
+    GATE_NOTE="the full unit suite" gate_check ci-linux 'tests passed|tests failed' scripts/ci-linux.sh
+else
+    gate_skip ci-linux "no --ci-linux (no CMake, dependency or platform change)"
+fi
+ran+=(publish-check)
 gate_check publish-check '.' just publish-check
 skipped_text=""
 [ "${#skipped[@]}" -eq 0 ] || skipped_text="; skipped: ${skipped[*]}"

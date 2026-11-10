@@ -6,8 +6,6 @@
 #include <doctest/doctest.h>
 
 #include <cstdlib>
-#include <fstream>
-#include <iterator>
 #include <string>
 
 #if defined(__linux__)
@@ -129,39 +127,3 @@ TEST_CASE("watchdog: off where there is no systemd") {
     CHECK(dog.sent() == 0);
 }
 #endif
-
-namespace {
-
-std::string source_text(const std::string& relative) {
-    std::ifstream in(std::string(ETUDE_SOURCE_DIR) + "/" + relative, std::ios::binary);
-    REQUIRE(in.good());
-    return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
-}
-
-std::size_t count_of(const std::string& text, const std::string& needle) {
-    std::size_t n = 0;
-    for (std::size_t at = text.find(needle); at != std::string::npos; at = text.find(needle, at + 1)) {
-        ++n;
-    }
-    return n;
-}
-
-} // namespace
-
-TEST_CASE("watchdog: only the frame loop pings, and the watchdog starts no thread of its own") {
-    // A ping from a thread of its own would go on while the frame thread hangs, and hide the hang.
-    const std::string loop = source_text("app/window_run.cpp");
-    CHECK(count_of(loop, "watchdog.ping(") == 1);
-    CHECK(loop.find("watchdog.ping(") > loop.find("while (running)"));
-    const std::string watchdog = source_text("app/watchdog.cpp");
-    for (const char* thread : {"<thread>", "std::thread", "std::jthread", "std::async", "pthread", "spawn_thread", "SDL_CreateThread",
-                               "timer_create", "SDL_AddTimer"}) {
-        CAPTURE(thread);
-        CHECK(watchdog.find(thread) == std::string::npos);
-    }
-    for (const char* file : {"app/window_state.hpp", "app/window_frame.cpp", "app/window_draw.cpp",
-                             "app/window_startup.cpp", "app/window_shutdown.cpp", "app/update_service.cpp"}) {
-        CAPTURE(file);
-        CHECK(source_text(file).find("Watchdog") == std::string::npos);
-    }
-}

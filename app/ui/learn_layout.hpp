@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Where the Learn screen's parts go, in ImGui points (its sizes are `learn_tok` in tokens.hpp). No
-// ImGui here, so tests/learn_layout_test.cpp checks the real numbers at every window size.
+// Where the Learn screen's parts go, in ImGui points (its sizes are `learn_tok` in tokens.hpp). No ImGui here.
 //
 // The screen covers everything under the top row. Its two pages, both with a header row (back, the
 // page's name, and on the cards the four tabs):

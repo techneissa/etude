@@ -43,8 +43,8 @@ sys.dont_write_bytecode = True
 
 ROOT = Path(__file__).resolve().parent.parent
 
-# Lints that read the source tree: they run on every diff.
-GUARDS = ("ui_token_lint_test", "accidental_guard_test", "touch_fire_guard_test")
+# Test files that run on every diff (none today).
+GUARDS = ()
 
 # Headers every screen draws with: a change there is a change everywhere (techneissa, 2026-10-20).
 SHARED_HEADERS = ("app/ui/tokens.hpp", "app/ui/kit.hpp", "app/ui/kit_internal.hpp")

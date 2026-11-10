@@ -6,7 +6,6 @@
 #include "song_controller.hpp"
 #include "song_library.hpp"
 
-#include "timing_factor.hpp"
 #include "etude/song_builder.hpp"
 #include "etude/song_schedule.hpp"
 

@@ -114,7 +114,7 @@ TEST_CASE("journal: song settings, groups, sources, overrides and pins held at q
         open_now(store);
         REQUIRE(store.state() == HistoryState::Ready);
         make_library_changes(store, run_id);
-        CHECK_FALSE(store.flush(300ms)); // every write finds the file read-only
+        CHECK_FALSE(flush_fails(store)); // every write finds the file read-only
         store.close();
         CHECK(store.take_errors().empty()); // all of it is in the journal
     }
@@ -186,7 +186,7 @@ TEST_CASE("journal: a long job of song settings is cut into records and saved wh
         HistoryStore store(dir.path, options);
         open_now(store);
         store.set_song_prefs(many);
-        CHECK_FALSE(store.flush(300ms));
+        CHECK_FALSE(flush_fails(store));
         store.close();
         CHECK(store.take_errors().empty());
     }
@@ -221,7 +221,7 @@ TEST_CASE("journal: when it cannot be written, the library's changes are in the 
     make_library_changes(store, run_id);
     store.add_run(sample_run(2));
     store.set_song_practice(kSong, busy_practice());
-    CHECK_FALSE(store.flush(300ms));
+    CHECK_FALSE(flush_fails(store));
     store.close();
     const std::vector<std::string> errors = store.take_errors();
     REQUIRE(errors.size() == 1);

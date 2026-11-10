@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// What typing does to a field's text, for the on-screen keys and the computer keyboard alike. No
-// ImGui here, so tests/osk_text_test.cpp checks it.
+// What typing does to a field's text, for the on-screen keys and the computer keyboard alike. No ImGui here.
 #pragma once
 
 #include "tokens.hpp"

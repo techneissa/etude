@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Fits the status text of the top row to its room, with no ImGui in it so tests/status_fit_test.cpp
-// checks the real rule. The keyboard's name and the notes after it (app/status_parts.hpp) are whole
+// Fits the status text of the top row to its room, with no ImGui in it. The keyboard's name and the notes after it (app/status_parts.hpp) are whole
 // parts: when the room is short the lowest-ranked note goes first, and so on in the fixed order
 // `StatusRank` lists, so the row never shows a cut word or a fragment. Only two things are cut with
 // an ellipsis, and never narrower than `min_cut`: the song's title, after every note below it has

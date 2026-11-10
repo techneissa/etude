@@ -344,7 +344,7 @@ TEST_CASE("delete profile: a deletion held at quit goes to the journal and the n
         open_now(store);
         REQUIRE(store.state() == HistoryState::Ready);
         REQUIRE(store.delete_profile(2) == ProfileResult::Ok);
-        CHECK_FALSE(store.flush(300ms)); // the file is read-only
+        CHECK_FALSE(flush_fails(store)); // the file is read-only
         store.close();
         CHECK(store.take_errors().empty());
     }

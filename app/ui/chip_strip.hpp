@@ -3,9 +3,7 @@
 // chips sit side by side in their own widths, a drag or a swipe scrolls them (and coasts after a
 // finger's fast swipe), a wheel scrolls them, and the chip last picked is scrolled into view. A
 // press that turned into a scroll is no tap on the chip under it: the strip takes the touch from it
-// (`took_touch`), as the library's shelves do. No ImGui here, so tests/chip_strip_test.cpp holds
-// the scroll limits, the drag-against-tap threshold and the selected chip in view; the screen feeds
-// it the pointer (learn_screen.cpp).
+// (`took_touch`), as the library's shelves do. No ImGui here; the screen feeds it the pointer (learn_screen.cpp).
 //
 // Positions are in design points: `x` along the strip from the first chip's left edge, the offset
 // how far the strip is scrolled (0 at its start).

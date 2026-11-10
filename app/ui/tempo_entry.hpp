@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // The typed tempo: which whole numbers of beats a minute the song's speed range allows, and what
-// to say of a number typed. No ImGui here, so tests/tempo_card_test.cpp checks it.
+// to say of a number typed. No ImGui here.
 #pragma once
 
 #include <algorithm>

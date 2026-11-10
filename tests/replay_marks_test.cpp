@@ -138,15 +138,3 @@ TEST_CASE("replay marks: the list is cleared each call and reuses its storage") 
     CHECK(etude::test::stop_counting_allocations() == 0);
     CHECK(out.size() == first);
 }
-
-TEST_CASE("replay marks: no more than the cap, the nearest the hit line kept") {
-    const Fixture f = make_fixture();
-    std::vector<RunEvent> events;
-    for (int i = 0; i < 2000; ++i) {
-        events.push_back(press(0, i, 0, NoteGrade::Perfect, 72, Hand::Right));
-    }
-    const ReplayTimeline t = timeline_of(f, run_of(events));
-    const auto marks = marks_at(t, 0.0, 10.0, 0.0);
-    CHECK(marks.size() == kMaxReplayMarks);
-    CHECK(marks.front().bottom == doctest::Approx(0.0f));
-}

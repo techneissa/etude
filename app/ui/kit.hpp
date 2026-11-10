@@ -378,7 +378,7 @@ ImVec2 text_size(ImFont* font, float size, const char* text);
 // `Centre` centres the visible letters (the advance less the side bearings of the first and last
 // letter), `Right` puts their right edge at the slot's right edge. Every text in a control goes
 // through this; the icon audit leaves these labels out of its second frame and measures where they
-// were (icon_audit.hpp), and tests/ui_token_lint_test.cpp counts the local centring maths left.
+// were (icon_audit.hpp).
 // `slot` is the control's face (or a row's, or one line's box), in ImGui points.
 LabelMetrics label_metrics(ImFont* font, float size, const char* text);
 // The width `label_at` draws `text` at: a size under 40 pt is rounded to a whole point there, so

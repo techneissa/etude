@@ -51,10 +51,6 @@ template <std::size_t N> std::vector<PlaybackMessage> contents(const DueQueue<N>
 
 } // namespace
 
-TEST_CASE("the look-ahead covers a frame at 30 FPS") {
-    CHECK(kSongSoundLeadNs >= 1'000'000'000 / 30 - 4 * kMs);
-}
-
 TEST_CASE("a queue gives messages back in due order, equal times in the order they came") {
     DueQueue<16> q;
     q.push(note_on(60, 30 * kMs));

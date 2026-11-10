@@ -42,7 +42,7 @@ struct SandboxRun {
     std::string mode;    // count, crashed or idle
     std::string unit;    // the transient service's name
     int limit_s = 0;     // RuntimeMaxSec of the transient service
-    int launch_margin_s = 20; // what systemd-run itself may add to that before it is ended
+    double launch_margin_s = 20; // what systemd-run itself may add to that before it is ended
     std::vector<std::string> properties;
 };
 

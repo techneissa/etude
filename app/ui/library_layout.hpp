@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Where the library screen's parts go, in ImGui points (its sizes are `lib_tok` in tokens.hpp).
-// No ImGui here, so tests/library_layout_test.cpp checks the real numbers at every window size.
+// No ImGui here.
 //
 // The screen covers everything under the top row. Top to bottom: the search row (the search field
 // and the view button), the chips row (Sort, Group, the quick filters), the results, and the

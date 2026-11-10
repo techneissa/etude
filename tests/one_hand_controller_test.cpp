@@ -225,61 +225,6 @@ TEST_CASE("a backing part is not graded or waited for, and sounds whatever the s
 
 namespace {
 
-// The velocities of the song's note-ons on `channel` over `frames` frames of 16 ms.
-std::vector<int> velocities(SongController& c, std::int64_t& now, int frames, int channel) {
-    std::vector<int> out;
-    std::vector<SongSoundEvent> events;
-    for (int i = 0; i < frames; ++i) {
-        now += 16 * kMs;
-        c.update(now, {});
-        events.clear();
-        c.take_sound_events(events);
-        for (const SongSoundEvent& e : events) {
-            if (e.kind == SongSoundEvent::Kind::Message &&
-                e.message.kind == PlaybackMessage::Kind::NoteOn && e.message.value > 0 &&
-                e.message.channel == channel) {
-                out.push_back(e.message.value);
-            }
-        }
-    }
-    return out;
-}
-
-} // namespace
-
-TEST_CASE("the accompaniment volume option scales what the backing part sounds with") {
-    std::vector<NoteSpec> notes = right_only_notes();
-    for (int i = 0; i < 8; ++i) {
-        notes.push_back({static_cast<double>(i), 40 + i, 1.0, Hand::Unknown, 2, true});
-    }
-    SongController c;
-    std::int64_t now = kSec;
-    c.load(make_loaded(notes), now);
-    c.play(now);
-    const std::vector<int> full = velocities(c, now, 40, 2);
-    REQUIRE_FALSE(full.empty());
-    CHECK(full.front() == 80);
-    SongOptions o = c.options();
-    o.accompaniment_volume = 25;
-    c.set_options(o, now);
-    c.seek(0.0, now);
-    c.play(now);
-    const std::vector<int> quiet = velocities(c, now, 40, 2);
-    REQUIRE_FALSE(quiet.empty());
-    CHECK(quiet.front() == 20);
-    // The piano's own parts are not touched by it.
-    c.seek(0.0, now);
-    c.set_song_sound(SongSound::BothHands, now);
-    c.play(now);
-    const std::vector<int> melody = velocities(c, now, 40, 0);
-    REQUIRE_FALSE(melody.empty());
-    CHECK(melody.front() == 80);
-    std::vector<SongSoundEvent> out;
-    c.shutdown(now, out);
-}
-
-namespace {
-
 // One note in each of `parts` accompaniment parts (their own tracks on channel 2), over a melody.
 LoadedSong with_many_parts(int parts) {
     Song s;

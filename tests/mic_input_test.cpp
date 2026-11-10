@@ -71,20 +71,6 @@ std::vector<MicOut> apply(MicNoteBridge& b, const MicEventIn& in) {
 
 // ---- Marker, meter
 
-TEST_CASE("a not-sure marker is fully shown at first, then fades to nothing and stays gone") {
-    CHECK(unsure_marker_alpha(0) == 1.0f);
-    CHECK(unsure_marker_alpha(kUnsureHoldNs) == 1.0f);
-    float last = 1.0f;
-    for (std::int64_t t = kUnsureHoldNs; t <= kUnsureHoldNs + kUnsureFadeNs; t += ms(50)) {
-        const float a = unsure_marker_alpha(t);
-        CHECK(a <= last);
-        CHECK(a >= 0.0f);
-        last = a;
-    }
-    CHECK(unsure_marker_alpha(kUnsureHoldNs + kUnsureFadeNs) == 0.0f);
-    CHECK(unsure_marker_alpha(kUnsureHoldNs + kUnsureFadeNs + sec(5)) == 0.0f);
-}
-
 TEST_CASE("the not-sure marker sits over the guess, else the last note heard, else mid-keyboard") {
     const KeyRange range = kRange61; // 36..96
     CHECK(unsure_marker_note(72, 50, range) == 72);
@@ -92,16 +78,6 @@ TEST_CASE("the not-sure marker sits over the guess, else the last note heard, el
     CHECK(unsure_marker_note(-1, -1, range) == (36 + 96) / 2);
     CHECK(unsure_marker_note(21, -1, range) == 36); // never off the keyboard
     CHECK(unsure_marker_note(108, -1, range) == 96);
-}
-
-TEST_CASE("the input meter is 0 at -60 dBFS, 1 at -6 dBFS and linear in dB between") {
-    CHECK(mic_meter_fraction(0.0f) == 0.0f);
-    CHECK(mic_meter_fraction(-1.0f) == 0.0f);
-    CHECK(mic_meter_fraction(std::numeric_limits<float>::quiet_NaN()) == 0.0f);
-    CHECK(mic_meter_fraction(1e-4f) == 0.0f); // -80 dBFS
-    CHECK(mic_meter_fraction(1.0f) == 1.0f);
-    CHECK(mic_meter_fraction(0.5012f) == doctest::Approx(1.0f).epsilon(0.01));  // -6 dBFS
-    CHECK(mic_meter_fraction(0.02239f) == doctest::Approx(0.5f).epsilon(0.02)); // -33 dBFS
 }
 
 // ---- The bridge

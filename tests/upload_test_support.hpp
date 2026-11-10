@@ -2,12 +2,17 @@
 // What the upload and folder-watch tests share: a temporary folder and small file helpers.
 #pragma once
 
+#include <sys/stat.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
 #include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <iterator>
 #include <random>
 #include <string>
+#include <string_view>
 #include <system_error>
 #include <vector>
 
@@ -35,6 +40,44 @@ struct TempDir {
 inline void write_file(const fs::path& p, const std::string& bytes = "x") {
     fs::create_directories(p.parent_path());
     std::ofstream(p, std::ios::binary | std::ios::trunc) << bytes;
+}
+
+// A shell script a test runs as a stand-in program ("#!/bin/sh" first line). macOS checks each new
+// executable the first time it runs (about 0.25 s), so every script is one shared, already-run
+// trampoline hard-linked to `path` that sources `<path>.body`; the script is not copied elsewhere
+// (a copy would lose its body).
+inline void write_script(const fs::path& path, const std::string& script) {
+    static const struct Trampoline {
+        fs::path file;
+        Trampoline() {
+            std::random_device device;
+            file = fs::temp_directory_path() / ("etude-script-" + std::to_string(device()) + std::to_string(device()));
+            std::ofstream(file) << "#!/bin/sh\n. \"$0.body\"\n";
+            std::ofstream(file.string() + ".body") << ":\n";
+            ::chmod(file.c_str(), 0755);
+            const pid_t pid = ::fork(); // the one slow first run, here and not in the first test
+            if (pid == 0) {
+                ::execl(file.c_str(), file.c_str(), static_cast<char*>(nullptr));
+                ::_exit(0);
+            }
+            if (pid > 0) {
+                ::waitpid(pid, nullptr, 0);
+            }
+        }
+        ~Trampoline() {
+            std::error_code ec;
+            fs::remove(file, ec);
+            fs::remove(file.string() + ".body", ec);
+        }
+    } trampoline;
+    constexpr std::string_view kShebang = "#!/bin/sh\n";
+    write_file(path.string() + ".body", script.rfind(kShebang, 0) == 0 ? script.substr(kShebang.size()) : script);
+    std::error_code ec;
+    fs::remove(path, ec);
+    fs::create_hard_link(trampoline.file, path, ec);
+    if (ec) {
+        fs::copy_file(trampoline.file, path, ec);
+    }
 }
 
 inline std::string read_file(const fs::path& p) {

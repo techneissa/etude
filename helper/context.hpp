@@ -7,6 +7,8 @@
 
 #include "etude/update_conf.hpp"
 
+#include <algorithm>
+#include <cmath>
 #include <string>
 
 namespace etude::helper {
@@ -19,8 +21,20 @@ struct Context {
     std::string ancestor_floor = "/";
     // How long one systemctl call that does something may take (SERVICE_TIMEOUT; a test shortens it),
     // and how long one that only asks (the state, a kill) may.
-    int service_timeout_s = 90;
-    int query_timeout_s() const { return service_timeout_s < 20 ? service_timeout_s : 20; }
+    double service_timeout_s = 90;
+    // A test that shortens the calls that do something sets `query_floor_s`, so the ones that ask
+    // keep a safe limit.
+    double query_floor_s = 0;
+    double query_timeout_s() const {
+        return std::max(service_timeout_s < 20 ? service_timeout_s : 20, query_floor_s);
+    }
+    // How long the helper waits for the new version to say ready, per start (READY_TIMEOUT; a test
+    // shortens it).
+    double ready_timeout_s = 30;
+    // The nap between two looks at a unit it has killed, and the pause between two looks at a
+    // trial's ready file (a test shortens both).
+    int kill_nap_ms = 1000;
+    int watch_poll_ms = 250;
     // How long the backup or restore of the app's data may take, as the app's user.
     int data_timeout_s = 240;
 
@@ -45,7 +59,7 @@ inline constexpr int kActingLockWaitS = 10;
 // it, at the defaults and at the largest values the settings file may ask for (update_conf.hpp).
 //
 // One program run with a timeout of `t` seconds: `run_program` gives it `t`, then 5 more to be reaped.
-inline int worst_case_call_seconds(int t) { return t + 5; }
+inline int worst_case_call_seconds(double t) { return static_cast<int>(std::ceil(t)) + 5; }
 
 // Stopping an app that will not stop: `stop` and a look at its state, twice; then a kill of the main
 // process and a kill of the whole unit, each the call and three looks (a state and a 1 s wait); then

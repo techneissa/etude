@@ -16,6 +16,7 @@
 #include <algorithm>
 #include <chrono>
 #include <memory>
+#include <sstream>
 #include <thread>
 
 namespace etude::helper {
@@ -472,12 +473,23 @@ int settle_after_crash(const Context& c) {
     return 0;
 }
 
+namespace {
+
+// 30 for 30.0, 0.2 for a test's short wait.
+std::string seconds_text(double s) {
+    std::ostringstream out;
+    out << s;
+    return out.str();
+}
+
+} // namespace
+
 int watch_trial(const Context& c) {
     const Service service(c);
     int polls = 0;
     for (;;) {
         const auto deadline = std::chrono::steady_clock::now() +
-                              std::chrono::seconds(c.conf.ready_timeout_s);
+                              std::chrono::milliseconds(static_cast<long long>(c.ready_timeout_s * 1000));
         PendingUpdate trial;
         for (;;) {
             bool locked = false;
@@ -526,16 +538,17 @@ int watch_trial(const Context& c) {
             if (std::chrono::steady_clock::now() >= deadline) {
                 break;
             }
-            std::this_thread::sleep_for(std::chrono::milliseconds(250));
+            std::this_thread::sleep_for(std::min<std::chrono::steady_clock::duration>(
+                std::chrono::milliseconds(c.watch_poll_ms), deadline - std::chrono::steady_clock::now()));
         }
         if (trial.starts >= c.conf.max_starts) {
             return go_back(c, service, trial,
                            trial.to + " did not reach its first frame in " +
                                std::to_string(trial.starts) + " starts of " +
-                               std::to_string(c.conf.ready_timeout_s) + " s",
+                               seconds_text(c.ready_timeout_s) + " s",
                            false);
         }
-        note(trial.to + " did not reach its first frame in " + std::to_string(c.conf.ready_timeout_s) +
+        note(trial.to + " did not reach its first frame in " + seconds_text(c.ready_timeout_s) +
              " s: starting it again");
         const ActingScope acting(c, kActingLockWaitS);
         if (trial.unit.empty() || !service.restart(trial.unit)) {

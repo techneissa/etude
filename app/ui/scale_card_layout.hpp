@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Where the scale overlay's popover puts its parts, in ImGui points (no ImGui here, so
-// tests/scale_card_layout_test.cpp checks the real numbers at the window sizes). The card hangs
+// Where the scale overlay's popover puts its parts, in ImGui points (no ImGui here). The card hangs
 // under the top row: the key ring on the left, as large as the room allows, and on the right the
 // fourteen scale types in a grid of three columns by five rows (the last row holds two), then a
 // row with the Fingers toggle and the Off control. Every cell is at least a hit across and tall;

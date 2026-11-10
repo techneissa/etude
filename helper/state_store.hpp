@@ -21,7 +21,7 @@ Fd open_state_dir(const Context& c, std::string& error);
 // at once when another holds it; `wait_s` above 0 waits that long at most, and then gives up the same way.
 class StateLock {
   public:
-    StateLock(const Context& c, const char* name, bool wait, std::string& error, int wait_s = 0);
+    StateLock(const Context& c, const char* name, bool wait, std::string& error, double wait_s = 0);
     bool held() const { return fd_.ok(); }
     // Not held because another run does hold it (as against trouble with the folder or the file).
     bool contended() const { return contended_; }

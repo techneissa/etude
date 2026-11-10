@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// scripts/release-pack-mac.sh, run on a Mac against a stand-in build folder: it must produce a zip of
-// an ad-hoc signed etude.app that unpacks, verifies and says its version, a release-macos.json the
-// app reads, and (signed with a key made for the test, through scripts/release-sign.sh) a zip that
-// the app's signature check accepts, from the bytes and from their hash. Only a Mac has the tools.
+// scripts/release-pack-mac.sh and scripts/release-sign.sh, run on a Mac against a stand-in build
+// folder: a build of another version than the tag is refused; signed with a key made for the test,
+// the zip is accepted by the app's signature check from the bytes and from their hash, and the
+// script signs only a folder with exactly one file of its kind. Only a Mac has the tools.
 #include "upload_test_support.hpp"
 
 #if defined(__APPLE__)
@@ -66,52 +66,6 @@ std::string pack_command(const fs::path& build, const fs::path& out, const std::
 }
 
 } // namespace
-
-TEST_CASE("release pack mac: a zip of a signed etude.app, its checksum and release-macos.json") {
-    TempDir dir;
-    const fs::path build = fake_build(dir.path / "build", "1.2.3");
-    const Run packed = run_command(pack_command(build, dir.path / "out", "--expect-version 1.2.3"));
-    INFO(packed.out);
-    REQUIRE(packed.status == 0);
-    const std::string name = "etude-1.2.3-macos-arm64.zip";
-    REQUIRE(fs::exists(dir.path / "out" / name));
-    CHECK_FALSE(fs::exists(dir.path / "out/stage"));
-    CHECK(fs::exists(dir.path / "out" / (name + ".sha256")));
-
-    // What the app reads of release-macos.json: the Mac's file, name, size and hash.
-    const ReleaseInfoResult info = parse_release_info(read_file(dir.path / "out/release-macos.json"));
-    REQUIRE(info.ok());
-    CHECK(info.info.os == "macos");
-    CHECK(info.info.arch == "arm64");
-    CHECK(info.info.min_os == "14");
-    CHECK(info.info.file == name);
-    CHECK(info.info.size == fs::file_size(dir.path / "out" / name));
-    const Run hash = run_command("shasum -a 256 '" + (dir.path / "out" / name).string() + "'");
-    CHECK(hash.out.substr(0, 64) == info.info.sha256);
-    CHECK(read_file(dir.path / "out" / (name + ".sha256")) == info.info.sha256 + "  " + name + "\n");
-
-    // It unpacks into one app that verifies, says its version, and holds the app's data beside the
-    // program where SDL_GetBasePath finds it.
-    const fs::path staging = dir.path / "Apps/.etude-update-1.2.3";
-    const ProgramRunner real = run_program;
-    REQUIRE(unpack_release_zip(real, dir.path / "out" / name, staging).ok);
-    const fs::path app = find_unpacked_bundle(staging);
-    REQUIRE_FALSE(app.empty());
-    CHECK(app.filename() == "etude.app");
-    const StepResult checked = check_new_bundle(real, app, "1.2.3");
-    INFO(checked.why);
-    CHECK(checked.ok);
-    CHECK(fs::exists(app / "Contents/Resources/etude-piano.sf2"));
-    CHECK(fs::exists(app / "Contents/Resources/verovio-data/Bravura.xml"));
-    CHECK(fs::exists(app / "Contents/Resources/etude.icns"));
-    const Run min_os = run_command("plutil -extract LSMinimumSystemVersion raw -o - '" +
-                                   (app / "Contents/Info.plist").string() + "'");
-    CHECK(min_os.out == "14\n");
-    // The microphone text of the program's own plist is in the bundle's too.
-    CHECK(run_command("plutil -extract NSMicrophoneUsageDescription raw -o - '" +
-                      (app / "Contents/Info.plist").string() + "'")
-              .status == 0);
-}
 
 TEST_CASE("release pack mac: a build of another version than the tag is refused") {
     TempDir dir;

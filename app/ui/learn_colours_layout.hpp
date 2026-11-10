@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Where the View page's Learn colour swatches go, with no ImGui in it, so
-// tests/learn_colours_layout_test.cpp checks the rules with the real tokens. Sizes in pixels (`u` is
+// Where the View page's Learn colour swatches go, with no ImGui in it. Sizes in pixels (`u` is
 // the kit's unit), from the top left of the room. The tab row above them (Scales, Chords, Ear,
 // Melodies) is the kit's `segmented`; this is the one row of seven shades under it, for the tab picked.
 //

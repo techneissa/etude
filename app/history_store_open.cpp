@@ -481,7 +481,8 @@ HistoryStore::Attempt HistoryStore::open_steps(std::string& why) {
     // The first statements that read the file are where a file that is not a database, or is
     // locked, shows up. Nothing here changes the file: the journal mode is set after the schema is
     // in place, so a database that is not ours is not touched when its migration fails.
-    rc = db_.run_script("PRAGMA foreign_keys = ON; PRAGMA synchronous = FULL");
+    rc = db_.run_script(options_.sync_commits ? "PRAGMA foreign_keys = ON; PRAGMA synchronous = FULL"
+                                             : "PRAGMA foreign_keys = ON; PRAGMA synchronous = OFF");
     if (rc != SQLITE_OK) {
         return fail(rc, why);
     }

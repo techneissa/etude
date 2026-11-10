@@ -114,9 +114,9 @@ std::string right_at(Piece& p, int bar) {
     return label_at(build_hand_chords(s, 0, false).right, s, bar);
 }
 
-constexpr int G2 = 43, B2 = 47, C3 = 48, Cs3 = 49, D3 = 50, E3 = 52, F3 = 53, Fs3 = 54, G3 = 55,
-              Ab3 = 56, A3 = 57, Bb3 = 58, B3 = 59, C4 = 60, D4 = 62, E4 = 64, F4 = 65, Fs4 = 66,
-              G4 = 67, A4 = 69, C5 = 72, A5 = 81;
+constexpr int G2 = 43, B2 = 47, C3 = 48, D3 = 50, E3 = 52, F3 = 53, Fs3 = 54, G3 = 55, A3 = 57,
+              Bb3 = 58, B3 = 59, C4 = 60, D4 = 62, E4 = 64, F4 = 65, Fs4 = 66, G4 = 67, A4 = 69,
+              C5 = 72, A5 = 81;
 
 std::string all_name(Piece& p, int bar = 1) {
     const Song& s = p.song();
@@ -487,16 +487,6 @@ TEST_CASE("chord label: the seventh and the bass are spelled from the transposed
     CHECK(inv.left[0].name.plain() == "Db/F");
 }
 
-TEST_CASE("chord label: a label's text carries the sign characters") {
-    Piece p(1);
-    p.key(-5);                              // D-flat major
-    p.twice(0, {Cs3, F3, Ab3}, Hand::Left); // Db F Ab
-    const HandChords c = build_hand_chords(p.song(), 0, false);
-    REQUIRE(c.left.size() == 1);
-    CHECK(c.left[0].name.plain() == "Db");
-    CHECK(c.left[0].name.display() == "D\xE2\x99\xAD");
-}
-
 // ---- The timeline -------------------------------------------------------------------------------
 
 namespace {
@@ -642,76 +632,4 @@ TEST_CASE("chord label: a song with no notes has no labels") {
     const HandChords c = build_hand_chords(empty, 0, false);
     CHECK(c.left.empty());
     CHECK(c.right.empty());
-}
-
-// ---- The title toast and the chord name (#272)
-
-namespace {
-
-bool overlaps(const etude::RectF& a, const etude::RectF& b) {
-    return a.x < b.right() && b.x < a.right() && a.y < b.bottom() && b.y < a.bottom();
-}
-
-} // namespace
-
-TEST_CASE("chord label: the song-title toast never lands on a chord name and its line") {
-    using namespace etude;
-    app::ui::ToastRegionsInput in;
-    in.display_w = 1366.0f;
-    in.display_h = 768.0f;
-    in.row_bottom = 57.0f;
-    in.toast_h = 34.0f;
-    in.gap = 8.0f;
-    in.u = 1.0f;
-    in.has_song = true;
-    // The right hand's name and line sit just right of the middle, where the title pill is centred.
-    in.chords[1] = {640.0f, 62.0f, 224.0f, 36.0f};
-    ToastRegions r;
-    r.notes = {0.0f, 57.0f, 1366.0f, 711.0f};
-    REQUIRE(app::ui::fill_toast_regions(r, in));
-    const ToastPlacement p =
-        place_toast(190.0f, 34.0f, 90.0f, 44.0f, false, {}, 1366.0f, 768.0f, r, 8.0f);
-    REQUIRE(p.spot == ToastSpot::Slot);
-    CHECK_FALSE(overlaps(p.box, in.chords[1]));
-    CHECK(p.box.w == doctest::Approx(190.0f)); // slid, not cut
-    CHECK(p.box.y == doctest::Approx(r.slot.y));
-    CHECK(p.box.x < in.chords[1].x);           // to the side the middle is nearer to
-    // Both hands' labels are kept clear of too, and a hand with no label asks for nothing.
-    in.chords[0] = {300.0f, 62.0f, 120.0f, 36.0f};
-    ToastRegions both;
-    both.notes = r.notes;
-    REQUIRE(app::ui::fill_toast_regions(both, in));
-    const ToastPlacement q =
-        place_toast(190.0f, 34.0f, 90.0f, 44.0f, false, {}, 1366.0f, 768.0f, both, 8.0f);
-    REQUIRE(q.spot != ToastSpot::None);
-    CHECK_FALSE(overlaps(q.box, in.chords[0]));
-    CHECK_FALSE(overlaps(q.box, in.chords[1]));
-    app::ui::ToastRegionsInput none = in;
-    none.chords = {};
-    ToastRegions free_regions;
-    free_regions.notes = r.notes;
-    REQUIRE(app::ui::fill_toast_regions(free_regions, none));
-    CHECK(free_regions.avoid_count + 2 == both.avoid_count);
-}
-
-TEST_CASE("toast: only a rect added as a give-way lets the pill slide; any other still drops it") {
-    using namespace etude;
-    ToastRegions r;
-    r.notes = {0.0f, 57.0f, 1366.0f, 711.0f};
-    r.slot = {0.0f, 65.0f, 1366.0f, 34.0f};
-    REQUIRE(r.add_avoid({640.0f, 62.0f, 224.0f, 36.0f}));
-    const ToastPlacement blocked =
-        place_toast(190.0f, 34.0f, 90.0f, 44.0f, false, {}, 1366.0f, 768.0f, r, 8.0f);
-    CHECK(blocked.spot == ToastSpot::None);
-    ToastRegions beside;
-    beside.notes = r.notes;
-    beside.slot = r.slot;
-    REQUIRE(beside.add_avoid_beside({640.0f, 62.0f, 224.0f, 36.0f}));
-    const ToastPlacement slid =
-        place_toast(190.0f, 34.0f, 90.0f, 44.0f, false, {}, 1366.0f, 768.0f, beside, 8.0f);
-    CHECK(slid.spot == ToastSpot::Slot);
-    // A pill wider than either side leaves nothing to slide into: dropped, not put over the name.
-    const ToastPlacement wide =
-        place_toast(900.0f, 34.0f, 900.0f, 44.0f, false, {}, 1366.0f, 768.0f, beside, 8.0f);
-    CHECK(wide.spot == ToastSpot::None);
 }

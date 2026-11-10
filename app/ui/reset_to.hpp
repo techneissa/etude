@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// The reset button of a settings slider or stepper, with no ImGui in it so tests/reset_to_test.cpp
-// checks the rules.
+// The reset button of a settings slider or stepper, with no ImGui in it.
 //
 // Rules:
 // - A slider or a stepper row that is given its default always has a small reset button at its

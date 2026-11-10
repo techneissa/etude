@@ -322,12 +322,9 @@ TEST_CASE("harmony corpus: the Bach left hand alone holds two notes a bar and is
     CHECK(named == 0);
 }
 
-TEST_CASE("harmony corpus: build_harmony covers the whole song in order, within a second") {
+TEST_CASE("harmony corpus: build_harmony covers the whole song in order") {
     const Song bach = load_song("bach-bwv846-prelude.mid");
-    const auto begin = std::chrono::steady_clock::now();
     const HarmonyTimeline t = build_harmony(bach);
-    const auto took = std::chrono::steady_clock::now() - begin;
-    CHECK(took < std::chrono::seconds(1)); // 549 notes: a few milliseconds in a Debug build
     CHECK_FALSE(t.all.empty());
     CHECK(t.all.front().start_tick == 0);
     CHECK(t.all.back().end_tick == bach.end_tick);

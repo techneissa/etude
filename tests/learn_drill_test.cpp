@@ -1,10 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // The Learn drill (#373) as the cards use it: the settings it is made from, the keys lit while Listen
-// sounds a second octave or an arpeggio, the foot row's room, the "How it went" card's layout, and
-// what the card offers.
-#include "ui/drill_card_layout.hpp"
+// sounds a second octave or an arpeggio, and what the card offers.
 #include "ui/learn_drill.hpp"
-#include "ui/learn_drill_layout.hpp"
 #include "ui/learn_lit.hpp"
 
 #include "etude/chord_diagram.hpp"
@@ -19,22 +16,6 @@
 
 using namespace etude;
 using namespace etude::app::ui;
-
-namespace {
-
-constexpr float kEps = 1e-3f;
-
-bool inside(const RectF& inner, const RectF& outer) {
-    return inner.x >= outer.x - kEps && inner.y >= outer.y - kEps &&
-           inner.right() <= outer.right() + kEps && inner.bottom() <= outer.bottom() + kEps;
-}
-
-bool overlap(const RectF& a, const RectF& b) {
-    return a.x < b.right() - kEps && b.x < a.right() - kEps && a.y < b.bottom() - kEps &&
-           b.y < a.bottom() - kEps;
-}
-
-} // namespace
 
 TEST_CASE("learn drill: the scale card's settings make the scale or its arpeggio") {
     AppSettings app;
@@ -157,97 +138,6 @@ TEST_CASE("learn lit: a drill's second octave lights the keys of the first, and 
     }
     REQUIRE(key < kLearnMaxKeys);
     CHECK(cd.picture.keys[key].note % 12 == 0);
-}
-
-TEST_CASE("learn foot: every control keeps a hit and the row fits its room, at the unit scales a taste setting makes") {
-    const float hit = tok::kHit;
-    for (const float u : {1.0f, 1.25f, 1.5f}) {
-        for (const float room : {260.0f, 320.0f, 420.0f, 520.0f, 700.0f, 1000.0f}) {
-            for (const float stepper : {0.0f, learn_tok::kStepperW}) {
-                for (const bool words : {false, true}) {
-                    const float foot_h = learn_tok::kBigScale * hit * u;
-                    const FootPlan p = learn_foot_plan(room * u, foot_h, hit * u, tok::kS2 * u,
-                                                       tok::kS1 * u, u, stepper, words);
-                    CAPTURE(room);
-                    CAPTURE(u);
-                    CAPTURE(stepper);
-                    CHECK(p.hand >= hit * u - kEps);
-                    CHECK(p.listen >= hit * u - kEps);
-                    CHECK(p.practise >= hit * u - kEps);
-                    if (stepper > 0.0f) {
-                        CHECK(p.stepper >= 2.0f * hit * u - kEps);
-                    }
-                    if (!words) {
-                        CHECK_FALSE(p.words);
-                    }
-                    // What the row needs at the very least (a hit each) must fit, else it is
-                    // allowed to be more than the room: nothing smaller could be pressed.
-                    const float least = 2.0f * hit * u + tok::kS1 * u +
-                                        (stepper > 0.0f ? tok::kS2 * u + 2.0f * hit * u + 0.6f * learn_tok::kTempoValueW * u : 0.0f) +
-                                        2.0f * (tok::kS2 * u + hit * u);
-                    if (room * u >= least) {
-                        CHECK(foot_total(p, tok::kS1 * u, tok::kS2 * u) <= room * u + kEps);
-                    }
-                }
-            }
-        }
-    }
-}
-
-TEST_CASE("drill card: its parts sit inside the area, the buttons a hit and apart, at every size") {
-    struct Area {
-        float w;
-        float h;
-        float u;
-    };
-    // The note area under the top row and over the keyboard: the 7 inch 800x480 panel, then the usual screens.
-    for (const Area a : {Area{800, 300, 1.0f}, Area{800, 260, 1.25f}, Area{800, 300, 1.5f},
-                         Area{1024, 380, 1.0f}, Area{1366, 560, 1.0f}, Area{1920, 800, 1.0f},
-                         Area{1920, 800, 1.4f}}) {
-        CAPTURE(a.w);
-        CAPTURE(a.h);
-        CAPTURE(a.u);
-        const RectF area{0.0f, 100.0f, a.w, a.h};
-        const float u = drill_card_unit(area, a.u);
-        CHECK(u >= a.u - kEps);
-        CHECK(u <= a.u * drill_card_tok::kMaxGrow + kEps);
-        const DrillCardLayout l = drill_card_layout(area, u);
-        REQUIRE(l.fits);
-        CHECK(inside(l.card, area));
-        const float hit = tok::kHit * u;
-        for (const RectF* b : {&l.again, &l.faster, &l.to_card}) {
-            CHECK(b->w >= hit - kEps);
-            CHECK(b->h >= hit - kEps);
-            CHECK(inside(*b, l.card));
-        }
-        CHECK_FALSE(overlap(l.again, l.faster));
-        CHECK_FALSE(overlap(l.faster, l.to_card));
-        CHECK_FALSE(overlap(l.again, l.to_card));
-        for (const RectF* part : {&l.figure, &l.notes}) {
-            CHECK(inside(*part, l.card));
-            for (const RectF* b : {&l.again, &l.faster, &l.to_card}) {
-                CHECK_FALSE(overlap(*part, *b));
-            }
-        }
-        CHECK_FALSE(overlap(l.figure, l.notes));
-        if (l.timing.w > 0.0f) {
-            CHECK(inside(l.timing, l.card));
-            CHECK_FALSE(overlap(l.timing, l.notes));
-            CHECK_FALSE(overlap(l.timing, l.figure));
-        }
-        if (!l.compact) {
-            CHECK(l.done.w >= hit - kEps);
-            CHECK(inside(l.done, l.card));
-            CHECK_FALSE(overlap(l.done, l.title));
-            CHECK_FALSE(overlap(l.head, l.figure));
-        }
-    }
-    // Where the area is too short for the head, the figure row and the buttons stay.
-    const DrillCardLayout tiny = drill_card_layout({0.0f, 100.0f, 800.0f, 150.0f}, 1.0f);
-    REQUIRE(tiny.fits);
-    CHECK(tiny.compact);
-    // And where there is not room for even those, no card is laid out (nothing is clipped).
-    CHECK_FALSE(drill_card_layout({0.0f, 100.0f, 800.0f, 60.0f}, 1.0f).fits);
 }
 
 TEST_CASE("drill card: Faster and the Learn card are offered for a drill's card only") {

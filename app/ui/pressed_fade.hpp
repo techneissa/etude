@@ -2,8 +2,7 @@
 // The pressed fade of a control is kept in ImGui's state storage, written only while it moves
 // (`item_state` in kit.cpp). A control that is not drawn for a while (a row on a page that was
 // left) keeps what it held, so the stored value carries the frame it was written on and counts for
-// nothing once the control has missed a frame. No ImGui here, so tests/pressed_fade_test.cpp
-// checks the rule.
+// nothing once the control has missed a frame. No ImGui here.
 #pragma once
 
 namespace etude::app::ui {

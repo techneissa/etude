@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// The settings sheet's frame and its rail of pages, with no ImGui in it, so
-// tests/sheet_layout_test.cpp checks the rules with the real tokens. Sizes in points; `u` is the
+// The settings sheet's frame and its rail of pages, with no ImGui in it. Sizes in points; `u` is the
 // kit's unit (points per design point).
 //
 // Rules:

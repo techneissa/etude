@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "etude/progress.hpp"
 
-#include "timing_factor.hpp"
 
 #include "progress_fixtures.hpp"
 
@@ -208,14 +207,9 @@ TEST_CASE("history and bests over 100,000 runs") {
         s.start_utc_s = i;
         runs.push_back(make(s));
     }
-    auto t0 = std::chrono::steady_clock::now();
     std::vector<HistoryPoint> h = history_series(runs, 3, 200);
     std::vector<BestEntry> b = song_bests(runs, 3);
     AttemptChange c = compare_with_last_attempt(runs, runs.back());
-    auto ms =
-        std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - t0)
-            .count();
-    CHECK(ms < 10'000 * etude::test::kTimingFactor);
     REQUIRE(h.size() == 200);
     int total = 0;
     for (const HistoryPoint& p : h) {

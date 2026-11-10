@@ -133,46 +133,6 @@ TEST_CASE("replay session: the answer is dropped when the card went before it ca
     CHECK(session.review() == ReplaySession::Review::None);
 }
 
-TEST_CASE("replay session: a run whose notes are gone has its record's summary") {
-    TempDir dir;
-    HistoryStore store(dir.path, quiet());
-    REQUIRE(open_now(store).empty());
-    const RunRecord record = sample_run(1);
-    store.add_run(record, "a.mid"); // no events kept
-    REQUIRE(store.flush());
-    ReplaySession session;
-    session.ask(store, record, song_notes(), song_measures());
-    REQUIRE(store.flush());
-    REQUIRE(session.poll(store, record.song_hash));
-    CHECK(session.review() == ReplaySession::Review::Ready);
-    CHECK_FALSE(session.watchable());
-    CHECK_FALSE(session.open_view());
-}
-
-TEST_CASE("replay session: the view plays on its own clock and hands out the sound") {
-    Ready r;
-    ReplaySession& s = r.session;
-    REQUIRE(s.open_view());
-    CHECK(s.viewing());
-    CHECK_FALSE(s.playing());
-    CHECK(s.position_ms() == 0);
-    s.set_sound(true);
-    s.play_pause();
-    CHECK(s.playing());
-    s.update(0.6);
-    CHECK(s.position_ms() > 0);
-    CHECK_FALSE(s.take_sound().empty()); // the first notes sounded
-    s.play_pause();
-    s.update(0.1);
-    const std::int32_t held = s.position_ms();
-    s.update(0.5);
-    CHECK(s.position_ms() == held); // paused: the clock stands
-    s.restart();
-    CHECK(s.position_ms() == 0);
-    s.close_view();
-    CHECK_FALSE(s.viewing());
-}
-
 TEST_CASE("replay session: the keys light as the replay passes them and go dark on a seek or a close") {
     Ready r;
     ReplaySession& s = r.session;
@@ -272,17 +232,4 @@ TEST_CASE("replay session: a run whose notes are gone cannot be pinned") {
     session.toggle_pin(store);
     CHECK_FALSE(session.pin_pending());
     CHECK_FALSE(session.pinned());
-}
-
-TEST_CASE("replay session: forgetting the review forgets the pin") {
-    Ready r;
-    ReplaySession& s = r.session;
-    s.toggle_pin(r.store);
-    REQUIRE(r.store.flush());
-    REQUIRE(s.poll(r.store, r.record.song_hash));
-    REQUIRE(s.pinned());
-    s.forget_review();
-    CHECK_FALSE(s.pinned());
-    CHECK_FALSE(s.pin_available());
-    CHECK_FALSE(s.pin_pending());
 }

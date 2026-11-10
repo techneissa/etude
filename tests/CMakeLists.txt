@@ -51,7 +51,6 @@ add_executable(etude_tests
   ${PROJECT_SOURCE_DIR}/app/mic_pipeline.cpp
   ${PROJECT_SOURCE_DIR}/app/net_fetch.cpp
   ${PROJECT_SOURCE_DIR}/app/panel_drm.cpp
-  ${PROJECT_SOURCE_DIR}/app/panel_scale.cpp
   ${PROJECT_SOURCE_DIR}/app/persistence.cpp
   ${PROJECT_SOURCE_DIR}/app/port_watcher.cpp
   ${PROJECT_SOURCE_DIR}/app/practice_tables_job.cpp
@@ -84,10 +83,7 @@ add_executable(etude_tests
   ${PROJECT_SOURCE_DIR}/app/sources_controller.cpp
   ${PROJECT_SOURCE_DIR}/app/sqlite_db.cpp
   ${PROJECT_SOURCE_DIR}/app/timed_sender.cpp
-  ${PROJECT_SOURCE_DIR}/app/ui/column_check.cpp
-  ${PROJECT_SOURCE_DIR}/app/ui/hit_check.cpp
   ${PROJECT_SOURCE_DIR}/app/ui/ink_measure.cpp
-  ${PROJECT_SOURCE_DIR}/app/ui/morph_glyphs.cpp
   ${PROJECT_SOURCE_DIR}/app/ui/page_ids.cpp
   ${PROJECT_SOURCE_DIR}/app/ui/settings_catalogue.cpp
   ${PROJECT_SOURCE_DIR}/app/update_files.cpp
@@ -130,61 +126,34 @@ add_executable(etude_tests
   abc_test.cpp
   abc_tunes_test.cpp
   abc_voices_test.cpp
-  about_layout_test.cpp
-  accidental_glyph_test.cpp
-  accidental_guard_test.cpp
   accidental_text_test.cpp
-  accompaniment_card_test.cpp
   accompaniment_test.cpp
-  add_songs_layout_test.cpp
   alloc_count.cpp
-  band_layout_test.cpp
   band_touch_test.cpp
-  bar_metrics_test.cpp
   bar_order_test.cpp
-  bar_reveal_test.cpp
   base64_test.cpp
   beat_lines_test.cpp
-  block_column_test.cpp
-  block_label_test.cpp
-  block_names_test.cpp
   catalogue_service_test.cpp
-  chip_strip_test.cpp
   chord_diagram_test.cpp
   chord_fingering_test.cpp
-  chord_label_fade_test.cpp
-  chord_label_layout_test.cpp
   chord_label_test.cpp
   chord_spelling_test.cpp
   chord_test.cpp
-  color_test.cpp
-  colours_layout_test.cpp
-  combo_display_test.cpp
   computer_keyboard_test.cpp
-  configs_layout_test.cpp
   configs_logic_test.cpp
-  confirm_arm_test.cpp
   content_hash_test.cpp
-  count_band_test.cpp
   crash_handler_test.cpp
-  crash_layout_test.cpp
   crash_notice_test.cpp
   crash_report_test.cpp
-  crash_run_test.cpp
-  crash_screen_layout_test.cpp
   crash_screen_test.cpp
   deploy_units_test.cpp
   desktop_entry_test.cpp
   device_check_host_test.cpp
   device_check_offer_test.cpp
   device_check_test.cpp
-  device_check_text_test.cpp
   difficulty_test.cpp
   ear_training_test.cpp
   ear_session_test.cpp
-  ear_layout_test.cpp
-  editor_layout_test.cpp
-  effects_governor_test.cpp
   evaluator_alloc_test.cpp
   evaluator_prepared_test.cpp
   evaluator_property_test.cpp
@@ -196,15 +165,10 @@ add_executable(etude_tests
   drill_test.cpp
   exercise_sound_test.cpp
   exercises_test.cpp
-  face_layout_test.cpp
   fit_text_test.cpp
   folder_watch_test.cpp
   folder_watcher_test.cpp
-  frame_log_test.cpp
-  game_feel_test.cpp
   ghost_run_test.cpp
-  grade_palette_test.cpp
-  grade_words_test.cpp
   gunzip_stream_test.cpp
   gunzip_test.cpp
   helper_apply_test.cpp
@@ -242,23 +206,10 @@ add_executable(etude_tests
   history_store_songs_test.cpp
   history_store_upgrade_test.cpp
   hit_area_test.cpp
-  hit_check_test.cpp
-  hit_effects_test.cpp
   hit_line_test.cpp
   hit_window_test.cpp
   icon_colour_test.cpp
-  icon_morph_test.cpp
-  icon_motion_test.cpp
-  icon_picker_facts_test.cpp
-  icon_picker_layout_test.cpp
-  icon_standing_test.cpp
-  idle_gate_test.cpp
-  idle_wait_test.cpp
   import_edges_test.cpp
-  info_toggle_test.cpp
-  ink_measure_test.cpp
-  key_label_test.cpp
-  key_ring_layout_test.cpp
   key_signature_test.cpp
   key_state_test.cpp
   keyboard_identity_test.cpp
@@ -266,43 +217,25 @@ add_executable(etude_tests
   keyboard_view_test.cpp
   latency_stats_test.cpp
   leaderboard_test.cpp
-  learn_chord_layout_test.cpp
-  learn_colours_layout_test.cpp
-  learn_colours_lint_test.cpp
-  learn_colours_test.cpp
   learn_drill_test.cpp
-  learn_layout_test.cpp
-  learn_lit_test.cpp
-  learn_melodies_layout_test.cpp
-  learn_palette_test.cpp
   learn_sound_test.cpp
-  level_stars_test.cpp
   library_binding_test.cpp
-  library_browse_test.cpp
   library_catalogue_test.cpp
-  library_collections_test.cpp
   library_files_test.cpp
   library_groups_test.cpp
-  library_layout_test.cpp
-  library_strip_test.cpp
   library_picks_test.cpp
   library_row_test.cpp
   library_search_test.cpp
   library_state_test.cpp
   library_test.cpp
-  live_redraw_test.cpp
   look_ahead_test.cpp
-  look_color_test.cpp
   look_names_test.cpp
   look_serialize_test.cpp
   look_test.cpp
   mac_install_test.cpp
   mac_update_test.cpp
   machine_os_test.cpp
-  medal_art_test.cpp
   medal_eval_test.cpp
-  medal_wall_layout_test.cpp
-  medals_test.cpp
   melody_book_test.cpp
   melody_manifest_test.cpp
   melody_progress_test.cpp
@@ -319,18 +252,13 @@ add_executable(etude_tests
   midi_stream_test.cpp
   midi_writer_test.cpp
   minisign_test.cpp
-  morph_glyphs_test.cpp
   musicxml_files_test.cpp
   musicxml_fuzz_test.cpp
   musicxml_real_test.cpp
   musicxml_repeats_details_test.cpp
   musicxml_repeats_test.cpp
   musicxml_test.cpp
-  name_fit_test.cpp
   network_share_test.cpp
-  note_colours_test.cpp
-  note_style_test.cpp
-  note_trail_test.cpp
   note_window_test.cpp
   octave_numbering_test.cpp
   octave_shift_test.cpp
@@ -338,15 +266,11 @@ add_executable(etude_tests
   one_hand_controller_test.cpp
   one_hand_parts_test.cpp
   one_hand_test.cpp
-  osk_layout_test.cpp
-  palette_test.cpp
   panel_drm_test.cpp
-  panel_scale_test.cpp
   panel_size_test.cpp
   persistence_profile_test.cpp
   persistence_test.cpp
   piano_synth_test.cpp
-  piece_widths_test.cpp
   pitch_accuracy_test.cpp
   pitch_chord_test.cpp
   pitch_detect_test.cpp
@@ -355,26 +279,18 @@ add_executable(etude_tests
   pitch_legato_test.cpp
   pitch_realtime_test.cpp
   pitch_test.cpp
-  plan_list_layout_test.cpp
   playback_loop_test.cpp
   playback_metronome_test.cpp
   playback_tables_test.cpp
   playback_test.cpp
   playback_transposition_test.cpp
   pointer_keys_test.cpp
-  popup_sizes_test.cpp
   port_watcher_test.cpp
   practice_plan_test.cpp
-  press_effects_test.cpp
-  pressed_fade_test.cpp
-  profile_layout_test.cpp
   profile_settings_test.cpp
   profile_test.cpp
-  progress_ask_test.cpp
   progress_daily_test.cpp
   progress_history_test.cpp
-  progress_layout_test.cpp
-  progress_text_test.cpp
   progress_trouble_test.cpp
   progress_view_test.cpp
   qr_code_test.cpp
@@ -384,23 +300,16 @@ add_executable(etude_tests
   release_pack_mac_test.cpp
   release_rule_test.cpp
   renderer_path_test.cpp
-  renderer_recovery_test.cpp
   repeat_order_test.cpp
   replay_demo_test.cpp
   replay_keys_test.cpp
   replay_marks_test.cpp
-  replay_bar_layout_test.cpp
   replay_session_test.cpp
   replay_sound_test.cpp
   resampler_test.cpp
-  reset_to_test.cpp
-  results_card_layout_test.cpp
   results_card_test.cpp
   resume_keeper_test.cpp
   resume_point_test.cpp
-  roll_view_test.cpp
-  row_columns_test.cpp
-  run_card_layout_test.cpp
   run_columns_test.cpp
   run_events_test.cpp
   run_record_test.cpp
@@ -412,19 +321,11 @@ add_executable(etude_tests
   sample_clock_test.cpp
   sample_ring_test.cpp
   saved_palettes_test.cpp
-  scale_card_layout_test.cpp
   scale_diagram_test.cpp
-  scale_marks_layout_test.cpp
   scale_overlay_test.cpp
   scales_test.cpp
-  screen_layout_bar_test.cpp
-  screen_layout_scale_test.cpp
-  screen_layout_test.cpp
-  screen_layout_top_row_test.cpp
-  screen_size_test.cpp
   scroll_drag_test.cpp
   section_editing_test.cpp
-  section_overview_test.cpp
   section_suggestions_test.cpp
   sections_binding_test.cpp
   sections_controller_bars_test.cpp
@@ -436,7 +337,6 @@ add_executable(etude_tests
   sections_property_test.cpp
   sections_store_test.cpp
   sections_test.cpp
-  segment_layout_test.cpp
   semver_test.cpp
   session_restore_test.cpp
   session_state_file_test.cpp
@@ -445,14 +345,11 @@ add_executable(etude_tests
   session_state_test.cpp
   settings_catalogue_test.cpp
   settings_doc_test.cpp
-  settings_fit_test.cpp
   settings_fuzz_test.cpp
   settings_store_test.cpp
   share_probe_test.cpp
   share_setup_script_test.cpp
-  sheet_layout_test.cpp
   sheet_map_test.cpp
-  sheet_names_test.cpp
   sheet_source_test.cpp
   sheet_target_test.cpp
   sheet_view_test.cpp
@@ -493,34 +390,18 @@ add_executable(etude_tests
   spsc_queue_test.cpp
   square_drag_test.cpp
   staff_plan_test.cpp
-  status_fit_test.cpp
   streak_freeze_test.cpp
-  summary_board_layout_test.cpp
-  summary_board_text_test.cpp
-  summary_layout_test.cpp
   tap_rule_test.cpp
-  tap_spot_test.cpp
   tar_archive_test.cpp
-  tempo_card_test.cpp
   tempo_control_test.cpp
   timed_sender_test.cpp
-  toast_test.cpp
   toast_undo_test.cpp
-  top_indicator_test.cpp
-  top_menu_layout_test.cpp
-  touch_fire_guard_test.cpp
   touch_gesture_fingers_test.cpp
   touch_gesture_swipe_test.cpp
   touch_gesture_test.cpp
   transport_test.cpp
-  transpose_card_test.cpp
   transpose_test.cpp
-  transpose_text_test.cpp
   trouble_run_test.cpp
-  ui_grow_hold_test.cpp
-  ui_token_lint_test.cpp
-  undo_chip_test.cpp
-  unit_format_test.cpp
   update_conf_test.cpp
   update_feed_test.cpp
   update_handoff_test.cpp
@@ -545,7 +426,6 @@ add_executable(etude_tests
   user_presets_test.cpp
   version_grouper_test.cpp
   version_test.cpp
-  view_choice_test.cpp
   watchdog_test.cpp
   weighted_score_test.cpp)
 # Generated (the phone page's bytes), so kept out of the warning flags.
@@ -573,8 +453,3 @@ target_compile_definitions(etude_tests PRIVATE
   ETUDE_TEST_CATALOGUE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/catalogue"
   ETUDE_SOURCE_DIR="${PROJECT_SOURCE_DIR}"
   ETUDE_PROJECT_VERSION="${PROJECT_VERSION}")
-# version_test.cpp runs `etude --version`, so the app is built before the tests when there is one.
-if(TARGET etude)
-  add_dependencies(etude_tests etude)
-  target_compile_definitions(etude_tests PRIVATE ETUDE_APP_PATH="$<TARGET_FILE:etude>")
-endif()

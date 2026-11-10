@@ -51,7 +51,7 @@ Fd open_state_dir(const Context& c, std::string& error) {
     return dir;
 }
 
-StateLock::StateLock(const Context& c, const char* name, bool wait, std::string& error, int wait_s) {
+StateLock::StateLock(const Context& c, const char* name, bool wait, std::string& error, double wait_s) {
     const Fd dir = open_state_dir(c, error);
     if (!dir.ok()) {
         return;
@@ -64,7 +64,8 @@ StateLock::StateLock(const Context& c, const char* name, bool wait, std::string&
     Fd lock(raw);
     if (wait && wait_s > 0) {
         // A bounded wait: tried again every 50 ms until the time is up or the helper is told to stop.
-        const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(wait_s);
+        const auto deadline = std::chrono::steady_clock::now() +
+                              std::chrono::milliseconds(static_cast<long long>(wait_s * 1000));
         while (::flock(lock.get(), LOCK_EX | LOCK_NB) != 0) {
             if (errno != EWOULDBLOCK && errno != EINTR) {
                 error = std::string(name) + ": " + errno_text(errno);

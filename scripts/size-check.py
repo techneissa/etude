@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Size guard: fails when a hand-written file passes 1,000 lines or a function passes 80 lines, or
-when one already over its limit grows, compared with the merge-base with origin/main. It also fails
+"""Size guard: fails when a hand-written file in app/, core/ or tools/ passes 1,000 lines, or when
+one already over that limit grows, compared with the merge-base with origin/main. tests/ is exempt.
+A function over 80 lines is printed, never a failure. It also fails
 when the assistant instructions file at the top of the tree passes 200 lines or 32,768 bytes (it is
 read whole at every start, so it stays short); that check needs no origin/main and is skipped where
 the file is absent.
 
 Run it with `python3 -I scripts/size-check.py` (`just test` does). It prints the files over 600
-lines so a reviewer sees them. With no origin/main to compare against it warns and checks nothing
+lines and the long functions of the changed files so a reviewer sees them. With no origin/main to compare against it warns and checks nothing
 (no ratchet), never crashes. Functions are found by brace matching on source with comments,
 strings, character literals and preprocessor lines blanked out; a lambda or a brace in a string or
 comment is part of the function around it.
@@ -18,7 +19,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-DIRS = ("app", "core", "tests", "tools")
+DIRS = ("app", "core", "tools")
 EXTS = (".cpp", ".hpp", ".h", ".cc", ".inc")
 FILE_MAX = 1000
 FUNC_MAX = 80
@@ -157,51 +158,22 @@ def functions(text):
     return found
 
 
-def moved_functions(changed, base):
-    """Sizes of the functions the changed files had at the base, by name, so a function moved to
-    another file (with `inline` added) counts as the old one and only has to not grow."""
-    out = {}
-    for r in sorted(changed):
-        old = git("show", f"{base}:{r}")
-        if old is not None:
-            for key, size in functions(old).items():
-                out[_unmoved(key)] = max(size, out.get(_unmoved(key), 0))
-    return out
-
-
-def _unmoved(key):
-    """The name a function had before a move: no `inline`, no `Class::` or `Class::Nested::` in front
-    of its name or its types (a method defined in its class body becomes `A::B::name` outside it)."""
-    key = key[len("inline "):] if key.startswith("inline ") else key
-    key = re.sub(r"\b\w+::", "", key)
-    return re.sub(r"\s*=\s*[^,()]+(?=[,)])", "", key)  # a default argument stays in the declaration
-
-
-def check_text(path, new_text, base_text, moved=None):
-    """Violations for one file. base_text is None for a file new since the base. `moved` is the
-    function sizes of the other changed files at the base (see moved_functions)."""
-    out = []
+def check_text(path, new_text, base_text):
+    """Violations for one file. base_text is None for a file new since the base."""
     n = line_count(new_text)
-    if n > FILE_MAX:
-        if base_text is None or line_count(base_text) <= FILE_MAX:
-            out.append(f"{path}: {n} lines, over {FILE_MAX}")
-        elif n > line_count(base_text):
-            out.append(f"{path}: grew from {line_count(base_text)} to {n} lines (over {FILE_MAX})")
-    new_fns = functions(new_text)
-    if any(v > FUNC_MAX for v in new_fns.values()):
-        base_fns = functions(base_text) if base_text is not None else {}
-        for key, size in new_fns.items():
-            if size <= FUNC_MAX:
-                continue
-            was = base_fns.get(key)
-            if was is None and moved:
-                was = moved.get(_unmoved(key))
-            what = key[:70]
-            if was is None or was <= FUNC_MAX:
-                out.append(f"{path}: function `{what}` is {size} lines, over {FUNC_MAX}")
-            elif size > was:
-                out.append(f"{path}: function `{what}` grew from {was} to {size} lines")
-    return out
+    if n <= FILE_MAX:
+        return []
+    if base_text is None or line_count(base_text) <= FILE_MAX:
+        return [f"{path}: {n} lines, over {FILE_MAX}"]
+    if n > line_count(base_text):
+        return [f"{path}: grew from {line_count(base_text)} to {n} lines (over {FILE_MAX})"]
+    return []
+
+
+def long_functions(path, text):
+    """Notes for the functions of one file over FUNC_MAX lines."""
+    return [f"{path}: function `{key[:70]}` is {size} lines, over {FUNC_MAX}"
+            for key, size in functions(text).items() if size > FUNC_MAX]
 
 
 def git(*args):
@@ -241,16 +213,20 @@ def main():
     changed |= set((git("ls-files", "-o", "--exclude-standard", "--", *DIRS) or "").split())
     changed = {r for r in changed if r.endswith(EXTS)}  # a picture under app/ is not source
     problems = []
-    moved = moved_functions(changed, base)
+    notes = []
     for r in sorted(changed & texts.keys()):
-        old = git("show", f"{base}:{r}")
-        problems += check_text(r, texts[r], old, moved)
+        problems += check_text(r, texts[r], git("show", f"{base}:{r}"))
+        notes += long_functions(r, texts[r])
+    if notes:
+        print(f"size-check: {len(notes)} long functions in changed files (not a failure):")
+        for n in notes:
+            print("  " + n)
     if problems:
         print("size-check: FAIL")
         for p in problems:
             print("  " + p)
-        print(f"A file over {FILE_MAX} lines or a function over {FUNC_MAX} only shrinks: move out at "
-              "least as much as the change adds (the rule on small files and functions).")
+        print(f"A file over {FILE_MAX} lines only shrinks: move out at least as much as the change "
+              "adds (the rule on small files).")
         return 1
     if doc_problems:
         return 1

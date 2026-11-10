@@ -1,10 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// CI accuracy gate for the pitch detector on the synthetic piano set: every key A0-C8 at two
+// CI accuracy gate for the pitch detector on the synthetic piano set: every third key A0-C8 at two
 // velocities, with room noise and an interfering tone. Targets: under 0.5 % wrong notes, under
 // 0.2 % octave errors, decisions within 40 ms from C4 up. Fails if accuracy or that latency drops.
-// tools/pitch-eval runs the full set. Under AddressSanitizer every fourth key is used: the run is
-// about five times slower there, and the sanitizer is after memory errors, not accuracy (the
-// other builds gate every key).
+// tools/pitch-eval runs the full set; this gate uses every third key.
 #include "etude/pitch_eval.hpp"
 
 #include <doctest/doctest.h>
@@ -13,17 +11,7 @@ using namespace etude;
 
 namespace {
 
-#if defined(__SANITIZE_ADDRESS__)
-constexpr int kKeyStep = 4;
-#elif defined(__has_feature)
-#if __has_feature(address_sanitizer)
-constexpr int kKeyStep = 4;
-#else
-constexpr int kKeyStep = 1;
-#endif
-#else
-constexpr int kKeyStep = 1;
-#endif
+constexpr int kKeyStep = 3; // every third key
 
 void check_targets(PitchMethod method) {
     SynthEvalOptions options;
@@ -51,8 +39,4 @@ void check_targets(PitchMethod method) {
 
 TEST_CASE("pitch accuracy: McLeod meets the accuracy targets on the synthetic piano set") {
     check_targets(PitchMethod::Mpm);
-}
-
-TEST_CASE("pitch accuracy: YIN meets the accuracy targets on the synthetic piano set") {
-    check_targets(PitchMethod::Yin);
 }

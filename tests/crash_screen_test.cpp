@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // The crash screen's state and buttons (pure): what it says after a crash and when an update's data was
 // not put back, what each button does, what it reads from the update's status and what it leaves for the
-// app it starts. The drawing is checked by the touch rules (crash_screen_layout_test.cpp) and the audit.
+// app it starts. The drawing is checked by the icon audit.
 #include "crash_notice.hpp"
 #include "crash_screen.hpp"
 #include "upload_test_support.hpp"

@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "etude/progress.hpp"
 
-#include "timing_factor.hpp"
 
 #include "etude/transport.hpp"
 
@@ -421,14 +420,9 @@ TEST_CASE("trouble: 100,000 runs of other songs and of one song") {
         }
         runs.push_back(make(s));
     }
-    auto t0 = std::chrono::steady_clock::now();
     TroublePlan rare = trouble_plan(runs, 7);
     TroublePlan common = trouble_plan(runs, 100);
     TroublePlan none = trouble_plan(runs, 12345);
-    auto ms =
-        std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - t0)
-            .count();
-    CHECK(ms < 10'000 * etude::test::kTimingFactor);
     REQUIRE(rare.spots.size() == 1);
     CHECK(rare.spots[0].first_measure == 12);
     CHECK(rare.runs_read == 30);

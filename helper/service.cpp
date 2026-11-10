@@ -162,7 +162,7 @@ bool Service::stop_hard(const std::string& unit, bool& killed, std::string& erro
             if (down()) {
                 return true;
             }
-            struct timespec nap{1, 0};
+            struct timespec nap{c_.kill_nap_ms / 1000, (c_.kill_nap_ms % 1000) * 1'000'000L};
             ::nanosleep(&nap, nullptr);
         }
     }

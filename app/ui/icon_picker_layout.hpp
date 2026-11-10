@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Where the About page's icon colours go, with no ImGui in it, so tests/icon_picker_layout_test.cpp
-// checks the rules with the real tokens. Sizes in pixels (`u` is the kit's unit), from the top left of
+// Where the About page's icon colours go, with no ImGui in it. Sizes in pixels (`u` is the kit's unit), from the top left of
 // the room; the colours sit straight on the page, with no card behind them.
 //
 // Rules:

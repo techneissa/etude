@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Where the profile switcher's parts go, in ImGui points (the sizes are `profile_tok` in
 // tokens.hpp): the chip in the top row, the "Who's playing" panel under it, and the sheet that adds
-// or edits a profile, with the on-screen keyboard under it. No ImGui here, so
-// tests/profile_layout_test.cpp checks the real numbers at every window size.
+// or edits a profile, with the on-screen keyboard under it. No ImGui here.
 //
 // Rules: every pressable is at least `tok::kHit` each way and inside the window; no two pressables
 // overlap; the sheet and its controls stay above the keyboard (osk_layout.hpp), never under it.

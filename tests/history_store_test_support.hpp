@@ -23,6 +23,7 @@
 #include <mutex>
 #include <random>
 #include <string>
+#include <thread>
 #include <vector>
 
 namespace history_test {
@@ -59,6 +60,7 @@ inline void write_all(const fs::path& p, const std::string& bytes) {
 inline HistoryOptions quiet() {
     HistoryOptions o;
     o.log = [](std::string_view) {};
+    o.sync_commits = false;
     return o;
 }
 
@@ -68,6 +70,7 @@ struct Log {
     std::vector<std::string> lines_;
     HistoryOptions options() {
         HistoryOptions o;
+        o.sync_commits = false;
         o.log = [this](std::string_view line) {
             std::lock_guard lock(mutex);
             lines_.emplace_back(line);
@@ -90,6 +93,18 @@ inline std::string open_now(HistoryStore& store) {
     store.open();
     REQUIRE(store.wait_until_settled(10s));
     return store.poll().message;
+}
+
+// A flush that cannot finish (the file is locked or read-only). Returns once the history thread
+// has tried and failed `attempts` times and logged it (`failed_attempts()`): 1 is the write that
+// was queued; 2 is a retry after it.
+inline bool flush_fails(HistoryStore& store, int attempts = 1) {
+    const bool flushed = store.flush(1ms);
+    for (int i = 0; i < 20000 && store.failed_attempts() < attempts; ++i) {
+        std::this_thread::sleep_for(1ms);
+    }
+    REQUIRE(store.failed_attempts() >= attempts); // a hang guard: the thread never reported
+    return flushed;
 }
 
 // A second connection to look at what is really in the file.
@@ -313,7 +328,7 @@ inline std::vector<std::string> quit_with_held_jobs(const fs::path& dir, bool wi
         star.favourite = true;
         store.set_song_prefs(0x77, star);
     }
-    CHECK_FALSE(store.flush(300ms)); // the writes find the file read-only
+    CHECK_FALSE(flush_fails(store)); // the writes find the file read-only
     CHECK(store.state() == HistoryState::Waiting);
     store.close();
     return store.take_errors();

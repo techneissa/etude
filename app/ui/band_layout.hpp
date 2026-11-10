@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Where the section band's parts go, with no ImGui in it, so tests/band_layout_test.cpp checks the
-// numbers the band draws from. Left to right: the loop toggle; the track (the song's sections as
+// Where the section band's parts go, with no ImGui in it. Left to right: the loop toggle; the track (the song's sections as
 // named bands, the cuts between them and the playhead); the time; then the tools: cut at the
 // playhead, the practice list, suggested cuts, the lane and the full section editor. Sizes in
 // points; `u` is the kit's unit (points per design point).

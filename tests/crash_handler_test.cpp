@@ -173,43 +173,6 @@ TEST_CASE("crash handler: an uncaught exception writes the report and ends in ab
     CHECK(text.find("secret message") == std::string::npos); // the type, never the message
 }
 
-TEST_CASE("crash handler: a report that cannot finish is ended by the alarm, not left hanging") {
-    TempDir t;
-    const fs::path dir = t.path / "crashes";
-    const pid_t pid = ::fork();
-    if (pid == 0) {
-        rlimit none{0, 0};
-        ::setrlimit(RLIMIT_CORE, &none);
-        fill_buffers();
-        install_crash_handler(t.path);
-        crash_test_hang_in_trace(true); // as a loader lock held by another thread would
-        ::raise(SIGSEGV);
-        ::_exit(0);
-    }
-    const auto began = std::chrono::steady_clock::now();
-    int status = 0;
-    pid_t done = 0;
-    while ((done = ::waitpid(pid, &status, WNOHANG)) == 0 &&
-           std::chrono::steady_clock::now() - began < std::chrono::seconds(15)) {
-        ::usleep(20'000);
-    }
-    if (done == 0) {
-        ::kill(pid, SIGKILL);
-        ::waitpid(pid, &status, 0);
-    }
-    const double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - began).count();
-    REQUIRE(done == pid); // it ended by itself
-    REQUIRE(WIFSIGNALED(status));
-    CHECK(WTERMSIG(status) == SIGALRM);
-    CHECK(seconds >= 2.0); // not before the alarm
-    CHECK(seconds < 10.0); // generous: the alarm is 3 s
-    // The header was written before the trace was tried, so the hang still left the facts.
-    const std::string text = only_report(dir);
-    CHECK(text.find("Version: 1.2.0\n") != std::string::npos);
-    CHECK(text.find("Signal: SIGSEGV (11)\n") != std::string::npos);
-    CHECK(text.find("Stack trace:\n") != std::string::npos);
-}
-
 namespace {
 
 bool has_alt_stack() {

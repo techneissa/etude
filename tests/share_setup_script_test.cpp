@@ -180,8 +180,7 @@ TEST_CASE("share setup: only home-network interfaces are shared on, not VPNs or 
 TEST_CASE("share setup: a share that testparm refuses is not installed") {
     TempDir pi;
     fs::create_directories(pi.path / "bin");
-    write_file(pi.path / "bin/testparm", "#!/bin/sh\necho 'Unknown parameter' >&2\nexit 1\n");
-    fs::permissions(pi.path / "bin/testparm", fs::perms::owner_all);
+    write_script(pi.path / "bin/testparm", "#!/bin/sh\necho 'Unknown parameter' >&2\nexit 1\n");
     const Run run =
         setup(pi.path, "--share-interface eth0", "PATH='" + (pi.path / "bin").string() + "':$PATH");
     INFO(run.out);
@@ -190,8 +189,7 @@ TEST_CASE("share setup: a share that testparm refuses is not installed") {
     CHECK_FALSE(fs::exists(pi.path / "etc/samba/etude-share.conf"));
     CHECK(read_file(pi.path / "etc/samba/smb.conf").find("include") == std::string::npos);
     // The same with a testparm that agrees: installed.
-    write_file(pi.path / "bin/testparm", "#!/bin/sh\nexit 0\n");
-    fs::permissions(pi.path / "bin/testparm", fs::perms::owner_all);
+    write_script(pi.path / "bin/testparm", "#!/bin/sh\nexit 0\n");
     REQUIRE(
         setup(pi.path, "--share-interface eth0", "PATH='" + (pi.path / "bin").string() + "':$PATH")
             .status == 0);

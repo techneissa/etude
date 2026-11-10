@@ -421,7 +421,7 @@ TEST_CASE("journal: the library's changes and pins held at quit are kept, and lo
         star.favourite = true;
         store.set_song_prefs(0x9, star);
         store.set_run_pinned(1, true);
-        CHECK_FALSE(store.flush(300ms));
+        CHECK_FALSE(flush_fails(store));
         store.close();
         store.close(); // twice is harmless
         const std::vector<std::string> errors = store.take_errors();

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// The Undo chip of a toast and its width (tests/undo_chip_test.cpp). `chip()` draws a chip as wide
+// The Undo chip of a toast and its width. `chip()` draws a chip as wide
 // as the larger of what its words need at the kit's own size and the width it was asked for. From
 // 1366 points wide the toast's words and its chip's step up (the popup rule), so the chip must be
 // asked for what the larger words need, or "Undo" is cut to "Un...".

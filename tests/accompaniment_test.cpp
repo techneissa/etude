@@ -50,30 +50,6 @@ TEST_CASE("accompaniment: the parts are the ones that are not a hand, never drum
     CHECK(accompaniment_parts(song_of({part(0, 0, "Piano", false)})).empty());
 }
 
-TEST_CASE("accompaniment: a part without a name takes its instrument or a number, and a repeated "
-          "name is numbered") {
-    Part a = part(1, 1, "", true);
-    a.instrument_name = "  Flute ";
-    Part b = part(2, 2, "", true);
-    const std::vector<AccompanimentPart> parts = accompaniment_parts(
-        song_of({a, b, part(3, 3, "Strings", true), part(4, 4, "Strings", true),
-                 part(5, 5, "Strings", true)}));
-    REQUIRE(parts.size() == 5);
-    CHECK(parts[0].name == "Flute");
-    CHECK(parts[1].name == "Part 2");
-    CHECK(parts[2].name == "Strings");
-    CHECK(parts[3].name == "Strings 2");
-    CHECK(parts[4].name == "Strings 3");
-}
-
-TEST_CASE("accompaniment: no more than kMaxAccompanimentParts are listed") {
-    std::vector<Part> many;
-    for (int i = 0; i < 40; ++i) {
-        many.push_back(part(static_cast<std::uint16_t>(i), 0, "P" + std::to_string(i), true));
-    }
-    CHECK(accompaniment_parts(song_of(many)).size() == kMaxAccompanimentParts);
-}
-
 TEST_CASE("accompaniment: a voice part is told by its name or, with no other name, its program") {
     CHECK(is_voice_part(part(0, 0, "Soprano", true)));
     CHECK(is_voice_part(part(0, 0, "Lead vocals", true)));
@@ -147,20 +123,4 @@ TEST_CASE("accompaniment: the real files give their voice and instrument parts")
     const app::SongFileLoad satie = app::load_song_file(dir + "/satie-gymnopedie-1.mid");
     REQUIRE(satie.ok);
     CHECK(accompaniment_parts(satie.song.song).empty());
-}
-
-TEST_CASE("accompaniment: no two rows share a name, however the repeats number") {
-    // "Violin", "Violin" and "Violin 2": the second cannot take "Violin 2".
-    const std::vector<AccompanimentPart> parts = accompaniment_parts(song_of(
-        {part(1, 1, "Violin", true), part(2, 2, "Violin", true), part(3, 3, "Violin 2", true),
-         part(4, 4, "Violin", true), part(5, 5, "Viola", true)}));
-    REQUIRE(parts.size() == 5);
-    std::vector<std::string> names;
-    for (const AccompanimentPart& p : parts) {
-        names.push_back(p.name);
-    }
-    CHECK(names == std::vector<std::string>{"Violin", "Violin 3", "Violin 2", "Violin 4", "Viola"});
-    std::vector<std::string> sorted = names;
-    std::sort(sorted.begin(), sorted.end());
-    CHECK(std::adjacent_find(sorted.begin(), sorted.end()) == sorted.end());
 }

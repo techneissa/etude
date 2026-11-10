@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Where the transposition card's rows go, with no ImGui in it so tests/transpose_card_test.cpp
-// checks the real numbers (transpose.cpp draws from them). Both cards are a stack of rows of
+// Where the transposition card's rows go, with no ImGui in it (transpose.cpp draws from it). Both cards are a stack of rows of
 // `tok::kHit`: the transposition card (opened from the tempo popover) holds the stepper (with Keys
 // and Reset beside it) and the three whole-octave moves, the offer card holds what it proposes and
 // its answers; either grows by the fit strip when it is shown. All lengths are in the units the

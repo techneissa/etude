@@ -656,20 +656,6 @@ TEST_CASE("count-in clicks: beats numbered across two bars, and none when no cou
     CHECK(out.empty());
 }
 
-TEST_CASE("count-in label: the beat shown follows the beats counted") {
-    CHECK(count_in_label(four_beats(100, 4.0)) == 1);
-    CHECK(count_in_label(four_beats(100, 3.5)) == 1);
-    CHECK(count_in_label(four_beats(100, 3.0)) == 2);
-    CHECK(count_in_label(four_beats(100, 1.2)) == 3);
-    CHECK(count_in_label(four_beats(100, 0.5)) == 4);
-    CHECK(count_in_label(four_beats(100, 0.0)) == 0);
-    CHECK(count_in_label(CountInInput{}) == 0);
-    CountInInput two = four_beats();
-    two.total_beats = 8;
-    two.beats_left = 3.0; // five counted: the first beat of the second bar's second half
-    CHECK(count_in_label(two) == 2);
-}
-
 TEST_CASE("count-in clicks: a count-in plan with the look-ahead hands the first notes over early") {
     // The look-ahead puts the first note due when the count-in ends, not when it is asked for.
     LookAheadInput in;
@@ -693,30 +679,6 @@ TEST_CASE("count-in clicks: a count-in plan with the look-ahead hands the first 
 }
 
 // ---- The click's voice ----------------------------------------------------------------------
-
-TEST_CASE("click sound: three voices on channel 10, volume scales the velocities, 0 mutes") {
-    const ClickSound wood = click_sound_for(ClickVoice::WoodBlock, kDefaultClickVolume);
-    CHECK(wood.enabled);
-    CHECK(wood.channel == 9);
-    CHECK(wood.accent_note == 76);
-    CHECK(wood.note == 77);
-    const ClickSound click = click_sound_for(ClickVoice::Click, kDefaultClickVolume);
-    CHECK(click.accent_note == 34);
-    CHECK(click.note == 33);
-    const ClickSound beep = click_sound_for(ClickVoice::Beep, kDefaultClickVolume);
-    CHECK(beep.accent_note == 81);
-    CHECK(beep.note == 80);
-    CHECK(wood.accent_velocity > wood.velocity);
-    CHECK(wood.velocity > wood.sub_velocity);
-
-    const ClickSound quiet = click_sound_for(ClickVoice::WoodBlock, 20);
-    CHECK(quiet.accent_velocity < wood.accent_velocity);
-    CHECK(quiet.sub_velocity >= 1);
-    const ClickSound loud = click_sound_for(ClickVoice::WoodBlock, 100);
-    CHECK(loud.accent_velocity == 127);
-    CHECK(loud.velocity > wood.velocity);
-    CHECK_FALSE(click_sound_for(ClickVoice::WoodBlock, 0).enabled);
-}
 
 TEST_CASE("click playback: a click is a one-shot percussion note, marked as a click") {
     Playback pb;

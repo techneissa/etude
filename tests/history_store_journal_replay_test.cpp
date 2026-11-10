@@ -95,7 +95,7 @@ TEST_CASE("journal: a song's practice choices are dated when they were made, not
         store.set_song_practice(0x77, p);
         p.speed_percent = 80;
         store.set_song_practice(0x77, p);
-        CHECK_FALSE(store.flush(300ms));
+        CHECK_FALSE(flush_fails(store));
         store.close();
         CHECK(store.take_errors().empty());
     }
@@ -375,7 +375,7 @@ TEST_CASE("journal: the loss sentence counts only the records the journal could 
     SongPrefs p;
     p.title = "Three";
     store.set_song_prefs(0x9, p);
-    CHECK_FALSE(store.flush(300ms));
+    CHECK_FALSE(flush_fails(store));
     const std::size_t room =
         encode_journal_header().size() + encode_journal_entry(first).size() * 2 + 5;
     {

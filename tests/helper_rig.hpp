@@ -39,7 +39,9 @@ struct Rig {
         c.conf.prefix = prefix.string();
         c.ancestor_floor = fs::canonical(root.path).string(); // /tmp is world-writable
         c.conf.state_dir = (root.path / "state").string();
-        c.conf.ready_timeout_s = 1;
+        c.ready_timeout_s = 0.1;
+        c.kill_nap_ms = 20;
+        c.watch_poll_ms = 20;
         c.service_timeout_s = 2;
         reset_interrupt();
         install_interrupt_handlers(); // the stand-in's SIGTERM is handled, as in the helper
@@ -55,17 +57,20 @@ struct Rig {
         // SIGTERM (or SIGINT for `int_on_<command>`) to its parent, the helper, once. `failed` holds the name of a
         // unit that is-active calls failed (it crashed; nothing restarts it); `show_answer` is what show prints
         // (the Result, ExecMainStatus and ExecMainCode of a failed unit).
-        write_file(c.conf.systemctl,
+        write_script(c.conf.systemctl,
                    "#!/bin/sh\n"
-                   "dir=\"" + root.path.string() + "\"\n"
+                   "dir=${0%/*}\n"
                    "echo \"$*\" >>\"$dir/calls\"\n"
                    "if [ -e \"$dir/term_on_$1\" ]; then rm -f \"$dir/term_on_$1\"; kill -TERM $PPID; fi\n"
                    "if [ -e \"$dir/int_on_$1\" ]; then rm -f \"$dir/int_on_$1\"; kill -INT $PPID; fi\n"
                    "case \"$1\" in\n"
-                   "is-active) if [ -e \"$dir/answer\" ]; then cat \"$dir/answer\"; exit 3;\n"
+                   "is-active) f=; a=\n"
+                   "  [ -e \"$dir/failed\" ] && read -r f <\"$dir/failed\"\n"
+                   "  [ -e \"$dir/active\" ] && read -r a <\"$dir/active\"\n"
+                   "  if [ -e \"$dir/answer\" ]; then while IFS= read -r w || [ -n \"$w\" ]; do echo \"$w\"; done <\"$dir/answer\"; exit 3;\n"
                    "  elif [ -e \"$dir/bus_error\" ]; then exit 1;\n"
-                   "  elif [ \"$(cat \"$dir/failed\" 2>/dev/null)\" = \"$2\" ]; then echo failed; exit 3;\n"
-                   "  elif [ \"$(cat \"$dir/active\" 2>/dev/null)\" = \"$2\" ]; then echo active;\n"
+                   "  elif [ \"$f\" = \"$2\" ]; then echo failed; exit 3;\n"
+                   "  elif [ \"$a\" = \"$2\" ]; then echo active;\n"
                    "  else echo inactive; exit 3; fi ;;\n"
                    "stop) [ -e \"$dir/hang\" ] && sleep 5\n"
                    "  [ -e \"$dir/stuck\" ] || rm -f \"$dir/active\"\n"
@@ -78,7 +83,6 @@ struct Rig {
                    "    *) [ -e \"$dir/start_fails\" ] && exit 1 ;; esac\n"
                    "  echo \"$last\" >\"$dir/active\" ;;\n"
                    "esac\n");
-        ::chmod(c.conf.systemctl.c_str(), 0755);
         for (const char* v : {"1.0.0", "1.1.0", "1.2.0"}) {
             put_version(v);
         }

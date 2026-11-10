@@ -24,7 +24,7 @@ struct ProgramResult {
 // kills it after `timeout_s` seconds. With `interruptible` a SIGTERM to the helper (interrupt.hpp)
 // kills it early; a call that is part of the clean-up after one (start the app, ask its state) is not,
 // so the clean-up is not cut short by the signal it answers.
-ProgramResult run_program(const std::vector<std::string>& argv, int timeout_s, bool interruptible = true);
+ProgramResult run_program(const std::vector<std::string>& argv, double timeout_s, bool interruptible = true);
 
 struct AppUser {
     std::string name;
@@ -42,7 +42,7 @@ bool find_app_user(const std::string& name, AppUser& out, std::string& error);
 // when the helper is told to stop). `job` returns "" when it worked or a sentence when it did not, which comes
 // back in `error`. True when it worked. Where the helper is not root and `user` is who it is
 // already, nothing is dropped (a unit test runs that way).
-bool run_as_user(const AppUser& user, int timeout_s, const std::function<std::string()>& job,
+bool run_as_user(const AppUser& user, double timeout_s, const std::function<std::string()>& job,
                  std::string& error);
 
 } // namespace etude::helper

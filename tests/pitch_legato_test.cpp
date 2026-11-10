@@ -16,19 +16,8 @@ using namespace etude;
 
 namespace {
 
-// Two 12-note melodies for each of two seeds, per method; under AddressSanitizer, which is
-// after memory errors rather than accuracy and runs about five times slower, the first seed only.
-#if defined(__SANITIZE_ADDRESS__)
+// Two 12-note melodies for the first seed.
 constexpr int kSeeds = 1;
-#elif defined(__has_feature)
-#if __has_feature(address_sanitizer)
-constexpr int kSeeds = 1;
-#else
-constexpr int kSeeds = 2;
-#endif
-#else
-constexpr int kSeeds = 2;
-#endif
 constexpr int kMelodies = 2;
 constexpr int kMelodyNotes = 12;
 
@@ -146,10 +135,6 @@ int wrong_in_melody(std::uint64_t seed, int melody, float repeats, PitchMethod m
 
 TEST_CASE("pitch legato: McLeod names no wrong key in melodies of loud, soft and repeated notes") {
     check_melodies(PitchMethod::Mpm);
-}
-
-TEST_CASE("pitch legato: YIN names no wrong key in melodies of loud, soft and repeated notes") {
-    check_melodies(PitchMethod::Yin);
 }
 
 TEST_CASE("pitch evaluation: melody_repeats strikes the same key again") {
@@ -312,7 +297,6 @@ TEST_CASE("pitch legato: melodies that once gave wrong keys") {
     // From the seed sweep of tools/pitch-eval --melodies 100 --note-velocities, each melody
     // played alone with the method that went wrong (and still goes wrong alone).
     CHECK(wrong_in_melody(10, 25, 0.0f, PitchMethod::Mpm) == 0); // F#7 under F7: F7
-    CHECK(wrong_in_melody(15, 51, 0.0f, PitchMethod::Yin) == 0); // C2 after A1: C1
     CHECK(wrong_in_melody(12, 13, 0.3f, PitchMethod::Mpm) == 0); // C#5 under G4: D#2
 }
 

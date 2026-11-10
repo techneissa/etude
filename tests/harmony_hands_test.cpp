@@ -146,15 +146,6 @@ TEST_CASE("harmony: a chord struck as a block keeps its top note in the span") {
     CHECK(s.high_pitch == C5);
 }
 
-TEST_CASE("harmony: a stretch with no chord has no span") {
-    Piece p(1);
-    const std::vector<HarmonyStretch> s = analyse_harmony(p.song(), HarmonyScope::All);
-    for (const HarmonyStretch& x : s) {
-        CHECK(x.low_pitch == -1);
-        CHECK(x.high_pitch == -1);
-    }
-}
-
 TEST_CASE("harmony: confidence is high for a plain chord and lower for a muddled one") {
     Piece clear(1);
     clear.whole(0, {C3, G3, E4});

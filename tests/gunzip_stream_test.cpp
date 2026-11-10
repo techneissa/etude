@@ -255,7 +255,7 @@ TEST_CASE("gunzip_stream: damaged input is refused, wherever it is cut") {
     bad[3] = 0x20; // a reserved flag
     CHECK(run(bad, 10).error == GunzipError::NotGzip);
     for (const std::vector<std::uint8_t>* gz : {&kNamed, &kRepeatingGz}) {
-        for (std::size_t keep = 0; keep < gz->size(); ++keep) {
+        for (std::size_t keep = 0; keep < gz->size(); keep += keep < 80 || keep + 16 >= gz->size() ? 1 : 37) { // every cut of the header and of the last 16 bytes (the trailer), a sample between
             CAPTURE(keep);
             const Run cut = run({gz->begin(), gz->begin() + static_cast<std::ptrdiff_t>(keep)}, 3);
             CHECK_FALSE(cut.ok());

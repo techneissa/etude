@@ -7,7 +7,7 @@
 // (`row_tap_parts`, here), a key's hit area (`keyboard_key_hit`), a card's and a row's controls and tap
 // areas (`card_parts`, `list_row`), and the key ring's decision (`key_ring_release`); tests/
 // release_rule_test.cpp checks that no hit area reaches over another, so a lift on one can never fire
-// the other. That no control fires on the press is guarded by tests/touch_fire_guard_test.cpp.
+// the other.
 #pragma once
 
 #include "face_layout.hpp"

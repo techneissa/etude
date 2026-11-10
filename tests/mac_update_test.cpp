@@ -83,18 +83,17 @@ TEST_CASE("mac update: two folders are exchanged in one call, and a missing one 
     CHECK(read_file(dir.path / "a/name") == "b");
 }
 
-TEST_CASE("mac update: the app's --swap-bundle mode does the exchange and nothing else") {
+TEST_CASE("mac update: the --swap-bundle mode exits 0 when it swapped and 1 when it could not (the relaunch script reads that)") {
     if (!swap_supported()) {
         return;
     }
     TempDir dir;
     write_file(dir.path / "a/name", "a");
     write_file(dir.path / "b/name", "b");
-    const std::string app = std::string("'") + ETUDE_APP_PATH + "' --swap-bundle '";
-    CHECK(sh(app + (dir.path / "a").string() + "' '" + (dir.path / "b").string() + "' >/dev/null 2>&1") == 0);
+    const std::string a = (dir.path / "a").string();
+    CHECK(run_swap_bundle(a.c_str(), (dir.path / "b").string().c_str()) == 0);
     CHECK(read_file(dir.path / "a/name") == "b");
-    CHECK(read_file(dir.path / "b/name") == "a");
-    CHECK(sh(app + (dir.path / "a").string() + "' '" + (dir.path / "gone").string() + "' >/dev/null 2>&1") == 1);
+    CHECK(run_swap_bundle(a.c_str(), (dir.path / "gone").string().c_str()) == 1);
     CHECK(read_file(dir.path / "a/name") == "b");
 }
 
@@ -153,7 +152,7 @@ TEST_CASE("mac update: the hash of a file read in pieces is the hash of its byte
 TEST_CASE("mac update: unpacking asks ditto to extract the zip into a fresh folder beside the app") {
     TempDir dir;
     std::vector<std::string> asked;
-    const ProgramRunner run = [&](const std::vector<std::string>& argv, int) {
+    const ProgramRunner run = [&](const std::vector<std::string>& argv, double) {
         asked = argv;
         fake_bundle(fs::path(argv[4]) / "etude.app", "1.2.3");
         ProgramResult done;
@@ -214,7 +213,7 @@ TEST_CASE("mac update: the new bundle must verify as signed and say the released
     std::string version = "1.2.3";
     int code = 0;
     std::vector<std::vector<std::string>> asked;
-    const ProgramRunner run = [&](const std::vector<std::string>& argv, int) {
+    const ProgramRunner run = [&](const std::vector<std::string>& argv, double) {
         asked.push_back(argv);
         ProgramResult done;
         done.started = true;
@@ -295,7 +294,7 @@ TEST_CASE("mac update: run_program reads the output and ends a program that runs
     CHECK(echoed.output == "hello\n");
     CHECK(run_program({"/bin/sh", "-c", "echo oops >&2; exit 3"}, 10).exit_code == 3);
     CHECK_FALSE(run_program({"/nonexistent/program"}, 10).started);
-    const ProgramResult slow = run_program({"/bin/sleep", "30"}, 1);
+    const ProgramResult slow = run_program({"/bin/sleep", "30"}, 0.2);
     CHECK(slow.timed_out);
     CHECK(slow.exit_code == -1);
 }
@@ -356,6 +355,13 @@ TEST_CASE("mac update: the relaunch script is saved runnable and started with it
 namespace {
 
 // Two fake bundles, a fake `open`, and the script, in a temporary folder.
+// `swap A B` or `etude --swap-bundle A B`: A and B trade places.
+constexpr const char* kSwapStandIn =
+    "#!/bin/sh\n"
+    "[ \"$1\" = --swap-bundle ] && shift\n"
+    "[ -e \"$1\" ] && [ -e \"$2\" ] || exit 1\n"
+    "mv \"$1\" \"$1.swapping\" && mv \"$2\" \"$1\" && mv \"$1.swapping\" \"$2\"\n";
+
 struct SwapRig {
     TempDir dir;
     fs::path apps = dir.path / "Apps";
@@ -367,28 +373,30 @@ struct SwapRig {
     fs::path script = update / "relaunch.sh";
     fs::path open_log = dir.path / "open.log";
     fs::path fake_open = dir.path / "open";
-    // The program that exchanges two folders: the built app's --swap-bundle mode.
-    std::string swap_env = std::string("ETUDE_SWAP='") + ETUDE_APP_PATH + " --swap-bundle'";
+    // The program that exchanges two folders (the app's own does it with one renamex_np call, tested
+    // above): a stand-in that moves them past a third name.
+    fs::path swap = dir.path / "swap";
+    std::string swap_env = "ETUDE_SWAP='" + swap.string() + "'";
 
     // `ready_for`: the version whose launch writes the ready file ("" : none does).
     explicit SwapRig(const std::string& ready_for) {
         fake_bundle(bundle, "1.0.0");
         fake_bundle(new_bundle, "2.0.0");
         fs::create_directories(update);
+        write_script(swap, kSwapStandIn);
         write_file(script, std::string(mac_relaunch_script()));
-        write_file(fake_open,
+        write_script(fake_open,
                    "#!/bin/sh\n"
                    "echo \"$1 $(cat \"$1/VERSION\")\" >> '" + open_log.string() + "'\n"
                    "if [ \"$(cat \"$1/VERSION\")\" = '" + ready_for + "' ]; then\n"
-                   "  (sleep 0.3; printf 'version=" + ready_for + "\\n' > '" + (update / "ready").string() +
+                   "  (sleep 0.06; printf 'version=" + ready_for + "\\n' > '" + (update / "ready").string() +
                    "') >/dev/null 2>&1 &\n"
                    "fi\n");
-        ::chmod(fake_open.c_str(), 0755);
     }
 
     // Runs the script for an app that has already quit (`app_pid` 2^22 + 1 is no process).
     int run(int wait_seconds, const std::string& pid = "4194305", const std::string& env = "") {
-        return sh("ETUDE_OPEN='" + fake_open.string() + "' " + swap_env + " " + env + " /bin/sh '" + script.string() + "' " +
+        return sh("ETUDE_TICK=0.02 ETUDE_OPEN='" + fake_open.string() + "' " + swap_env + " " + env + " /bin/sh '" + script.string() + "' " +
                   pid + " '" + bundle.string() + "' '" + new_bundle.string() + "' '" + previous.string() +
                   "' '" + (update / "ready").string() + "' '" + (update / "status").string() +
                   "' 2.0.0 1.0.0 " + std::to_string(wait_seconds) + " >/dev/null 2>&1");
@@ -564,10 +572,9 @@ TEST_CASE("mac relaunch: a rollback whose swap fails leaves a whole app at the p
     SwapRig rig(""); // the new version never reaches its first frame
     // The first exchange works, the second (the rollback) does not.
     const fs::path flaky = rig.dir.path / "flaky";
-    write_file(flaky, std::string("#!/bin/sh\nif [ -f '") + (rig.dir.path / "used").string() +
+    write_script(flaky, std::string("#!/bin/sh\nif [ -f '") + (rig.dir.path / "used").string() +
                           "' ]; then exit 1; fi\ntouch '" + (rig.dir.path / "used").string() + "'\nexec '" +
-                          ETUDE_APP_PATH + "' --swap-bundle \"$@\"\n");
-    ::chmod(flaky.c_str(), 0755);
+                          rig.swap.string() + "' \"$@\"\n");
     rig.swap_env = "ETUDE_SWAP='" + flaky.string() + "'";
     CHECK(rig.run(1) == 1);
     CHECK(fs::is_directory(rig.bundle));
@@ -581,9 +588,8 @@ TEST_CASE("mac relaunch: the swap program is a copy of the new bundle's own, use
         return;
     }
     SwapRig rig("");
-    // The new bundle's program hands the mode on to the built app, as the real one would handle it.
-    write_file(rig.new_bundle / "Contents/MacOS/etude",
-               std::string("#!/bin/sh\nexec '") + ETUDE_APP_PATH + "' \"$@\"\n");
+    // The new bundle's program does the swap in its --swap-bundle mode, as the real one does.
+    write_file(rig.new_bundle / "Contents/MacOS/etude", kSwapStandIn);
     ::chmod((rig.new_bundle / "Contents/MacOS/etude").c_str(), 0755);
     rig.swap_env = ""; // the script copies the program out of the staged bundle
     CHECK(rig.run(1) == 1);

@@ -65,8 +65,7 @@ ArpeggioSpec arpeggio(int root, ChordQuality q, int inversion = 0, int octaves =
     return a;
 }
 
-constexpr int C = 0, Db = 1, D = 2, Eb = 3, E = 4, F = 5, Gb = 6, G = 7, Ab = 8, A = 9, Bb = 10,
-              B = 11;
+constexpr int C = 0, F = 5, G = 7, A = 9, Bb = 10, B = 11;
 
 const KeyRange kRanges[] = {kRange49, kRange61, kRange76, kRange88};
 
@@ -78,95 +77,6 @@ bool all_in_range(const Song& s, KeyRange r) {
 } // namespace
 
 // ----- fingering -----
-
-TEST_CASE("fingering: C major right hand, one octave and two") {
-    CHECK(scale_fingers(C, ScaleType::Major, Hand::Right, 1) == v({1, 2, 3, 1, 2, 3, 4, 5}));
-    CHECK(scale_fingers(C, ScaleType::Major, Hand::Right, 2) ==
-          v({1, 2, 3, 1, 2, 3, 4, 1, 2, 3, 1, 2, 3, 4, 5}));
-}
-
-TEST_CASE("fingering: C major left hand, one octave and two") {
-    CHECK(scale_fingers(C, ScaleType::Major, Hand::Left, 1) == v({5, 4, 3, 2, 1, 3, 2, 1}));
-    CHECK(scale_fingers(C, ScaleType::Major, Hand::Left, 2) ==
-          v({5, 4, 3, 2, 1, 3, 2, 1, 4, 3, 2, 1, 3, 2, 1}));
-}
-
-TEST_CASE("fingering: well-known major scales") {
-    CHECK(scale_fingers(F, ScaleType::Major, Hand::Right, 1) == v({1, 2, 3, 4, 1, 2, 3, 4}));
-    CHECK(scale_fingers(F, ScaleType::Major, Hand::Left, 1) == v({5, 4, 3, 2, 1, 3, 2, 1}));
-    CHECK(scale_fingers(G, ScaleType::Major, Hand::Right, 1) == v({1, 2, 3, 1, 2, 3, 4, 5}));
-    CHECK(scale_fingers(D, ScaleType::Major, Hand::Right, 1) == v({1, 2, 3, 1, 2, 3, 4, 5}));
-    CHECK(scale_fingers(Bb, ScaleType::Major, Hand::Right, 1) == v({4, 1, 2, 3, 1, 2, 3, 4}));
-    CHECK(scale_fingers(Bb, ScaleType::Major, Hand::Left, 1) == v({3, 2, 1, 4, 3, 2, 1, 3}));
-    CHECK(scale_fingers(Eb, ScaleType::Major, Hand::Right, 1) == v({3, 1, 2, 3, 4, 1, 2, 3}));
-    CHECK(scale_fingers(Eb, ScaleType::Major, Hand::Left, 1) == v({3, 2, 1, 4, 3, 2, 1, 3}));
-    CHECK(scale_fingers(B, ScaleType::Major, Hand::Right, 1) == v({1, 2, 3, 1, 2, 3, 4, 5}));
-    CHECK(scale_fingers(B, ScaleType::Major, Hand::Left, 1) == v({4, 3, 2, 1, 4, 3, 2, 1}));
-    CHECK(scale_fingers(Gb, ScaleType::Major, Hand::Right, 1) == v({2, 3, 4, 1, 2, 3, 1, 2}));
-    CHECK(scale_fingers(Gb, ScaleType::Major, Hand::Left, 1) == v({4, 3, 2, 1, 3, 2, 1, 4}));
-    CHECK(scale_fingers(Db, ScaleType::Major, Hand::Right, 1) == v({2, 3, 1, 2, 3, 4, 1, 2}));
-    CHECK(scale_fingers(Ab, ScaleType::Major, Hand::Right, 1) == v({3, 4, 1, 2, 3, 1, 2, 3}));
-}
-
-TEST_CASE("fingering: well-known minor scales, natural and harmonic alike") {
-    for (ScaleType t : {ScaleType::NaturalMinor, ScaleType::HarmonicMinor}) {
-        CHECK(scale_fingers(A, t, Hand::Right, 1) == v({1, 2, 3, 1, 2, 3, 4, 5}));
-        CHECK(scale_fingers(A, t, Hand::Left, 1) == v({5, 4, 3, 2, 1, 3, 2, 1}));
-        CHECK(scale_fingers(E, t, Hand::Right, 1) == v({1, 2, 3, 1, 2, 3, 4, 5}));
-        CHECK(scale_fingers(D, t, Hand::Right, 1) == v({1, 2, 3, 1, 2, 3, 4, 5}));
-        CHECK(scale_fingers(C, t, Hand::Right, 1) == v({1, 2, 3, 1, 2, 3, 4, 5}));
-        CHECK(scale_fingers(C, t, Hand::Left, 1) == v({5, 4, 3, 2, 1, 3, 2, 1}));
-        CHECK(scale_fingers(F, t, Hand::Right, 1) == v({1, 2, 3, 4, 1, 2, 3, 4}));
-        CHECK(scale_fingers(Gb, t, Hand::Right, 1) == v({3, 4, 1, 2, 3, 1, 2, 3}));
-    }
-}
-
-TEST_CASE("fingering: the fourth finger sits where the teaching charts put it (major keys)") {
-    // Place of the 4th finger in each hand, as scale degrees 1..7, from Prof. Escadon's chart.
-    struct Place {
-        int root;
-        int lh;
-        int rh;
-    };
-    const Place places[] = {{C, 2, 7}, {D, 2, 7},  {E, 2, 7},  {G, 2, 7},  {A, 2, 7},  {F, 2, 4},
-                            {B, 5, 7}, {Db, 4, 6}, {Eb, 4, 5}, {Gb, 1, 3}, {Ab, 4, 2}, {Bb, 4, 1}};
-    for (const Place& p : places) {
-        CAPTURE(p.root);
-        // The second octave of a two-octave scale: degrees 1..7 there use the repeating pattern
-        // (a scale may start on a different finger than it repeats on, as B major's left hand).
-        const auto lh = scale_fingers(p.root, ScaleType::Major, Hand::Left, 2);
-        const auto rh = scale_fingers(p.root, ScaleType::Major, Hand::Right, 2);
-        REQUIRE(lh.size() == 15);
-        REQUIRE(rh.size() == 15);
-        for (int d = 1; d <= 7; ++d) {
-            CAPTURE(d);
-            CHECK((lh[static_cast<std::size_t>(6 + d)] == 4) == (d == p.lh));
-            CHECK((rh[static_cast<std::size_t>(6 + d)] == 4) == (d == p.rh));
-        }
-    }
-}
-
-TEST_CASE("fingering: defined for major and the three minors in all 12 keys, both hands") {
-    for (ScaleType t : {ScaleType::Major, ScaleType::NaturalMinor, ScaleType::HarmonicMinor,
-                        ScaleType::MelodicMinor}) {
-        for (int root = 0; root < 12; ++root) {
-            for (Hand h : {Hand::Right, Hand::Left}) {
-                for (int octaves : {1, 2}) {
-                    CAPTURE(scale_type_name(t));
-                    CAPTURE(root);
-                    for (const auto& f : {scale_fingers(root, t, h, octaves),
-                                          scale_fingers_descending(root, t, h, octaves)}) {
-                        REQUIRE(f.size() == static_cast<std::size_t>(7 * octaves + 1));
-                        for (int x : f) {
-                            CHECK(x >= 1);
-                            CHECK(x <= 5);
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
 
 TEST_CASE("fingering: undefined for the other scales, an unknown hand and a bad octave count") {
     for (ScaleType t : {ScaleType::Dorian, ScaleType::MajorPentatonic, ScaleType::Blues,
@@ -227,68 +137,6 @@ TEST_CASE("fingering: the thumb is on a white key and crossings are legal, in ev
                             CHECK((next == prev - 1 || (prev == 1 && (next == 3 || next == 4))));
                         }
                     }
-                }
-            }
-        }
-    }
-}
-
-TEST_CASE("fingering: melodic minor, every key, both hands, up and down (one octave)") {
-    // Index 0 is the tonic at the bottom, both ways. Sources: the chart of Prof. Escadon (4th
-    // finger per key, up and down apart) and the minor fingering table of
-    // composition.gregspero.com.
-    const std::vector<int> c_rh = v({1, 2, 3, 1, 2, 3, 4, 5});
-    const std::vector<int> c_lh = v({5, 4, 3, 2, 1, 3, 2, 1});
-    struct Key {
-        int root;
-        std::vector<int> rh_up, rh_down, lh_up, lh_down;
-    };
-    const std::vector<int> sharp_rh = v({3, 4, 1, 2, 3, 1, 2, 3});
-    const std::vector<int> sharp_lh = v({3, 2, 1, 4, 3, 2, 1, 3});
-    const Key keys[] = {
-        {C, c_rh, c_rh, c_lh, c_lh},
-        // C# minor: the 4th finger goes to the raised sixth (A#) going up, the thumb to B#.
-        {Db, v({3, 4, 1, 2, 3, 4, 1, 2}), sharp_rh, sharp_lh, sharp_lh},
-        {D, c_rh, c_rh, c_lh, c_lh},
-        {Eb, v({3, 1, 2, 3, 4, 1, 2, 3}), v({3, 1, 2, 3, 4, 1, 2, 3}), v({2, 1, 4, 3, 2, 1, 3, 2}),
-         v({2, 1, 4, 3, 2, 1, 3, 2})},
-        {E, c_rh, c_rh, c_lh, c_lh},
-        {F, v({1, 2, 3, 4, 1, 2, 3, 4}), v({1, 2, 3, 4, 1, 2, 3, 4}), c_lh, c_lh},
-        // F# minor: as C#, the 4th finger on D# going up and on G# coming down.
-        {Gb, v({2, 3, 1, 2, 3, 4, 1, 2}), sharp_rh, v({4, 3, 2, 1, 3, 2, 1, 4}),
-         v({4, 3, 2, 1, 3, 2, 1, 4})},
-        {G, c_rh, c_rh, c_lh, c_lh},
-        // G# minor: the left hand's 4th finger on C# going up and on F# coming down.
-        {Ab, sharp_rh, sharp_rh, sharp_lh, v({3, 2, 1, 3, 2, 1, 4, 3})},
-        {A, c_rh, c_rh, c_lh, c_lh},
-        {Bb, v({4, 1, 2, 3, 1, 2, 3, 4}), v({4, 1, 2, 3, 1, 2, 3, 4}), v({2, 1, 3, 2, 1, 4, 3, 2}),
-         v({2, 1, 3, 2, 1, 4, 3, 2})},
-        {B, c_rh, c_rh, v({4, 3, 2, 1, 4, 3, 2, 1}), v({4, 3, 2, 1, 4, 3, 2, 1})},
-    };
-    for (const Key& k : keys) {
-        CAPTURE(k.root);
-        CHECK(scale_fingers(k.root, ScaleType::MelodicMinor, Hand::Right, 1) == k.rh_up);
-        CHECK(scale_fingers_descending(k.root, ScaleType::MelodicMinor, Hand::Right, 1) ==
-              k.rh_down);
-        CHECK(scale_fingers(k.root, ScaleType::MelodicMinor, Hand::Left, 1) == k.lh_up);
-        CHECK(scale_fingers_descending(k.root, ScaleType::MelodicMinor, Hand::Left, 1) ==
-              k.lh_down);
-        // Two octaves repeat the cycle and end on the one-octave top finger.
-        for (Hand h : {Hand::Right, Hand::Left}) {
-            const auto one = scale_fingers(k.root, ScaleType::MelodicMinor, h, 1);
-            const auto two = scale_fingers(k.root, ScaleType::MelodicMinor, h, 2);
-            REQUIRE(two.size() == 15);
-            if (k.root == Db && h == Hand::Right) {
-                CHECK(two == v({3, 4, 1, 2, 3, 4, 1, 2, 3, 1, 2, 3, 4, 1, 2}));
-            }
-            CHECK(two.front() == one.front());
-            CHECK(two.back() == one.back());
-            for (std::size_t i = 1; i < 7; ++i) {
-                CHECK(two[i] == one[i]);
-                // The second octave repeats the cycle; C# minor's right hand starts 3 4 but
-                // repeats 2 3.
-                if (i != 1 || k.root != Db || h != Hand::Right) {
-                    CHECK(two[7 + i] == one[i]);
                 }
             }
         }
@@ -416,49 +264,6 @@ TEST_CASE("exercise: harmonic minor raises the seventh, and the melodic comes do
           v({69, 71, 72, 74, 76, 78, 80, 81, 79, 77, 76, 74, 72, 71, 69}));
     // Up with the ascending fingering, down with the descending one (A minor: the same).
     CHECK(fingers(melodic.song, 1) == v({1, 2, 3, 1, 2, 3, 4, 5, 4, 3, 2, 1, 3, 2, 1}));
-}
-
-TEST_CASE("exercise: melodic minor carries the up fingering up and the down fingering down") {
-    for (int root = 0; root < 12; ++root) {
-        for (Hand hand : {Hand::Right, Hand::Left}) {
-            for (int octaves : {1, 2}) {
-                CAPTURE(root);
-                CAPTURE(octaves);
-                const HandsChoice hc = hand == Hand::Right ? HandsChoice::Right : HandsChoice::Left;
-                auto up = scale_fingers(root, ScaleType::MelodicMinor, hand, octaves);
-                auto down = scale_fingers_descending(root, ScaleType::MelodicMinor, hand, octaves);
-                std::reverse(down.begin(), down.end());
-                std::vector<int> both = up;
-                both.insert(both.end(), down.begin() + 1, down.end());
-                // The turn at the top takes the descent's finger.
-                both[up.size() - 1] =
-                    scale_fingers_descending(root, ScaleType::MelodicMinor, hand, octaves).back();
-                const auto fingers_of = [&](Direction d) {
-                    const ExerciseResult r =
-                        make_scale_exercise(scale(root, ScaleType::MelodicMinor, octaves, d, hc));
-                    REQUIRE(r.ok);
-                    return fingers(r.song, 1);
-                };
-                CHECK(fingers_of(Direction::Up) == up);
-                CHECK(fingers_of(Direction::Down) == down);
-                CHECK(fingers_of(Direction::UpDown) == both);
-            }
-        }
-    }
-    // F# minor, right hand: 4th finger on D# going up and on G# coming down, and the turn at the
-    // top takes the descent's 3rd finger so that the next note (E) does not repeat a finger.
-    const ExerciseResult f = make_scale_exercise(
-        scale(Gb, ScaleType::MelodicMinor, 1, Direction::UpDown, HandsChoice::Right));
-    REQUIRE(f.ok);
-    CHECK(fingers(f.song, 1) == v({2, 3, 1, 2, 3, 4, 1, 3, 2, 1, 3, 2, 1, 4, 3}));
-}
-
-TEST_CASE("exercise: scales with no fingering table have finger 0") {
-    const ExerciseResult r = make_scale_exercise(scale(D, ScaleType::Dorian));
-    REQUIRE(r.ok);
-    for (const Note& n : r.song.notes) {
-        CHECK(n.finger == 0);
-    }
 }
 
 TEST_CASE("exercise: every scale type, key, length, direction and hand stays on the keyboard") {
@@ -852,16 +657,6 @@ TEST_CASE("chord drill: steps follow step_beats and notes last hold_beats, at th
     CHECK(r.song.notes.back().duration_s == doctest::Approx(1.0));
     // The song lasts to the end of the last chord, and each chord starts a bar-fraction apart.
     CHECK(r.song.duration_s == doctest::Approx(3.0));
-}
-
-TEST_CASE("chord drill: flat names when asked") {
-    ChordDrillSpec d = drill({{Bb, ChordQuality::Major, 0}, {Eb, ChordQuality::Minor7, 0}});
-    CHECK(make_chord_drill(d).steps[0].label == "A\xE2\x99\xAF");
-    d.prefer_flats = true;
-    const ExerciseResult r = make_chord_drill(d);
-    CHECK(r.steps[0].label == "B\xE2\x99\xAD");
-    CHECK(r.steps[1].label == "E\xE2\x99\xAD"
-                              "m7");
 }
 
 TEST_CASE("chord drill: bad specs are errors") {

@@ -55,7 +55,6 @@ FixedLine<96> g_screen;
 FixedLine<160> g_song;
 
 char g_dir[1024];                // `<data>/crashes`, set at the start
-std::atomic<bool> g_hang_for_test{false}; // the test of the alarm: the trace never comes back
 std::atomic<bool> g_writing{false};
 
 // Output without stdio: each piece is one `write`.
@@ -177,9 +176,6 @@ bool write_crash_report(const char* dir, int signo, const char* detail) {
     name[15] = '\0'; // the name without ".txt"
     put(fd, name);
     put(fd, "\n\nStack trace:\n");
-    while (g_hang_for_test.load(std::memory_order_relaxed)) {
-        ::pause(); // a test of the alarm: the header is written, the trace never is
-    }
     void* frames[64];
     const int count = ::backtrace(frames, 64);
     ::backtrace_symbols_fd(frames, count, fd);
@@ -257,8 +253,6 @@ void crash_thread_init() {
         ::munmap(memory, kAltStackBytes);
     }
 }
-
-void crash_test_hang_in_trace(bool on) { g_hang_for_test.store(on, std::memory_order_relaxed); }
 
 void install_crash_handler(const std::filesystem::path& data_dir) {
     const std::filesystem::path dir = data_dir / "crashes";

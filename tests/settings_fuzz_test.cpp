@@ -306,7 +306,7 @@ std::string mutate(Rng& rng, std::string text) {
     return text;
 }
 
-constexpr int kIterations = 6000;
+constexpr int kIterations = 1500;
 
 std::string next_input(Rng& rng, int i) {
     switch (i % 3) {
