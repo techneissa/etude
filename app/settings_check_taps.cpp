@@ -8,6 +8,7 @@
 
 #include "ui/icon_audit.hpp"
 #include "ui/item_probe.hpp"
+#include "ui/tokens.hpp"
 
 #include <imgui.h>
 
@@ -91,6 +92,18 @@ bool reveal(const CheckRig& rig, const std::string& name, Spot* at, float lowest
         frames(rig, 3);
     }
     return false;
+}
+
+// Draws until the sheet's close fade (`tok::kSheet` of frame time, which a long frame gets through
+// in fewer frames) is over and the toast has moved to its place for a closed sheet. Counting frames
+// would tap while the fade still runs on a quiet machine and after it on a loaded one.
+void let_sheet_close(const CheckRig& rig) {
+    float elapsed = 0.0f;
+    for (int i = 0; i < 600 && elapsed < ui::tok::kSheet * 2.0f; ++i) {
+        rig.draw();
+        elapsed += ImGui::GetIO().DeltaTime;
+    }
+    frames(rig, 2);
 }
 
 // A tap: the press in one frame, the release in the next, and a few frames after.
@@ -187,7 +200,7 @@ void check_opacity(const CheckRig& rig, std::vector<std::string>& problems) {
         }
         if (close_first) {
             rig.ui.close_panel(); // the row is no longer drawn when Undo is tapped
-            frames(rig, 4);
+            let_sheet_close(rig);
         }
         const Spot chip = hit_spot(kUndoChip);
         if (!chip.found) {

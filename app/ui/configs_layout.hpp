@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Where the Configs page puts its parts, in ImGui points (no ImGui here, so
-// tests/configs_layout_test.cpp checks the real numbers): three cards side by side, each a hit area
+// Where the Configs page puts its parts, in ImGui points (no ImGui here): three cards side by side, each a hit area
 // of at least 12 mm with a preview over its name, a dead gap of 2 mm between them, and under them
 // the row of the other profiles, a pill for each that wraps onto a new row when the row is full.
 #pragma once

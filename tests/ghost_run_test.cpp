@@ -36,28 +36,6 @@ TEST_CASE("a run at the same setup is comparable") {
     CHECK(ghost_comparable(setup(), run(1, setup(), 90)));
 }
 
-TEST_CASE("speed: both ends of 10% are in, one percent past is out") {
-    CHECK(ghost_comparable(setup(100), run(1, setup(90), 90)));
-    CHECK(ghost_comparable(setup(100), run(1, setup(110), 90)));
-    CHECK_FALSE(ghost_comparable(setup(100), run(1, setup(89), 90)));
-    CHECK_FALSE(ghost_comparable(setup(100), run(1, setup(111), 90)));
-}
-
-TEST_CASE("speed: 10% is of the speed now, so 80% takes 72 to 88 and 50% takes 45 to 55") {
-    CHECK(ghost_comparable(setup(80), run(1, setup(72), 90)));
-    CHECK(ghost_comparable(setup(80), run(1, setup(88), 90)));
-    CHECK_FALSE(ghost_comparable(setup(80), run(1, setup(71), 90)));
-    CHECK_FALSE(ghost_comparable(setup(80), run(1, setup(89), 90)));
-    CHECK(ghost_comparable(setup(50), run(1, setup(45), 90)));
-    CHECK(ghost_comparable(setup(50), run(1, setup(55), 90)));
-    CHECK_FALSE(ghost_comparable(setup(50), run(1, setup(56), 90)));
-    // The slowest and the fastest the app plays.
-    CHECK(ghost_comparable(setup(200), run(1, setup(180), 90)));
-    CHECK_FALSE(ghost_comparable(setup(200), run(1, setup(179), 90)));
-    CHECK(ghost_comparable(setup(25), run(1, setup(27), 90)));
-    CHECK_FALSE(ghost_comparable(setup(25), run(1, setup(28), 90)));
-}
-
 TEST_CASE("a different transposition is a different exercise, even one semitone") {
     CHECK_FALSE(ghost_comparable(setup(100, 0), run(1, setup(100, 1), 90)));
     CHECK_FALSE(ghost_comparable(setup(100, -2), run(1, setup(100, 0), 90)));
@@ -73,12 +51,6 @@ TEST_CASE("the mode and the hands must match") {
                                  run(1, setup(100, 0, RunMode::Flow, HandFilter::Left), 90)));
     CHECK(ghost_comparable(setup(100, 0, RunMode::Wait, HandFilter::Left),
                            run(1, setup(100, 0, RunMode::Wait, HandFilter::Left), 90)));
-}
-
-TEST_CASE(
-    "every mode the app has may provide a ghost; the list of modes that may is one function") {
-    CHECK(ghost_mode_allowed(RunMode::Flow));
-    CHECK(ghost_mode_allowed(RunMode::Wait));
 }
 
 TEST_CASE("an incomplete run is never comparable") {

@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // What each bar style is made of, in design points, with no ImGui in it: the controls of each form
 // with their hit widths, and the gaps between them. The bars draw from these numbers and size
-// themselves with them, and tests/bar_metrics_test.cpp reads the same ones, so the claim "every
-// control keeps its hit area" is checked against what is drawn, not against a copy.
+// themselves with them.
 //
 // Rules:
 // - The three styles hold one set of controls, in one order (`lineup`), and give them up in one

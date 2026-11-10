@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// What the icon audit reports about the settings sheet's fit, with no ImGui in it so
-// tests/settings_fit_test.cpp checks the rules on known bad cases:
+// What the icon audit reports about the settings sheet's fit, with no ImGui in it:
 //
 // - No cut text. At 1366x768 and up no label, row title or description in Settings is shortened with
 //   an ellipsis ("Replays kept per …"): a label that does not fit wraps to a second line or its row

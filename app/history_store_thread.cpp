@@ -319,6 +319,7 @@ bool HistoryStore::open_loop(bool initial) {
             waiting_logged = true;
             tell_waiting(attempt, problem, why);
         }
+        failed_attempts_.fetch_add(1);
         // Closing: one more attempt, then give up.
         last_attempt = !sleep_for_retry();
     }
@@ -588,6 +589,7 @@ void HistoryStore::write_phase() {
                 announce();
                 return;
             }
+            failed_attempts_.fetch_add(1);
             close_database();
             sleep_for_retry();
             const bool reopened = open_loop(false);
@@ -616,6 +618,7 @@ void HistoryStore::write_phase() {
                 announce();
                 return;
             }
+            failed_attempts_.fetch_add(1);
             sleep_for_retry();
             lock.lock();
             continue;

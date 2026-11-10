@@ -79,8 +79,9 @@ TEST_CASE("install: a bus that does not answer, or a stop that hangs, aborts the
     }
     {
         Staged s;
-        s.r.c.service_timeout_s = 1;
-        write_file(s.r.root.path / "hang", ""); // stop takes 5 s: the call is killed at 1
+        s.r.c.service_timeout_s = 0.3; // the hung stop only; the calls that ask keep 2 s
+        s.r.c.query_floor_s = 2;
+        write_file(s.r.root.path / "hang", ""); // stop takes 5 s: the call is killed at 0.3 s
         CHECK(s.install() == 1);
         CHECK(s.r.status().state == UpdateState::Failed);
         CHECK(s.r.status().reason.find("is active after it was told to stop") != std::string::npos);

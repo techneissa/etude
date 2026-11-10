@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// How a segmented control's cells share its track, with no ImGui in it, so
-// tests/segment_layout_test.cpp checks the rule with the real tokens. Sizes in points; `u` is the
+// How a segmented control's cells share its track, with no ImGui in it. Sizes in points; `u` is the
 // kit's unit (points per design point).
 //
 // Rule: every cell is at least `tok::kCell` wide (a hit area and the dead gap to the next cell; the

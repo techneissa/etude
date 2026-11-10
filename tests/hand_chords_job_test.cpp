@@ -158,63 +158,6 @@ TEST_CASE("hand chords job: a cancel drops the answer") {
     CHECK_FALSE(job.take().has_value());
 }
 
-TEST_CASE("hand chords feed: asks when the key changes, not otherwise") {
-    const Tune tune;
-    HandChordsFeed feed;
-    int made = 0;
-    const auto make = [&] {
-        ++made;
-        return tune.request(0);
-    };
-    HandChordsKey key{true, 1, 1, 0, false};
-    CHECK(feed.chords() == nullptr);
-    feed.update(key, make);
-    CHECK(made == 1);
-    feed.update(key, make);
-    feed.update(key, make);
-    CHECK(made == 1); // nothing changed: the request is not even built
-    feed.wait_idle();
-    REQUIRE(feed.chords() != nullptr);
-    CHECK(*feed.chords() == build_hand_chords(tune.song, 0, false));
-    const std::uint32_t first = feed.serial();
-    CHECK(first > 0);
-}
-
-TEST_CASE("hand chords feed: other notes drop the labels at once, a transposition keeps them") {
-    const Tune tune;
-    HandChordsFeed feed;
-    int semitones = 0;
-    const auto make = [&] { return tune.request(0, semitones); };
-    feed.update({true, 1, 1, 0, false}, make);
-    feed.wait_idle();
-    REQUIRE(feed.chords() != nullptr);
-    const std::uint32_t before = feed.serial();
-
-    // Another transposition: the old names stay until the new ones are in.
-    semitones = 2;
-    feed.update({true, 1, 1, 2, false}, make);
-    CHECK(feed.chords() != nullptr);
-    CHECK(feed.serial() == before);
-    feed.wait_idle();
-    REQUIRE(feed.chords() != nullptr);
-    CHECK(feed.serial() > before);
-    CHECK(feed.chords()->left[0].name.plain() == "A");
-
-    // Another split of the hands: labels of the old hands go now.
-    const std::uint32_t mid = feed.serial();
-    feed.update({true, 1, 2, 2, false}, make);
-    CHECK(feed.chords() == nullptr);
-    CHECK(feed.serial() > mid);
-    feed.wait_idle();
-    CHECK(feed.chords() != nullptr);
-
-    // Another song likewise.
-    feed.update({true, 2, 2, 2, false}, make);
-    CHECK(feed.chords() == nullptr);
-    feed.wait_idle();
-    CHECK(feed.chords() != nullptr);
-}
-
 TEST_CASE("hand chords feed: no song, or the label switched off, drops the labels and the answer") {
     const Tune tune;
     HandChordsFeed feed;

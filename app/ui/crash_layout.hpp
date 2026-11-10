@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Where everything of the crash notice goes, with no ImGui in it, so tests/crash_layout_test.cpp
-// checks the touch rules with the real tokens. Points, `u` is the kit's unit.
+// Where everything of the crash notice goes, with no ImGui in it. Points, `u` is the kit's unit.
 //
 // - The notice is a card centred in the note area: a badge and the words (what happened and that
 //   the report stays on the device), and under them "Dismiss" and "Send report" at the right. Both

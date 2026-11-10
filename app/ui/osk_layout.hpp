@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // The on-screen keyboard: its keys, where they go, and where the name card sits above it, in ImGui
-// points (the sizes are `osk_tok` in tokens.hpp). No ImGui here, so tests/osk_layout_test.cpp
-// checks the real numbers at every window size. One keyboard serves every text field in the app:
+// points (the sizes are `osk_tok` in tokens.hpp). No ImGui here. One keyboard serves every text field in the app:
 // the library's search and names, a section's name, a look's name, the typed tempo.
 #pragma once
 

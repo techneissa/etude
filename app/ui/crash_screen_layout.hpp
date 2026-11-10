@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Where everything of the crash screen goes, with no ImGui in it, so tests/crash_screen_layout_test.cpp
-// checks the touch rules with the real tokens. Points, `u` is the kit's unit.
+// Where everything of the crash screen goes, with no ImGui in it. Points, `u` is the kit's unit.
 //
 // One column, centred in the window both ways: the badge, the title, the paragraph (as many lines as
 // the caller wrapped it into), and the buttons under them, side by side where both fit the column and

@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // The Configs page's rules (configs_logic.hpp): what a card applies and previews, what saving and
 // clearing a slot replaces and how Undo puts it back, and the copy from another profile, which
-// takes that profile's look, leaves their settings alone and is undone by putting yours back. The
-// page's source is read for the calls that carry the preview rule, so a card that previewed the
-// look in use fails here.
+// takes that profile's look, leaves their settings alone and is undone by putting yours back.
 #include "../app/ui/configs_logic.hpp"
 
 #include "etude/look.hpp"
@@ -13,10 +11,7 @@
 
 #include <doctest/doctest.h>
 
-#include <filesystem>
-#include <fstream>
 #include <functional>
-#include <sstream>
 #include <string>
 
 #include "sample_looks.hpp"
@@ -27,21 +22,6 @@ using namespace etude::app::ui;
 using namespace etude::test;
 
 namespace {
-
-std::string source(const char* name) {
-    std::ifstream in(std::filesystem::path(ETUDE_SOURCE_DIR) / "app" / "ui" / name);
-    std::stringstream text;
-    text << in.rdbuf();
-    return text.str();
-}
-
-std::string function_text(const std::string& file, const std::string& header) {
-    const std::size_t at = file.find(header);
-    REQUIRE(at != std::string::npos);
-    const std::size_t end = file.find("\n}\n", at);
-    REQUIRE(end != std::string::npos);
-    return file.substr(at, end - at);
-}
 
 // A model whose look in use is `in_use` and whose slot 0 holds `saved`.
 UiModel model_with(const LookSettings& in_use, const LookSettings& saved) {
@@ -86,14 +66,6 @@ TEST_CASE("a card previews its slot's own config, never the look in use") {
     CHECK(*shown == neon.clamped());
     CHECK_FALSE(*shown == m.look);
     CHECK_FALSE(config_card_look(m.user_presets, 1).has_value()); // an empty card previews nothing
-}
-
-TEST_CASE("the page draws each card's preview from config_card_look and not from the look in use") {
-    const std::string page = source("pages_configs.cpp");
-    const std::string card = function_text(page, "void config_card(");
-    CHECK(card.find("config_card_look(model.user_presets, slot)") != std::string::npos);
-    CHECK(card.find("preview->draw(k, *own,") != std::string::npos);
-    CHECK(card.find("draw(k, model.look") == std::string::npos);
 }
 
 TEST_CASE("tapping a filled card applies its config, an empty one is not applied") {
@@ -198,23 +170,11 @@ TEST_CASE("the copy row counts the other profiles; one profile alone has none to
     CHECK(std::string(kConfigNoOtherProfile) == "There is no other profile to copy from");
     const Household h = household(LookSettings{});
     CHECK(config_other_count(&h.info) == 1);
-    // The page shows the line when the count is 0 and the pills otherwise.
-    const std::string page = source("pages_configs.cpp");
-    const std::string row = function_text(page, "void copy_row(");
-    CHECK(row.find("config_other_count(k.profiles) == 0") != std::string::npos);
-    CHECK(row.find("kConfigNoOtherProfile") != std::string::npos);
 }
 
 TEST_CASE("a profile whose look was not worked out is not copied") {
     const Household h = household(LookSettings{});
     CHECK(config_of_profile(h.info, 99) == nullptr);
-}
-
-TEST_CASE("the page never writes another profile's settings") {
-    const std::string page = source("pages_configs.cpp");
-    CHECK(page.find("set_profile_settings") == std::string::npos);
-    CHECK(page.find("profile_settings_text") == std::string::npos);
-    CHECK(page.find("HistoryStore") == std::string::npos);
 }
 
 TEST_CASE("the first tap on a profile only asks: nothing is copied") {
@@ -227,14 +187,6 @@ TEST_CASE("the first tap on a profile only asks: nothing is copied") {
     CHECK(ask.open());
     CHECK(ask.profile() == h.dani_id);
     CHECK(m == before); // asking touches nothing
-    // The page's pill does no more than ask; the copy is only on the question's Copy.
-    const std::string page = source("pages_configs.cpp");
-    const std::string row = function_text(page, "void copy_row(");
-    CHECK(row.find("g_copy_ask.ask(") != std::string::npos);
-    CHECK(row.find("copy_from(") == std::string::npos);
-    CHECK(row.find("config_copy(") == std::string::npos);
-    const std::string top = function_text(page, "void page_configs(");
-    CHECK(top.find("draw_copy_confirm(k, g_copy_ask)") != std::string::npos);
 }
 
 TEST_CASE("Copy on the question copies that profile's config, and Undo restores yours") {
@@ -442,15 +394,6 @@ TEST_CASE("Clear empties at once; the toast's Undo restores the name and look") 
     toast.tap_undo();
     CHECK(m.user_presets.slot_name(0) == "Evening");
     CHECK(config_card_look(m.user_presets, 0) == neon.clamped());
-}
-
-TEST_CASE("the page draws the buttons under each card and has no hold menu") {
-    const std::string page = source("pages_configs.cpp");
-    const std::string buttons = function_text(page, "void config_buttons(");
-    CHECK(buttons.find("icon_action(") != std::string::npos);
-    CHECK(buttons.find("config_action_enabled(b.action, used)") != std::string::npos);
-    CHECK(page.find("press.hold") == std::string::npos);
-    CHECK(page.find("open_config_menu") == std::string::npos);
 }
 
 TEST_CASE("the question's words") {

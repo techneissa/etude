@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Where the Learn cards' parts go (the scale card and the chord card share them), in ImGui points.
-// No ImGui here, so tests/learn_layout_test.cpp checks the real numbers at every window size.
+// No ImGui here.
 //
 // A card is one structure at every size, drawn in a unit that grows with the window. The header has
 // the back arrow, the page's name and the four tabs. The left column is the tempo over the name

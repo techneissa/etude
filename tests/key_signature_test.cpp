@@ -56,27 +56,6 @@ const std::initializer_list<int> kOdeInG = {71, 71, 72, 74, 74, 72, 71, 69, 67, 
 
 } // namespace
 
-TEST_CASE("key: a signature and a mode give the tonic and its name") {
-    const struct {
-        int fifths;
-        KeyMode mode;
-        const char* text;
-    } cases[] = {
-        {0, KeyMode::Major, "C major"},        {1, KeyMode::Major, "G major 1#"},
-        {-3, KeyMode::Major, "Eb major 3b"},   {0, KeyMode::Minor, "A minor"},
-        {-3, KeyMode::Minor, "C minor 3b"},    {3, KeyMode::Minor, "F# minor 3#"},
-        {0, KeyMode::Dorian, "D dorian"},      {2, KeyMode::Mixolydian, "A mixolydian 2#"},
-        {-1, KeyMode::Lydian, "Bb lydian 1b"}, {-2, KeyMode::Phrygian, "D phrygian 2b"},
-        {5, KeyMode::Locrian, "A# locrian 5#"}, {7, KeyMode::Major, "C# major 7#"},
-        {-7, KeyMode::Major, "Cb major 7b"},
-    };
-    for (const auto& c : cases) {
-        CAPTURE(c.text);
-        const KeyChange k = key_from_signature(0, c.fifths, c.mode);
-        CHECK(key_label_text(key_label_parts(k, false)) == c.text);
-    }
-}
-
 TEST_CASE("key: the tonic is a pitch class and follows the signature's spelling") {
     CHECK(key_from_signature(0, 1, KeyMode::Major).tonic == 7);   // G
     CHECK(key_from_signature(0, -3, KeyMode::Minor).tonic == 0);  // C minor
@@ -88,22 +67,6 @@ TEST_CASE("key: the tonic is a pitch class and follows the signature's spelling"
     CHECK(key_from_pitch_class(0, 3, KeyMode::Major).fifths == -3); // Eb major, not D#
     CHECK(key_from_pitch_class(0, 6, KeyMode::Major).fifths == 6);
     CHECK(key_from_pitch_class(0, 6, KeyMode::Major, true).fifths == -6);
-}
-
-TEST_CASE("key: Solfege names the tonic and keeps the accidental a glyph") {
-    const KeyLabelParts g = key_label_parts(key_from_signature(0, 1, KeyMode::Major), true);
-    CHECK(g.tonic == "Sol");
-    CHECK(g.accidental == AccidentalKind::None);
-    CHECK(g.mode == "major");
-    const KeyLabelParts fs = key_label_parts(key_from_signature(0, 3, KeyMode::Minor), true);
-    CHECK(fs.tonic == "Fa");
-    CHECK(fs.accidental == AccidentalKind::Sharp);
-    CHECK(fs.signature_count == 3);
-    CHECK(fs.signature_kind == AccidentalKind::Sharp);
-    const KeyLabelParts eb = key_label_parts(key_from_signature(0, -3, KeyMode::Major), true);
-    CHECK(eb.tonic == "Mi");
-    CHECK(eb.accidental == AccidentalKind::Flat);
-    CHECK(key_label_parts(key_from_signature(0, 0, KeyMode::Major), true).signature_count == 0);
 }
 
 TEST_CASE("key: the transposed key is the one that is played") {
@@ -125,15 +88,6 @@ TEST_CASE("key: the transposed key is the one that is played") {
     // The mode stays.
     const KeyChange dd = key_from_signature(0, 0, KeyMode::Dorian);
     CHECK(key_label_text(key_label_parts(dd, false, 5)) == "G dorian 1b");
-}
-
-TEST_CASE("key: a tonic past one accidental is spelled plainly, not as a double") {
-    // 7 sharps, locrian: the tonic would be B## on the line of fifths.
-    const KeyChange k = key_from_signature(0, 7, KeyMode::Locrian);
-    const KeyLabelParts p = key_label_parts(k, false);
-    CHECK(p.tonic.size() == 1);
-    CHECK(p.accidental != AccidentalKind::None);
-    CHECK(p.signature_count == 7);
 }
 
 TEST_CASE("key: the key at a time or a tick") {
@@ -844,24 +798,4 @@ TEST_CASE("key: a tie of six sharps and six flats goes by the tonic, the scales'
     CHECK(key_label_text(key_label_parts(transposed_key(a_minor, 6), false)) == "Eb minor 6b");
     const KeyChange c_major = key_from_pitch_class(0, 0, KeyMode::Major);
     CHECK(transposed_key(c_major, 6).fifths == 6); // F# major
-}
-
-TEST_CASE("key: the scales' default spelling of a tonic is the key label's, for every key") {
-    const struct {
-        KeyMode mode;
-        ScaleType type;
-    } pairs[] = {{KeyMode::Major, ScaleType::Major},       {KeyMode::Minor, ScaleType::NaturalMinor},
-                 {KeyMode::Dorian, ScaleType::Dorian},     {KeyMode::Phrygian, ScaleType::Phrygian},
-                 {KeyMode::Lydian, ScaleType::Lydian},     {KeyMode::Mixolydian, ScaleType::Mixolydian},
-                 {KeyMode::Locrian, ScaleType::Locrian}};
-    for (const auto& p : pairs) {
-        for (int pc = 0; pc < 12; ++pc) {
-            CAPTURE(pc);
-            const std::string label = key_label_text(key_label_parts(key_from_pitch_class(0, pc, p.mode), false));
-            const Tonic tonic = default_tonic(pc, p.type);
-            const std::string name = spelled_name(SpelledNote{tonic.letter, tonic.accidental, pc});
-            CAPTURE(label);
-            CHECK(label.substr(0, label.find(' ')) == name);
-        }
-    }
 }

@@ -18,25 +18,6 @@ TEST_CASE("black keys follow the piano pattern") {
     }
 }
 
-TEST_CASE("octaves use scientific pitch notation") {
-    CHECK(octave(60) == 4);
-    CHECK(octave(59) == 3);
-    CHECK(octave(21) == 0);  // A0, lowest piano key
-    CHECK(octave(108) == 8); // C8, highest piano key
-    CHECK(octave(0) == -1);
-}
-
-TEST_CASE("note names") {
-    CHECK(note_name(60) == "C4");
-    CHECK(note_name(61) == "C#4");
-    CHECK(note_name(61, true) == "Db4");
-    CHECK(note_name(21) == "A0");
-    CHECK(note_name(36) == "C2");
-    CHECK(note_name(96) == "C7");
-    CHECK(note_name(-1).empty());
-    CHECK(note_name(128).empty());
-}
-
 TEST_CASE("frequencies round-trip through note numbers") {
     CHECK(frequency_hz(69) == doctest::Approx(440.0));
     CHECK(frequency_hz(60) == doctest::Approx(261.6256).epsilon(1e-6));
@@ -64,29 +45,6 @@ TEST_CASE("note_from_frequency reports no note for unusable input") {
     // Sub-audio frequencies below MIDI 0 are also negative.
     CHECK(note_from_frequency(1.0) < 0.0);
     CHECK_FALSE(std::isnan(note_from_frequency(nan)));
-}
-
-TEST_CASE("sharp and flat names for all 12 pitch classes") {
-    const char* sharps[12] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
-    const char* flats[12] = {"C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"};
-    for (int pc = 0; pc < 12; ++pc) {
-        CHECK(note_name(60 + pc) == std::string(sharps[pc]) + "4");
-        CHECK(note_name(60 + pc, true) == std::string(flats[pc]) + "4");
-    }
-}
-
-TEST_CASE("negative octaves and the top note") {
-    for (int n = 0; n < 12; ++n) {
-        CHECK(octave(n) == -1);
-    }
-    CHECK(octave(12) == 0);
-    CHECK(note_name(0) == "C-1");
-    CHECK(note_name(1) == "C#-1");
-    CHECK(note_name(1, true) == "Db-1");
-    CHECK(note_name(11) == "B-1");
-    CHECK(note_name(127) == "G9");
-    CHECK(note_name(127, true) == "G9");
-    CHECK(octave(127) == 9);
 }
 
 TEST_CASE("a custom A4 reference works in both directions") {

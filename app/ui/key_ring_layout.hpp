@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Where the key ring's parts go, in ImGui points. The ring is the twelve keys on a circle in
 // fifths: C at the top, G to its right, then D, A, E, B, F#, Db, Ab, Eb, Bb and F, so the keys a
-// fifth apart (the ones that share most of their notes) sit side by side. No ImGui here, so
-// tests/key_ring_layout_test.cpp checks the real numbers at every window size.
+// fifth apart (the ones that share most of their notes) sit side by side. No ImGui here.
 //
 // Every key is a round button at least `kHit` across (its face and its hit area are the same
 // circle), whatever room the ring has: the ring takes the square it is given and the keys grow with

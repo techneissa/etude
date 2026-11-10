@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Where the Melodies page of the Learn screen puts its parts (#375), in ImGui points. No ImGui here, so tests/learn_melodies_layout_test.cpp checks the real numbers at every
-// window size.
+// Where the Melodies page of the Learn screen puts its parts (#375), in ImGui points. No ImGui here.
 //
 // The header is the Learn cards' (back arrow, the page's name, the four tabs). Under it one section
 // for each tutorial path: a header row (the path's icon, its name over "3 of 6", the next piece in

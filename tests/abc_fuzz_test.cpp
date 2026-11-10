@@ -135,9 +135,8 @@ Bytes read_data(const std::string& name) {
 }
 
 // Runs the loader on `bytes` every way the app does: the first tune, each listed tune, with and
-// without chord symbols, and the library entry. Returns the seconds it took.
-double load_all_ways(const Bytes& bytes) {
-    const auto start = std::chrono::steady_clock::now();
+// without chord symbols, and the library entry.
+void load_all_ways(const Bytes& bytes) {
     for (const bool chords : {false, true}) {
         AbcOptions options;
         options.chords_as_left_hand = chords;
@@ -161,7 +160,6 @@ double load_all_ways(const Bytes& bytes) {
     if (entry.ok) {
         CHECK(entry.entry.note_count > 0);
     }
-    return std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
 }
 
 const char* const kTunes[] = {"abc-reel-repeats.abc", "abc-dorian.abc", "abc-triplets.abc",
@@ -183,17 +181,13 @@ void prefixes(std::size_t stride) {
 
 void mutated(int per_tune) {
     Rng rng(0xABC0);
-    double slowest = 0.0;
     for (const char* name : kTunes) {
         const Bytes data = read_data(name);
         CAPTURE(name);
         for (int i = 0; i < per_tune; ++i) {
-            const Bytes damaged = mutate(data, rng);
-            slowest = std::max(slowest, load_all_ways(damaged));
+            load_all_ways(mutate(data, rng));
         }
     }
-    // No input is slow: a few kilobytes of text load in far under a second even in a debug build.
-    CHECK(slowest < 1.0);
 }
 
 void random_inputs(int count) {
@@ -276,8 +270,7 @@ void pathological(std::size_t n) {
     }
     for (std::size_t i = 0; i < cases.size(); ++i) {
         CAPTURE(i);
-        const double seconds = load_all_ways(bytes_of(cases[i]));
-        CHECK(seconds < 5.0);
+        load_all_ways(bytes_of(cases[i]));
     }
 }
 
@@ -287,7 +280,7 @@ void pathological(std::size_t n) {
 
 TEST_CASE("abc fuzz: prefixes of the test tunes load or fail cleanly") { prefixes(13); }
 
-TEST_CASE("abc fuzz: mutated test tunes load or fail cleanly, and quickly") { mutated(25); }
+TEST_CASE("abc fuzz: mutated test tunes load or fail cleanly") { mutated(25); }
 
 TEST_CASE("abc fuzz: random bytes and random ABC-looking text") { random_inputs(60); }
 

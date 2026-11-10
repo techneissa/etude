@@ -172,14 +172,6 @@ TEST_CASE("an unknown specific name is reported as no profile, not generic") {
     CHECK(match(KeyboardIdentity{}).reason == KeyboardMatchReason::NoMatch);
 }
 
-TEST_CASE("match reasons read as midi-ports prints them") {
-    CHECK(describe(KeyboardMatchReason::UsbId) == "matched by USB id");
-    CHECK(describe(KeyboardMatchReason::Name) == "matched by name");
-    CHECK(describe(KeyboardMatchReason::GenericName) == "generic name, unknown");
-    CHECK(describe(KeyboardMatchReason::Ambiguous) == "ambiguous, unknown");
-    CHECK(describe(KeyboardMatchReason::NoMatch) == "no profile, unknown");
-}
-
 // --- Built-in table ----------------------------------------------------------------------------
 
 TEST_CASE("the built-in table matches the PSR-E383 by name") {

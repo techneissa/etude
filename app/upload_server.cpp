@@ -257,7 +257,7 @@ struct UploadServer::Impl {
     void watch() {
         std::unique_lock<std::mutex> lock(watch_mutex);
         while (!watch_stop) {
-            watch_cv.wait_for(lock, std::chrono::milliseconds(250), [this] { return watch_stop; });
+            watch_cv.wait_for(lock, options.sweep_interval, [this] { return watch_stop; });
             if (watch_stop) {
                 break;
             }

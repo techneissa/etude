@@ -15,7 +15,7 @@ About offers the ones a profile's title has unlocked.
 `scripts/make-icons.py` writes the SVGs (`svg`), renders every PNG, the `.icns` and the README's
 `docs-public/icon.png` from them (`render`, needs inkscape or rsvg-convert) and makes a contact
 sheet (`sheet`; `compare` sets the 16 and 32 px icons against an earlier set). The 16, 24 and 32 px icons are drawn for the pixel grid by `scripts/icon_small.py`: a thickened clef on whole pixels, no staff lines (two at 32 px) and more contrast, since the big art scaled down turns to mush. The colours live in that script and in `core/include/etude/icon_colour.hpp`;
-`tests/icon_colour_test.cpp` holds the two, the PNG sets and the Pi setup together.
+`tests/icon_colour_test.cpp` checks that every colour's PNG set exists at every size.
 
 The clef is Bravura's, a music font by Steinberg Media Technologies GmbH under the SIL Open Font
 License 1.1 (https://github.com/steinbergmedia/bravura, https://openfontlicense.org). The icon as a

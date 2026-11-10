@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// The practice list's card, top to bottom, with no ImGui in it, so tests/plan_list_layout_test.cpp
-// checks the numbers the card draws from. Sizes in pixels (the kit's `s()` already applied).
+// The practice list's card, top to bottom, with no ImGui in it. Sizes in pixels (the kit's `s()` already applied).
 //
 // Rules:
 // - The card is as tall as its content needs and no taller than the room under the band

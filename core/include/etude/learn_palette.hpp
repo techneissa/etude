@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // The colours a player can give the four Learn sections (Settings > View). Seven shades, each a
 // card colour: its tab, the top of its cards and the keys it lights (`learn_key_colours`). Teal,
-// pink, coral and violet are the sections' own colours, the defaults. Every shade is held to the
-// contrast rules in `learn_palette_test.cpp`: clear of both default hand colours, of the unlit keys
+// pink, coral and violet are the sections' own colours, the defaults. Every shade keeps the
+// contrast rules: clear of both default hand colours, of the unlit keys
 // and of the Ear card's answers, readable on the dark card, and apart from the other shades. Two
 // sections may share a shade. The choice is a `LearnPicks` in the look (`LookSettings::learn_picks`),
 // so it is kept per profile with the rest of the look; everything that draws a section's colour asks

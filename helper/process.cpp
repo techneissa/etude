@@ -18,6 +18,7 @@
 
 #include <cerrno>
 #include <chrono>
+#include <cmath>
 #include <cstring>
 
 namespace etude::helper {
@@ -78,6 +79,7 @@ int exit_code_of(int status) { return WIFEXITED(status) ? WEXITSTATUS(status) : 
 // Waits for `pid`; after `deadline`, or when the helper is told to stop, kills it. True when it ended
 // on its own.
 bool reap(pid_t pid, Clock::time_point deadline, int& status, bool interruptible, bool& stopped) {
+    long nap_ns = 500'000;
     for (;;) {
         if (interruptible && interrupt_in_wait()) {
             stopped = true;
@@ -98,8 +100,9 @@ bool reap(pid_t pid, Clock::time_point deadline, int& status, bool interruptible
             ::waitpid(pid, &status, 0);
             return false;
         }
-        struct timespec nap{0, 20'000'000};
+        struct timespec nap{0, nap_ns}; // a program that has just closed its output is gone in a moment
         ::nanosleep(&nap, nullptr);
+        nap_ns = std::min<long>(nap_ns * 2, 20'000'000);
     }
 }
 
@@ -151,7 +154,7 @@ bool become(const AppUser& user) {
 
 } // namespace
 
-ProgramResult run_program(const std::vector<std::string>& argv, int timeout_s, bool interruptible) {
+ProgramResult run_program(const std::vector<std::string>& argv, double timeout_s, bool interruptible) {
     ProgramResult result;
     if (argv.empty() || argv[0].empty() || argv[0].front() != '/') {
         return result;
@@ -184,7 +187,7 @@ ProgramResult run_program(const std::vector<std::string>& argv, int timeout_s, b
     }
     ::close(pipes[1]);
     const Fd reader(pipes[0]);
-    const auto deadline = Clock::now() + std::chrono::seconds(timeout_s);
+    const auto deadline = Clock::now() + std::chrono::milliseconds(static_cast<long long>(timeout_s * 1000));
     bool stopped = false;
     const bool in_time = drain(reader.get(), result.output, deadline, interruptible, stopped);
     int status = 0;
@@ -218,7 +221,7 @@ bool find_app_user(const std::string& name, AppUser& out, std::string& error) {
     return true;
 }
 
-bool run_as_user(const AppUser& user, int timeout_s, const std::function<std::string()>& job,
+bool run_as_user(const AppUser& user, double timeout_s, const std::function<std::string()>& job,
                  std::string& error) {
     int pipes[2];
     if (make_pipe(pipes) != 0) {
@@ -242,7 +245,7 @@ bool run_as_user(const AppUser& user, int timeout_s, const std::function<std::st
             if (::chdir("/") != 0) {
                 message = "could not leave the current folder";
             } else {
-                ::alarm(static_cast<unsigned>(timeout_s));
+                ::alarm(static_cast<unsigned>(std::ceil(timeout_s)));
                 try {
                     message = job();
                 } catch (const std::exception& e) {
@@ -260,7 +263,7 @@ bool run_as_user(const AppUser& user, int timeout_s, const std::function<std::st
     }
     ::close(pipes[1]);
     const Fd reader(pipes[0]);
-    const auto deadline = Clock::now() + std::chrono::seconds(timeout_s);
+    const auto deadline = Clock::now() + std::chrono::milliseconds(static_cast<long long>(timeout_s * 1000));
     std::string said;
     bool stopped = false;
     const bool in_time = drain(reader.get(), said, deadline, true, stopped);

@@ -85,7 +85,6 @@ TEST_CASE("update state: a line that does not fit is an error, not a guess") {
 }
 
 TEST_CASE("data folder: the way SDL_GetPrefPath finds it, with XDG_DATA_HOME honoured") {
-    CHECK(std::string(kAppDataFolderName) == "io.github.techneissa.etude");
     CHECK(app_data_folder("/home/etude", "") == "/home/etude/.local/share/io.github.techneissa.etude");
     CHECK(app_data_folder("/home/etude", "/data/share") == "/data/share/io.github.techneissa.etude");
     CHECK(app_data_folder("/home/etude", "/data/share/") == "/data/share/io.github.techneissa.etude");

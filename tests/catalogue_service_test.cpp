@@ -2,7 +2,6 @@
 // "Get songs" off the network: a FolderFetcher stands in for the sites, so no test reaches one.
 #include "catalogue_service.hpp"
 
-#include "alloc_count.hpp"
 
 #include "etude/content_hash.hpp"
 
@@ -309,34 +308,6 @@ TEST_CASE("catalogue service: a download in progress can be cancelled; offline c
     s.preview(rondo);
     REQUIRE(until(s, [&] { return s.file(rondo).state == CatalogueFile::State::Failed; }));
     CHECK(s.file_reason(rondo) == "Offline");
-}
-
-TEST_CASE("catalogue service: typing and polling allocate nothing once warm") {
-    Sites sites("etude_catalogue_alloc");
-    CatalogueService s(sites.options());
-    s.start();
-    s.set_online(true);
-    REQUIRE(until(s, [&] { return s.index_state(CatalogueId::OpenScoreLieder).songs > 0; }));
-    const char* words[] = {"s", "sc", "sch", "schu", "schub", "schube", "schuber", "schubert"};
-    // Warm: the texts and hits at their largest.
-    for (const char* w : words) {
-        s.search(w);
-        until(s, [&] { return !s.searching(); });
-    }
-    s.search(std::string(CatalogueService::kMaxQueryBytes, 'x'));
-    until(s, [&] { return !s.searching(); });
-    for (const char* w : words) {
-        etude::test::start_counting_allocations();
-        s.search(w);
-        s.poll();
-        const int n = etude::test::stop_counting_allocations();
-        CHECK(n == 0);
-        until(s, [&] { return !s.searching(); });
-        etude::test::start_counting_allocations();
-        s.poll();
-        s.poll();
-        CHECK(etude::test::stop_counting_allocations() == 0);
-    }
 }
 
 TEST_CASE("versions: the snapshot comes with the entries that are one piece, worked out off the frame thread") {

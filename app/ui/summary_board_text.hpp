@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// The words of the summary page's Board tab that are worked out from numbers: pure, so
-// tests/summary_board_text_test.cpp checks them without a font.
+// The words of the summary page's Board tab that are worked out from numbers: pure, with no font needed.
 #pragma once
 
 #include "fit_text.hpp"

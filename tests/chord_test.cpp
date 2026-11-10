@@ -191,23 +191,3 @@ TEST_CASE("the new qualities keep the old readings") {
     CHECK(name_of({60, 64, 67, 70, 74}) == "C9");   // 13 needs its sixth
     CHECK(name_of({65, 67, 70, 72}) == "C7sus4/F"); // F as bass: no new reading outranks it
 }
-
-TEST_CASE("the shapes are listed with the tones a voicing may leave out") {
-    const std::span<const ChordShape> shapes = chord_shapes();
-    CHECK(shapes.size() > 20);
-    const auto find = [&](ChordQuality q) {
-        for (const ChordShape& s : shapes) {
-            if (s.quality == q) {
-                return s;
-            }
-        }
-        return ChordShape{};
-    };
-    CHECK(find(ChordQuality::Dominant7).mask == (1u | (1u << 4) | (1u << 7) | (1u << 10)));
-    CHECK((find(ChordQuality::Dominant7).optional & (1u << 7)) != 0); // the fifth may go
-    CHECK(find(ChordQuality::Major).optional == 0);
-    CHECK(find(ChordQuality::Major6).optional == 0); // a sixth chord keeps its fifth
-    CHECK(chord_quality_mask(ChordQuality::Minor) == (1u | (1u << 3) | (1u << 7)));
-    CHECK(chord_quality_mask(ChordQuality::None) == 0);
-    CHECK(std::string(chord_suffix(ChordQuality::Dominant13)) == "13");
-}

@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Where everything on the Add songs page goes, with no ImGui in it, so
-// tests/add_songs_layout_test.cpp checks the rules with the real tokens. Sizes in points, from the
+// Where everything on the Add songs page goes, with no ImGui in it. Sizes in points, from the
 // page body's top left; `u` is the kit's unit (points per design point).
 //
 // Rules:

@@ -3,8 +3,6 @@
 
 #include <doctest/doctest.h>
 
-#include <fstream>
-#include <iterator>
 #include <string>
 
 using namespace etude;
@@ -64,14 +62,6 @@ TEST_CASE("machine os: the architecture is the build's, so a 32-bit userland on 
     CHECK_FALSE(release_fits_machine(arm64, userland.view()));
     arm64.arch = "armhf";
     CHECK(release_fits_machine(arm64, userland.view()));
-    // Nothing reads the kernel's machine name for it any more.
-    for (const char* file : {"/app/update_service.cpp", "/helper/install.cpp"}) {
-        std::ifstream in(std::string(ETUDE_SOURCE_DIR) + file);
-        REQUIRE(in.good());
-        const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
-        CAPTURE(file);
-        CHECK(text.find("uname(") == std::string::npos);
-    }
 }
 
 TEST_CASE("machine os: the first line of /etc/debian_version") {

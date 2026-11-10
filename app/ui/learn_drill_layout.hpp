@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Where the Learn cards' drill controls go (#373), in ImGui points: the tempo stepper, the direction,
 // octave and scale / arpeggio buttons, and the foot row (the hands, the chord card's inversion
-// stepper, Listen and Practice). No ImGui here, so tests/learn_drill_layout_test.cpp checks the real
-// numbers at every window size. learn_layout.hpp puts them on the card.
+// stepper, Listen and Practice). No ImGui here. learn_layout.hpp puts them on the card.
 //
 // The left column has three forms, by the room the body has (`learn_choose_column`):
 //   Full     the tempo over the name over the picker, then a row for each setting (direction,

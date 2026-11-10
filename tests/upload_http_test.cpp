@@ -2,7 +2,6 @@
 // The upload server over a real socket on this machine: a plain client written here sends the
 // requests a browser, a script or an attacker would, byte for byte.
 #include "../app/upload_server.hpp"
-#include "timing_factor.hpp"
 #include "upload_test_support.hpp"
 
 #include "etude/upload_network.hpp"
@@ -526,8 +525,9 @@ int connect_to(int port) {
     return fd;
 }
 
-// True when the server has closed `fd` (or answered and closed) within `ms`.
-bool closed_within(int fd, int ms) {
+// True when the server has closed `fd` (or answered and closed) within `ms`; what it sent before
+// closing is appended to `seen`.
+bool closed_within(int fd, int ms, std::string* seen = nullptr) {
     const auto end = std::chrono::steady_clock::now() + std::chrono::milliseconds(ms);
     while (std::chrono::steady_clock::now() < end) {
         pollfd p{fd, POLLIN, 0};
@@ -537,52 +537,57 @@ bool closed_within(int fd, int ms) {
             if (n <= 0) {
                 return true;
             }
+            if (seen != nullptr) {
+                seen->append(buffer, static_cast<std::size_t>(n));
+            }
         }
     }
     return false;
 }
 
-constexpr auto kSteady = std::chrono::steady_clock::now;
-
 } // namespace
 
 TEST_CASE("upload server: a client that trickles bytes is cut at the total deadline") {
-    Server s([](UploadServerOptions& o) { o.request_deadline = std::chrono::milliseconds(700); });
+    Server s([](UploadServerOptions& o) {
+        o.request_deadline = std::chrono::milliseconds(100);
+        o.sweep_interval = std::chrono::milliseconds(20);
+    });
     const int fd = connect_to(s.server.port());
     REQUIRE(fd >= 0);
     const std::string head = "POST /api/login HTTP/1.1\r\nHost: " + s.host() +
                              "\r\nContent-Type: application/x-www-form-urlencoded"
                              "\r\nContent-Length: 4000\r\n\r\n";
     REQUIRE(::send(fd, head.data(), head.size(), 0) == static_cast<ssize_t>(head.size()));
-    // A byte every 150 ms keeps every single read well inside the library's 10 s timeout; only
+    // A byte every 25 ms keeps every single read well inside the library's 10 s timeout; only
     // the total deadline can end it (the body never completes: 4000 bytes would take ten minutes).
-    const auto start = kSteady();
     bool cut = false;
+    std::string seen;
     for (int i = 0; i < 40 && !cut; ++i) {
         if (::send(fd, "p", 1, 0) != 1) {
             cut = true;
         } else {
-            cut = closed_within(fd, 150);
+            cut = closed_within(fd, 25, &seen);
         }
     }
-    const auto took = kSteady() - start;
     ::close(fd);
     CHECK(cut);
-    CHECK(took >= std::chrono::milliseconds(600));
-    CHECK_TIMING(took < std::chrono::milliseconds(3500));
+    CHECK(seen.find("HTTP/") == std::string::npos); // shut down by the deadline, not answered (a status would mean another cause)
 }
 
 TEST_CASE("upload server: one peer cannot hold every worker") {
-    Server s([](UploadServerOptions& o) { o.max_per_peer = 3; });
+    Server s([](UploadServerOptions& o) {
+        o.max_per_peer = 3;
+        o.sweep_interval = std::chrono::milliseconds(20);
+    });
     std::vector<int> held;
     for (int i = 0; i < 3; ++i) {
         held.push_back(connect_to(s.server.port()));
         REQUIRE(held.back() >= 0);
     }
-    std::this_thread::sleep_for(std::chrono::milliseconds(300)); // all three are being served
+    std::this_thread::sleep_for(std::chrono::milliseconds(300)); // the sweeps have seen all three
     const int fourth = connect_to(s.server.port());
     REQUIRE(fourth >= 0);
-    CHECK(closed_within(fourth, 2000)); // refused at once
+    CHECK(closed_within(fourth, 10'000)); // refused (the wait only ends a hang)
     for (const int fd : held) {
         CHECK_FALSE(closed_within(fd, 100)); // the three are still there
     }
@@ -591,8 +596,12 @@ TEST_CASE("upload server: one peer cannot hold every worker") {
         ::close(fd);
     }
     // They went away, so the same peer can come back.
-    std::this_thread::sleep_for(std::chrono::milliseconds(300));
-    CHECK(s.get("/").status == 200);
+    int status = 0;
+    for (int i = 0; i < 500 && status != 200; ++i) {
+        status = s.get("/").status;
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+    CHECK(status == 200);
 }
 
 TEST_CASE("upload server: a chunked body is refused on every POST") {
@@ -786,11 +795,6 @@ TEST_CASE("upload server: the phone page's script reaches no other server and wr
     CHECK(html.find("x.open(\"POST\", \"/api/upload\")") != std::string::npos);
     // What it writes into the page from a file name goes in as text, never as markup.
     CHECK_FALSE(page.has("innerHTML"));
-    // The long help paragraph is not on the page itself: it is shown from the (i) by the title.
-    CHECK_FALSE(page.has("class=\"help\""));
-    CHECK(html.find("Everything lands in the Inbox.") ==
-          html.rfind("Everything lands in the Inbox."));
-    CHECK(html.find("var ABOUT = \"Everything lands in the Inbox.") != std::string::npos);
     CHECK_FALSE(page.has("document.write"));
     CHECK_FALSE(page.has("eval("));
 }

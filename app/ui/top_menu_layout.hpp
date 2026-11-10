@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Where the top row's menu popover puts its parts, in ImGui points (no ImGui here, so
-// tests/top_menu_layout_test.cpp checks the real numbers). The popover hangs under the top row from
+// Where the top row's menu popover puts its parts, in ImGui points (no ImGui here). The popover hangs under the top row from
 // the menu button's left edge, with one row for each destination the narrow top row has no button
 // for: Library, Learn and Profile, in that order. Every row is a hit area at least a hit tall and
 // as wide as the card's inside; two rows are a dead gap apart.

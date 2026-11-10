@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // The rule the settings pages' columns keep, as a check over the rows a page drew: in one column of
 // one page, every row of one kind has its control at one x (compact controls, by their right edge).
-// No ImGui in it, so tests/row_columns_test.cpp feeds it rows; `etude --check-settings` feeds it
+// No ImGui in it; `etude --check-settings` feeds it
 // what the pages really drew (row_layout.hpp).
 #pragma once
 

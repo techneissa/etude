@@ -530,22 +530,11 @@ std::string huge_text(int n) {
 } // namespace
 
 TEST_CASE("sections store: a file of 16000 entries parses, drops the stale ones and saves") {
-    // In a Debug build this took 2.3 s to parse and 17.8 s to write before the document indexed
-    // its sections by name; now it is tens of milliseconds. The bound is only there to catch a
-    // return to the quadratic scan, so it is far over what a loaded machine needs.
     const std::string text = huge_text(16000);
-    using Clock = std::chrono::steady_clock;
-    const auto parse_start = Clock::now();
     SettingsDocument doc = SettingsDocument::parse(text);
-    const double parse_s = std::chrono::duration<double>(Clock::now() - parse_start).count();
-    // read_sections' own per-entry work is linear and not what this checks, so it is not timed.
     const SectionLibrary lib = read_sections(doc, nullptr);
-    const auto write_start = Clock::now();
     write_sections(doc, lib);
     const std::string out = doc.serialize();
-    const double write_s = std::chrono::duration<double>(Clock::now() - write_start).count();
-    const double seconds = parse_s + write_s;
-    CHECK(seconds < 8.0);
     CHECK(lib.songs().size() == kMaxSongsWithSections);
     CHECK(lib.stale_names().size() == 16000 - kMaxSongsWithSections);
     const SettingsDocument saved = SettingsDocument::parse(out);

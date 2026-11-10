@@ -39,6 +39,7 @@ struct TempDir {
 
 HistoryOptions quiet() {
     HistoryOptions o;
+    o.sync_commits = false;
     o.log = [](std::string_view) {};
     return o;
 }

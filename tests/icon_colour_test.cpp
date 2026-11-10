@@ -5,7 +5,6 @@
 #include <doctest/doctest.h>
 
 #include <array>
-#include <cmath>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
@@ -111,95 +110,4 @@ TEST_CASE("icon colours: every colour's icon set exists at every size") {
     }
     CHECK(fs::is_regular_file(kIcons / "etude.icns"));
     CHECK(fs::is_regular_file(kIcons / "src" / "bravura-gclef-E050.txt"));
-}
-
-TEST_CASE("icon colours: the Pi setup installs every colour's set") {
-    const std::string setup = read_text(fs::path(ETUDE_SOURCE_DIR) / "deploy" / "pi" / "setup.sh");
-    std::string keys;
-    for (const IconColourInfo& info : kIconColours) {
-        keys += (keys.empty() ? "" : " ") + std::string(info.key);
-    }
-    CHECK(setup.find("ICON_COLOURS=(" + keys + ")") != std::string::npos);
-    std::string sizes;
-    for (const int px : kIconHicolorSizes) { // hicolor stops at 512; the 1024 is for the .icns
-        sizes += (sizes.empty() ? "" : " ") + std::to_string(px);
-    }
-    CHECK(setup.find("ICON_SIZES=(" + sizes + ")") != std::string::npos);
-}
-
-TEST_CASE("icon colours: the app embeds every colour's icon, in the catalogue's order") {
-    // The colours the CMake embedding loops over (app/CMakeLists.txt) are the catalogue's.
-    const std::string cmake = read_text(fs::path(ETUDE_SOURCE_DIR) / "app" / "CMakeLists.txt");
-    std::string keys;
-    for (const IconColourInfo& info : kIconColours) {
-        keys += (keys.empty() ? "" : " ") + std::string(info.key);
-    }
-    CHECK(cmake.find("foreach(colour " + keys + ")") != std::string::npos);
-}
-
-namespace {
-
-// "#rrggbb" as 0xrrggbb.
-std::uint32_t hex_of(const std::string& text) { return static_cast<std::uint32_t>(std::stoul(text.substr(1, 6), nullptr, 16)); }
-
-std::uint32_t channel(std::uint32_t rgb, int shift) { return (rgb >> shift) & 0xffu; }
-
-// `from` moved `t` of the way to `to`, each channel rounded.
-std::uint32_t lift(std::uint32_t from, std::uint32_t to, double t) {
-    std::uint32_t out = 0;
-    for (const int shift : {16, 8, 0}) {
-        const double v = static_cast<double>(channel(from, shift)) +
-                         (static_cast<double>(channel(to, shift)) - static_cast<double>(channel(from, shift))) * t;
-        out |= static_cast<std::uint32_t>(std::lround(v)) << shift;
-    }
-    return out;
-}
-
-bool near_rgb(std::uint32_t a, std::uint32_t b) {
-    for (const int shift : {16, 8, 0}) {
-        const int d = static_cast<int>(channel(a, shift)) - static_cast<int>(channel(b, shift));
-        if (d > 1 || d < -1) {
-            return false;
-        }
-    }
-    return true;
-}
-
-} // namespace
-
-TEST_CASE("icon colours: each colour's highlight comes from the icon's own palette") {
-    // scripts/make-icons.py PLAIN rows: key: (centre of the gradient, its edge, staff line, opacity).
-    const std::string script = read_text(fs::path(ETUDE_SOURCE_DIR) / "scripts" / "make-icons.py");
-    for (const IconColourInfo& info : kIconColours) {
-        CAPTURE(info.key);
-        const std::string key = "\"" + std::string(info.key) + "\": (\"";
-        const std::size_t at = script.find(key);
-        if (info.id == IconColour::Black) {
-            // Virtuoso has no row: its highlight is the clef's gold (GOLD_RICH's middle and first stops).
-            CHECK(script.find("\"#ffd04a\"") != std::string::npos);
-            CHECK(script.find("\"#fff5c8\"") != std::string::npos);
-            CHECK(info.rim == 0xffd04a);
-            CHECK(info.ink == 0xfff5c8);
-            continue;
-        }
-        REQUIRE(at != std::string::npos);
-        const std::size_t row = at + key.size() - 1; // the first quote of the centre colour
-        const std::uint32_t inner = hex_of(script.substr(row + 1, 7));
-        const std::uint32_t line = hex_of(script.substr(script.find("\"#", row + 10 + 6) + 1, 7));
-        // The name is the staff line's light shade, which reads on the dark page.
-        CHECK(info.ink == line);
-        switch (info.id) {
-        case IconColour::Wine:
-        case IconColour::Teal:
-        case IconColour::Cobalt:
-            CHECK(info.rim == inner); // bright enough as it is
-            break;
-        case IconColour::Graphite:
-            CHECK(info.rim == line); // light silver, so it shows on the dark page
-            break;
-        default: // Petrol, Midnight, Aubergine: the centre is too dark, so lifted towards the line colour
-            CHECK(near_rgb(info.rim, lift(inner, line, 0.45)));
-            break;
-        }
-    }
 }

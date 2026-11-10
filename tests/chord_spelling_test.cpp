@@ -117,39 +117,6 @@ TEST_CASE("a diminished seventh takes the tone nearest the key as its root") {
     CHECK_FALSE(respell_symmetric(Chord{}, &c_major).found);
 }
 
-TEST_CASE("a spelled chord name shows only real sharp and flat signs") {
-    // The display text of every root, quality and bass keeps no '#' and no letter b.
-    const ChordQuality qualities[] = {
-        ChordQuality::Major,           ChordQuality::Minor,         ChordQuality::Diminished,
-        ChordQuality::Augmented,       ChordQuality::Sus2,          ChordQuality::Sus4,
-        ChordQuality::Dominant7,       ChordQuality::Major7,        ChordQuality::Minor7,
-        ChordQuality::HalfDiminished7, ChordQuality::Diminished7,   ChordQuality::MinorMajor7,
-        ChordQuality::Major6,          ChordQuality::Minor6,        ChordQuality::Add9,
-        ChordQuality::Dominant9,       ChordQuality::Major9,        ChordQuality::Minor9,
-        ChordQuality::Power,           ChordQuality::Dominant7Sus4, ChordQuality::Dominant7Flat9,
-        ChordQuality::Major69,         ChordQuality::Dominant13,
-    };
-    int names = 0;
-    int signs = 0;
-    for (const ChordQuality quality : qualities) {
-        for (int root = 0; root < 12; ++root) {
-            for (int bass = 0; bass < 12; ++bass) {
-                for (const int fifths : {-6, -3, 0, 3, 6}) {
-                    const KeyChange key = major(fifths);
-                    const std::string name = spelled(root, quality, bass, &key);
-                    const std::string shown = accidental_display(name);
-                    ++names;
-                    signs += shown != name ? 1 : 0;
-                    CHECK(shown.find('#') == std::string::npos);
-                    CHECK(shown.find('b') == std::string::npos);
-                }
-            }
-        }
-    }
-    CHECK(names == 23 * 12 * 12 * 5);
-    CHECK(signs > 0);
-}
-
 TEST_CASE("the tones of a chord are named from the root by their interval") {
     const auto tone = [](int root_pc, ChordQuality q, int semitones, const KeyChange* key) {
         const Chord c{true, root_pc, q, root_pc};

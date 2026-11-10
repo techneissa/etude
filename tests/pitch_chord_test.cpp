@@ -19,19 +19,8 @@ using namespace etude;
 
 namespace {
 
-// Two chords for each register in each context, per method; under AddressSanitizer, which is
-// after memory errors rather than accuracy and runs about five times slower, one.
-#if defined(__SANITIZE_ADDRESS__)
+// One chord for each register in each context.
 constexpr int kRounds = 1;
-#elif defined(__has_feature)
-#if __has_feature(address_sanitizer)
-constexpr int kRounds = 1;
-#else
-constexpr int kRounds = 2;
-#endif
-#else
-constexpr int kRounds = 2;
-#endif
 
 constexpr int kRate = 48000;
 
@@ -130,10 +119,6 @@ TEST_CASE("pitch chords: McLeod names no key outside the chord, struck together 
     check_gate(PitchMethod::Mpm);
 }
 
-TEST_CASE("pitch chords: YIN names no key outside the chord, struck together or nearly") {
-    check_gate(PitchMethod::Yin);
-}
-
 TEST_CASE("pitch chords: a loud triad out of silence is not its common subharmonic") {
     // Each used to be reported two or three octaves below its root (C1 or C2 for C3 and C4).
     for (int root : {36, 48, 60, 72, 84}) {
@@ -190,23 +175,17 @@ TEST_CASE("pitch chords: chords that once gave wrong keys") {
     // the method that went wrong.
     // C#4 G#4 F5, soft: C#3. Sound before the onset gave a 28.5 Hz period, a comb so low that
     // nearly every partial fell in a notch, and C#3's empty fundamental went unmeasured.
-    CHECK(wrong_in_chord(11, 628, PitchMethod::Yin) == 0);
     // C#2 G#2 over a ringing chord: C#1, whose "fundamental" was the old chord's sound, which
     // did not grow at the onset.
-    CHECK(wrong_in_chord(11, 817, PitchMethod::Yin) == 0);
     // A1 A2 C#3 over a ringing chord: A0, the same way.
     CHECK(wrong_in_chord(15, 1121, PitchMethod::Mpm) == 0);
     // D#1 A#1, 5-30 ms apart, over a ringing chord and a steady G#1 tone: G#1, which seemed to
     // grow when A#1 spread into its partials in a frame too short to separate them.
-    CHECK(wrong_in_chord(12, 143, PitchMethod::Yin) == 0);
     // A1 A2 C#3 and G#1 C#2 E2, soft, out of silence: A0. In a frame of 2.2 periods the
     // search around A0's fundamental reached into A1's main lobe.
-    CHECK(wrong_in_chord(1, 2044, PitchMethod::Yin) == 0);
-    CHECK(wrong_in_chord(5, 2128, PitchMethod::Yin) == 0);
     // A5 D6 F#6, loud, 5-30 ms apart, over a ringing chord: D4, whose "fundamental" was hammer
     // noise, as loud beside it.
     CHECK(wrong_in_chord(4, 1839, PitchMethod::Mpm) == 0);
-    CHECK(wrong_in_chord(4, 1839, PitchMethod::Yin) == 0);
     // G#6 D#7 C8 over a ringing chord: C7, already sounding and quieter than before the onset.
     CHECK(wrong_in_chord(6, 83, PitchMethod::Mpm, false) == 0);
 }

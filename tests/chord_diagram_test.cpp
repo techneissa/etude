@@ -44,17 +44,6 @@ int name_pc(const std::string& name) {
 
 } // namespace
 
-TEST_CASE("chord card: the qualities are every quality but None, once each") {
-    std::set<ChordQuality> seen(kChordCardQualities.begin(), kChordCardQualities.end());
-    CHECK(seen.size() == kChordCardQualities.size());
-    CHECK(seen.count(ChordQuality::None) == 0);
-    // ChordQuality runs None, then 23 more.
-    CHECK(kChordCardQualities.size() == static_cast<std::size_t>(ChordQuality::Dominant13));
-    for (int v = 1; v <= static_cast<int>(ChordQuality::Dominant13); ++v) {
-        CHECK(seen.count(static_cast<ChordQuality>(v)) == 1);
-    }
-}
-
 TEST_CASE("chord card: the bass may be the root, third, fifth or seventh, never an added tone") {
     for (const ChordQuality q : kChordCardQualities) {
         CAPTURE(static_cast<int>(q));

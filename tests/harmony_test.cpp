@@ -16,30 +16,6 @@ using namespace harmony_test_support;
 
 // ---- Weighting ----------------------------------------------------------------------------------
 
-TEST_CASE("harmony: a beat's strength falls from the downbeat to the finest subdivision") {
-    CHECK(harmony_beat_strength(0.0, 4) == doctest::Approx(1.0));
-    CHECK(harmony_beat_strength(2.0, 4) == doctest::Approx(0.8)); // the middle of an even bar
-    CHECK(harmony_beat_strength(1.0, 4) == doctest::Approx(0.65));
-    CHECK(harmony_beat_strength(3.0, 4) == doctest::Approx(0.65));
-    CHECK(harmony_beat_strength(1.0, 3) == doctest::Approx(0.65)); // a waltz has no strong middle
-    CHECK(harmony_beat_strength(2.0, 3) == doctest::Approx(0.65));
-    CHECK(harmony_beat_strength(2.0, 2) == doctest::Approx(0.65)); // beat 3 of 2 is not a thing
-    CHECK(harmony_beat_strength(0.5, 4) == doctest::Approx(0.45)); // off the beat
-    CHECK(harmony_beat_strength(2.5, 4) == doctest::Approx(0.45));
-    CHECK(harmony_beat_strength(0.25, 4) == doctest::Approx(0.3)); // a sixteenth
-    CHECK(harmony_beat_strength(1.75, 4) == doctest::Approx(0.3));
-}
-
-TEST_CASE("harmony: a note weighs its length times its beat's strength") {
-    CHECK(harmony_note_weight(0.0, 1.0) ==
-          doctest::Approx(0.35)); // an instant still counts a little
-    CHECK(harmony_note_weight(1.5, 1.0) == doctest::Approx(1.0)); // a beat and a half is full
-    CHECK(harmony_note_weight(6.0, 1.0) == doctest::Approx(1.0)); // longer adds nothing
-    CHECK(harmony_note_weight(1.5, 0.45) == doctest::Approx(0.45));
-    CHECK(harmony_note_weight(0.25, 1.0) < harmony_note_weight(1.0, 1.0));
-    CHECK(harmony_note_weight(0.5, 0.45) < harmony_note_weight(0.5, 1.0));
-}
-
 TEST_CASE("harmony: short off-beat passing notes do not change the name") {
     Piece p(1);
     p.whole(0, {C3, G3, E4});

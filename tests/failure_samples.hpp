@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Every failure text the update code can show, for the tests of the words (update_status_test.cpp)
-// and of the room they need (about_layout_test.cpp).
+// and the audit of the room they need.
 #pragma once
 
 #include "../app/update_status.hpp"

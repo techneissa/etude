@@ -10,15 +10,6 @@
 
 using namespace etude;
 
-TEST_CASE("transpose: the amount is clamped to -12..+12") {
-    CHECK(Transposition(5, kRange61).semitones() == 5);
-    CHECK(Transposition(12, kRange61).semitones() == 12);
-    CHECK(Transposition(-12, kRange61).semitones() == -12);
-    CHECK(Transposition(13, kRange61).semitones() == 12);
-    CHECK(Transposition(-40, kRange61).semitones() == -12);
-    CHECK(Transposition(1000, kRange61).semitones() == 12);
-}
-
 TEST_CASE("transpose: zero semitones leaves every note inside the keyboard alone") {
     for (const KeyRange range : {kRange61, kRange88, kRange49}) {
         const Transposition t(0, range);

@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// How the Effects page lays out in the body the sheet gives it, with no ImGui in it, so
-// tests/colours_layout_test.cpp checks the rules with the real tokens. Sizes in points; `u` is the
+// How the Effects page lays out in the body the sheet gives it, with no ImGui in it. Sizes in points; `u` is the
 // kit's unit (points per design point).
 //
 // The page is the live preview and six blocks. Colours: the scheme chips; the palettes (the six

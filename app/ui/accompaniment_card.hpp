@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Where the accompaniment menu's card goes and in what shape, with no ImGui in it so
-// tests/accompaniment_card_test.cpp checks the real numbers (accompaniment.cpp draws from them).
+// Where the accompaniment menu's card goes and in what shape, with no ImGui in it (accompaniment.cpp draws from it).
 // The card is one column of rows: "All", one row per part, the volume. Where that column does not
 // fit between the bar and the keyboard, the rows go in two columns (the first takes the larger
 // half, so the volume ends the second) with a tighter padding; where even that is too tall, the

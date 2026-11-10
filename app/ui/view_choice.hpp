@@ -8,7 +8,7 @@
 //   Full  the sheet only                (ViewMode::Sheet)
 //
 // A song with no sheet music refuses On and Full (and Sheet and Both on the row); a tap on one
-// says why and changes nothing. No ImGui here, so tests/view_choice_test.cpp checks the real rules.
+// says why and changes nothing. No ImGui here.
 #pragma once
 
 #include "morph_glyphs.hpp"

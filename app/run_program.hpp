@@ -18,11 +18,11 @@ struct ProgramResult {
 };
 
 // What the update code runs programs through, so a test can stand in for them.
-using ProgramRunner = std::function<ProgramResult(const std::vector<std::string>& argv, int timeout_s)>;
+using ProgramRunner = std::function<ProgramResult(const std::vector<std::string>& argv, double timeout_s)>;
 
 // Runs argv[0] (a full path) with the other arguments and waits at most `timeout_s` seconds, then
 // ends it.
-ProgramResult run_program(const std::vector<std::string>& argv, int timeout_s);
+ProgramResult run_program(const std::vector<std::string>& argv, double timeout_s);
 
 // Starts argv[0] in a new session with its output in `log_path`, no descriptor of this process
 // open, and does not wait. False when it could not be started.

@@ -567,7 +567,7 @@ TEST_CASE("profiles: runs, choices, settings and profiles held at quit go to the
         store.set_song_practice(0x77, busy_practice());
         store.set_profile_settings(2, "[app]\nbar_style = dock\n");
         REQUIRE(store.add_profile("Ben") == ProfileResult::Ok);
-        CHECK_FALSE(store.flush(300ms)); // the writes find the file read-only
+        CHECK_FALSE(flush_fails(store)); // the writes find the file read-only
         store.close();
         CHECK(store.take_errors().empty()); // kept, so nothing to tell the player
     }

@@ -30,8 +30,6 @@ void crash_thread_init();
 // The seconds after which a crash that cannot finish its report (a lock held by another thread)
 // is ended by SIGALRM at its default action.
 inline constexpr unsigned kCrashAlarmSeconds = 3;
-// Test only: makes the report writer wait after the header lines, as a held lock would.
-void crash_test_hang_in_trace(bool on);
 
 // Makes `<data_dir>/crashes`, warms `backtrace` (its first call loads code, which a handler must
 // not), sets the alternate stack and the handlers.

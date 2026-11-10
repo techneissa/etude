@@ -15,7 +15,7 @@ build:
 run: build
     {{build_dir}}/app/etude
 
-# Build, then run the unit-test files the diff against origin/main touches (scripts/test-scope.py: name matches, direct includers, the source-scanning guards; `--since REF` diffs against REF instead, so a fix round tests its own edits) and the settings check when settings code changed, each waiting for any other checkout's heavy check; the size checks run every time. The scope falls back to everything when it cannot be worked out (no origin/main, a CMake change beyond file names in a list, or a shared header changed). `just test --all` runs the full suite (the batch gate's ci-linux runs it too)
+# Build, then run the unit-test files the diff against origin/main touches (scripts/test-scope.py: name matches, direct includers, and the files that name a changed path; `--since REF` diffs against REF instead, so a fix round tests its own edits) and the settings check when settings code changed, each waiting for any other checkout's heavy check; the size checks run every time. The scope falls back to everything when it cannot be worked out (no origin/main, a CMake change beyond file names in a list, or a shared header changed). `just test --all` runs the full suite (the batch gate's ci-linux runs it too)
 [positional-arguments]
 test *args: build
     #!/usr/bin/env bash
@@ -30,8 +30,6 @@ test *args: build
             *) echo "just test: unknown argument '$a' (--all runs the full suite, --since REF scopes to the diff against REF)" >&2; exit 2 ;;
         esac
     done
-    scripts/ui-run.sh python3 -I scripts/size-check-test.py
-    scripts/ui-run.sh python3 -I scripts/test-scope-test.py
     scripts/ui-run.sh python3 -I scripts/size-check.py
     # Exit 3: a test file is not in tests/CMakeLists.txt (it names it on stderr); anything else
     # that goes wrong runs everything.
@@ -77,7 +75,7 @@ shots-check: build
 ci-linux:
     scripts/ci-linux.sh
 
-# The batch gate on main: build, then under the heavy-check lock the icon audit of the scenarios in --audit "NAMES" (none: skipped), the shot check with --shots (default: skipped), ci-linux and publish-check; one summary line per check, a SKIP line for each skipped (logs in build/gate/)
+# The batch gate on main: build, then under the heavy-check lock the icon audit of the scenarios in --audit "NAMES" (none: skipped), the shot check with --shots (default: skipped), ci-linux with --ci-linux (default: skipped) and publish-check; one summary line per check, a SKIP line for each skipped (logs in build/gate/)
 [positional-arguments]
 gate *args:
     scripts/gate.sh "$@"
@@ -99,15 +97,13 @@ synth-test *args: build
 piano-sf2 *args:
     python3 -I tools/extract_piano_sf2.py --out {{build_dir}}/etude-piano.sf2 {{args}}
 
-# Release build, then frame times of all eight note styles at 1080p with 200 notes (args pass through), then the timing assertions of the unit tests (wall-clock and thread-CPU bounds, CHECK_TIMING and TIMING_ONLY in tests/; they do not run in `just test`)
+# Release build, then frame times of all eight note styles at 1080p with 200 notes (args pass through): a hand-run tool that prints numbers and never fails on a bound
 bench *args:
     #!/usr/bin/env bash
     set -euo pipefail
     scripts/ui-run.sh cmake -S . -B build-release -G Ninja -DCMAKE_BUILD_TYPE=Release
-    scripts/ui-run.sh cmake --build build-release --target etude etude_tests
+    scripts/ui-run.sh cmake --build build-release --target etude
     scripts/heavy-lock.sh bench build-release/app/etude --bench-all --headless {{args}}
-    files=$(grep -l 'CHECK_TIMING\|TIMING_ONLY' tests/*_test.cpp | sed 's|^tests/|*/|' | paste -sd, -)
-    ETUDE_TIMING=1 scripts/heavy-lock.sh bench build-release/tests/etude_tests --source-file="$files"
 
 # Release build, then the library search timed a keystroke at a time over 5,000 made-up songs
 # (fails at 5 ms or more a keystroke, or any allocation; args pass through: --songs N)

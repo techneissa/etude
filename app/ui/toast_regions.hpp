@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// What a toast keeps clear of on the practice screen, with no ImGui in it so tests/toast_test.cpp
-// checks the real numbers: the section band's height under the bar, and the rects the host hands
+// What a toast keeps clear of on the practice screen, with no ImGui in it: the section band's height under the bar, and the rects the host hands
 // `place_toast` each frame. Sizes in points; `u` is the kit's unit (points per design point).
 #pragma once
 

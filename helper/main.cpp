@@ -182,6 +182,7 @@ int main(int argc, char** argv) {
         return on_trouble;
     }
     c.service_timeout_s = c.conf.service_timeout_s;
+    c.ready_timeout_s = c.conf.ready_timeout_s;
     if (sandboxed) {
         if (const std::optional<int> status = run_in_sandbox(c, mode, config, sandbox_file, argv[0])) {
             return *status;

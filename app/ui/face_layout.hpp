@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Where an icon control's face (the shape its selected, hover and pressed states fill) and its
-// caption go. No ImGui in it, so tests/face_layout_test.cpp checks the rules with the real tokens.
+// caption go. No ImGui in it.
 //
 // Rules:
 // - The face, and so every state drawn on it, stays inside the area the control may draw in (its

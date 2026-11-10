@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// The words of the transposition control and the octave-shift card, with no ImGui in them so
-// tests/transpose_text_test.cpp checks the real strings. Each writes into the caller's buffer
+// The words of the transposition control and the octave-shift card, with no ImGui in them. Each writes into the caller's buffer
 // (never more than `n` bytes, always terminated): the card draws every frame and allocates
 // nothing. The minus is U+2212, as the speed readout's is.
 #pragma once

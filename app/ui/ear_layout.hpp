@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Where the Ear card's parts go (#374), in ImGui points. No ImGui here, so tests/ear_layout_test.cpp
-// checks the real numbers at every window size.
+// Where the Ear card's parts go (#374), in ImGui points. No ImGui here.
 //
 // The header is the Learn cards' (back arrow, name, the four tabs). Under it two columns. The left
 // has the streak (a flame and its number, the ten dots under it), the interval's name in a pill (a

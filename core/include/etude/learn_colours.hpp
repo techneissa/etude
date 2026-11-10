@@ -15,16 +15,15 @@
 namespace etude {
 
 // The cards' colours are the player's picks (learn_palette.hpp; teal, pink, coral and violet until
-// they pick), the same on every Learn screen: `learn_section_colour` is the one way to ask for one,
-// and `learn_colours_lint_test.cpp` holds that nothing else names a shade. The hands' own colours
-// are for the hands, so no shade is near either default hand (`learn_palette_test.cpp`).
+// they pick), the same on every Learn screen: `learn_section_colour` is the one way to ask for one.
+// The hands' own colours are for the hands, so no shade is near either default hand.
 RGBA learn_section_colour(const LookSettings& look, LearnSection section);
 
 // The Ear card's keys: a right key is a dark green with a check mark in it, a wrong tap a dark wine
 // red (apart from the Ear coral) with a cross, the right key a wrong tap missed a grey (clear of the
 // unlit white and black keys) with a target mark, and the note the question started from the Ear coral,
 // so no hand's colour is used for a key's meaning. Each is clear of both default hands and of the
-// others (`learn_colours_test.cpp`).
+// others.
 inline constexpr RGBA kEarRightColour{26, 128, 72, 255};   // dark green
 inline constexpr RGBA kEarWrongColour{124, 24, 56, 255};   // wine red
 inline constexpr RGBA kEarMissedColour{130, 134, 142, 255}; // grey
@@ -33,7 +32,7 @@ inline constexpr RGBA kEarMissedColour{130, 134, 142, 255}; // grey
 // colour, the Ear card's colour (the tab's) or any answer's. A lavender near #9C8CF2 comes within 0.1 of the
 // right hand's blue, so this one leans toward violet (at least 0.15 from every other colour here); an
 // amber is the orange family the left hand lives in, so this one is the deepest gold that stays clear
-// of that orange (`learn_colours_test.cpp` holds the distances).
+// of that orange.
 inline constexpr RGBA kEarStartColour{184, 120, 232, 255}; // lavender
 inline constexpr RGBA kEarHintColour{200, 150, 10, 255};   // amber
 

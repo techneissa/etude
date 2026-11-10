@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Where the tempo popover's card goes and in what shape, with no ImGui in it so
-// tests/tempo_card_test.cpp checks the real numbers (tempo.cpp draws from them). The card is one
+// Where the tempo popover's card goes and in what shape, with no ImGui in it (tempo.cpp draws from it). The card is one
 // column of rows: the readout, the speed slider, the presets, the typed tempo (while "set =" is on),
 // the metronome (where the bar has no toggle of its own) and the count-in. Where that column does
 // not fit between the bar and the keyboard, the card takes two columns (the speed controls, then

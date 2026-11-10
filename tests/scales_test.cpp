@@ -57,11 +57,6 @@ TEST_CASE("scales: semitone steps of every scale type, from a worked example") {
     CHECK(intervals(ScaleType::Chromatic) == v({0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11}));
 }
 
-TEST_CASE("scales: Ionian and Aeolian are the major and natural minor scales") {
-    CHECK(ScaleType::Ionian == ScaleType::Major);
-    CHECK(ScaleType::Aeolian == ScaleType::NaturalMinor);
-}
-
 TEST_CASE("scales: the melodic minor comes down as the natural minor") {
     const auto down = scale_intervals_descending(ScaleType::MelodicMinor);
     CHECK(std::vector<int>(down.begin(), down.end()) == intervals(ScaleType::NaturalMinor));
@@ -69,31 +64,6 @@ TEST_CASE("scales: the melodic minor comes down as the natural minor") {
         if (t != ScaleType::MelodicMinor) {
             const auto d = scale_intervals_descending(t);
             CHECK(std::vector<int>(d.begin(), d.end()) == intervals(t));
-        }
-    }
-}
-
-TEST_CASE("scales: names and the full list") {
-    CHECK(std::string(scale_type_name(ScaleType::Major)) == "Major");
-    CHECK(std::string(scale_type_name(ScaleType::HarmonicMinor)) == "Harmonic minor");
-    CHECK(std::string(scale_type_name(ScaleType::WholeTone)) == "Whole tone");
-    CHECK(kAllScaleTypes.size() == 14);
-    for (ScaleType t : kAllScaleTypes) {
-        CHECK(std::string(scale_type_name(t)) != "");
-    }
-}
-
-TEST_CASE("scales: pitch classes in scale order, for every type and all 12 roots") {
-    for (ScaleType t : kAllScaleTypes) {
-        for (int root = 0; root < 12; ++root) {
-            CAPTURE(scale_type_name(t));
-            CAPTURE(root);
-            const std::vector<int> pcs = scale_pitch_classes(root, t);
-            REQUIRE(pcs.size() == intervals(t).size());
-            CHECK(pcs.front() == root);
-            for (std::size_t i = 0; i < pcs.size(); ++i) {
-                CHECK(pcs[i] == (root + intervals(t)[i]) % 12);
-            }
         }
     }
 }

@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// What a press and a tap do to the open (i) bubble, with no ImGui in it so tests/info_toggle_test.cpp
-// checks the rules. `open` is the id of the (i) whose bubble is open, 0 for none.
+// What a press and a tap do to the open (i) bubble, with no ImGui in it. `open` is the id of the (i) whose bubble is open, 0 for none.
 //
 // Rules:
 // - A tap on a closed (i) opens its bubble.

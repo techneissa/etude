@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Where a settings row's parts go inside one page column, so the controls of every row line up.
-// No ImGui in it: tests/row_columns_test.cpp checks the rules with the real tokens, and
-// `etude --check-settings` checks the rows the pages really draw (row_layout.hpp,
+// No ImGui in it; `etude --check-settings` checks the rows the pages really draw (row_layout.hpp,
 // column_check.hpp).
 //
 // A row has a label side (its icon, its text, an info button) and a control side. Four kinds:

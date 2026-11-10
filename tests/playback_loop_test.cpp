@@ -2,7 +2,6 @@
 // playback: loop (split from playback_test.cpp).
 #include "etude/metronome.hpp"
 #include "etude/playback.hpp"
-#include "timing_factor.hpp"
 #include "etude/evaluator.hpp"
 #include "etude/keyboard.hpp"
 #include "etude/midi_file.hpp"

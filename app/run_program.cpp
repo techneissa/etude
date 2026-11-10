@@ -41,7 +41,7 @@ void close_inherited(posix_spawnattr_t& attr) {
 
 } // namespace
 
-ProgramResult run_program(const std::vector<std::string>& argv, int timeout_s) {
+ProgramResult run_program(const std::vector<std::string>& argv, double timeout_s) {
     ProgramResult result;
     int fds[2];
     if (argv.empty() || ::pipe(fds) != 0) {
@@ -66,7 +66,7 @@ ProgramResult run_program(const std::vector<std::string>& argv, int timeout_s) {
         return result;
     }
     result.started = true;
-    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(timeout_s);
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(static_cast<long long>(timeout_s * 1000));
     char buffer[4096];
     for (;;) {
         const auto left = std::chrono::duration_cast<std::chrono::milliseconds>(
