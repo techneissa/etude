@@ -1,0 +1,19 @@
+name: CI Schedule
+
+# Every 3 days, the same build and tests as CI on all three systems, on main. The ccache and
+# download caches it saves belong to main, which every branch and pull request may read, and stay
+# inside GitHub's 7-day limit for unused caches. A push to staging does not start this workflow, so
+# a publish still has exactly one CI run.
+on:
+  schedule:
+    - cron: "17 3 */3 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+    with:
+      macos: true

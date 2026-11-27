@@ -1,13 +1,30 @@
 name: CI
 
 # One run per change. Every publish goes to staging first and main moves to the same commit only
-# after that run is green, so a push to main would repeat it. Pull requests and manual runs
-# (`gh workflow run CI --ref <branch>`, also for a trial branch) test the same three systems.
+# after that run is green, so a push to main would repeat it.
+# - A pull request builds and runs the unit tests on Linux x64 only.
+# - A push to staging and a manual run (`gh workflow run CI --ref <branch>`, also for a trial
+#   branch) build the app, the tools and the tests in full on both Linux systems.
+# - macOS runs only in the scheduled run (ci-schedule.yml) and in a manual run with `macos` on: the
+#   app is built for the Raspberry Pi, and a Mac is a local test machine. The release builds the
+#   Mac app; this CI does not gate on it.
 on:
   push:
     branches: [staging]
   pull_request:
   workflow_dispatch:
+    inputs:
+      macos:
+        description: Build on macOS too
+        type: boolean
+        default: false
+  # The scheduled run (ci-schedule.yml) calls this workflow.
+  workflow_call:
+    inputs:
+      macos:
+        description: Build on macOS too
+        type: boolean
+        default: false
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
@@ -25,6 +42,7 @@ jobs:
     timeout-minutes: 5
     outputs:
       code: ${{ steps.diff.outputs.code }}
+      matrix: ${{ steps.diff.outputs.matrix }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -35,6 +53,7 @@ jobs:
         env:
           EVENT: ${{ github.event_name }}
           PR_BASE: ${{ github.event.pull_request.base.sha }}
+          MACOS: ${{ inputs.macos }}
         # A push to staging compares with main, the last commit that passed, not with the previous
         # staging commit: that one may have failed, and a docs-only commit on top must not hide it.
         run: |
@@ -54,16 +73,27 @@ jobs:
           echo "code=$code" >> "$GITHUB_OUTPUT"
           echo "build: $code"
 
+          # ubuntu-24.04-arm is arm64 like the Raspberry Pi 5. A pull request builds only the
+          # unit tests (no app, no tools), which needs no SDL3 or Verovio.
+          if [ "$EVENT" = pull_request ]; then
+            matrix='{"include":[{"os":"ubuntu-24.04","tests_only":true}]}'
+          else
+            matrix='{"include":[{"os":"ubuntu-24.04-arm"},{"os":"ubuntu-24.04"}'
+            [ "$MACOS" = true ] && matrix="$matrix"',{"os":"macos-26"}'
+            matrix="$matrix"']}'
+          fi
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+          echo "matrix: $matrix"
+
   build:
     name: ${{ matrix.os }}
     needs: changes
     if: needs.changes.outputs.code == 'true'
     strategy:
       fail-fast: false
-      matrix:
-        # ubuntu-24.04-arm is arm64 like the Raspberry Pi 5. macos-26 is the system the release
-        # builds the Mac app on.
-        os: [macos-26, ubuntu-24.04-arm, ubuntu-24.04]
+      # The systems for this event, from the changes job. macos-26 is needed: macos-15 cannot
+      # build the code.
+      matrix: ${{ fromJSON(needs.changes.outputs.matrix) }}
     runs-on: ${{ matrix.os }}
     # A cold build takes up to 25 minutes; a hung test must not hold the run for six hours.
     timeout-minutes: 45
@@ -76,7 +106,7 @@ jobs:
         if: runner.os == 'Linux'
         # ALSA for MIDI, and the DRM/GBM/EGL/GLES stack SDL3 uses on the Pi without a desktop.
         run: |
-          sudo apt-get update
+          sudo apt-get update -o Acquire::Languages=none
           sudo apt-get install -y --no-install-recommends \
             ninja-build ccache libasound2-dev libudev-dev \
             libdrm-dev libgbm-dev libegl-dev libgles-dev \
@@ -86,6 +116,9 @@ jobs:
 
       - name: Install macOS packages
         if: runner.os == 'macOS'
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: 1
+          HOMEBREW_NO_INSTALL_CLEANUP: 1
         run: brew install ninja ccache
 
       - name: Cache dependency downloads
@@ -96,16 +129,17 @@ jobs:
           restore-keys: deps-
 
       # ccache keeps the compiled objects between runs: a run compiles only what changed. Every
-      # push saves its own copy under a new key and starts from the newest one of its OS and CPU
-      # (a branch reads its own caches and main's). The check is the compiler's content, not its
-      # time, so a runner image update does not empty the cache. A pull request saves nothing:
-      # its cache could only be read by a re-run of the same pull request.
+      # push saves its own copy under a new key and starts from the newest one of its runner image
+      # (a branch reads its own caches and main's; the scheduled run keeps main's fresh). The key
+      # names the image, so a cache from another macOS or compiler version is never restored. The
+      # check is the compiler's content, not its time. A pull request saves nothing: its cache
+      # could only be read by a re-run of the same pull request.
       - name: Restore ccache
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.ccache
-          key: ccache-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
-          restore-keys: ccache-${{ runner.os }}-${{ runner.arch }}-
+          key: ccache-${{ matrix.os }}-${{ github.sha }}
+          restore-keys: ccache-${{ matrix.os }}-
 
       - name: Configure ccache
         run: |
@@ -116,12 +150,23 @@ jobs:
           } >> "$GITHUB_ENV"
 
       - name: Configure
-        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_COMPILE_WARNING_AS_ERROR=ON -DETUDE_PIANO_FROM_SOURCE=OFF
+        env:
+          TESTS_ONLY: ${{ matrix.tests_only }}
+        run: |
+          args=()
+          [ "$TESTS_ONLY" = true ] && args=(-DETUDE_BUILD_APP=OFF -DETUDE_BUILD_TOOLS=OFF)
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_COMPILE_WARNING_AS_ERROR=ON -DETUDE_PIANO_FROM_SOURCE=OFF "${args[@]}"
 
       - name: Build
+        id: build
+        env:
+          TESTS_ONLY: ${{ matrix.tests_only }}
         run: |
+          target=()
+          [ "$TESTS_ONLY" = true ] && target=(--target etude_tests)
           ccache --zero-stats
-          cmake --build build -- -k 0
+          cmake --build build "${target[@]}" -- -k 0
 
       - name: ccache statistics
         if: always()
@@ -129,11 +174,12 @@ jobs:
         run: ccache --show-stats -vv
 
       - name: Save ccache
-        if: always() && github.event_name != 'pull_request'
+        # Only after a good build: a failed or cancelled one leaves a partial cache.
+        if: steps.build.outcome == 'success' && github.event_name != 'pull_request'
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.ccache
-          key: ccache-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
+          key: ccache-${{ matrix.os }}-${{ github.sha }}
 
       - name: Test
         timeout-minutes: 15
