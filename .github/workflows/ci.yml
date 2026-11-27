@@ -61,9 +61,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # ubuntu-24.04-arm is arm64 like the Raspberry Pi 5. macos-15 is the system the release
+        # ubuntu-24.04-arm is arm64 like the Raspberry Pi 5. macos-26 is the system the release
         # builds the Mac app on.
-        os: [macos-15, ubuntu-24.04-arm, ubuntu-24.04]
+        os: [macos-26, ubuntu-24.04-arm, ubuntu-24.04]
     runs-on: ${{ matrix.os }}
     # A cold build takes up to 25 minutes; a hung test must not hold the run for six hours.
     timeout-minutes: 45
