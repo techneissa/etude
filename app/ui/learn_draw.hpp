@@ -4,9 +4,10 @@
 #pragma once
 
 #include "icons.hpp"
-#include "kit.hpp"
+#include "kit_core.hpp"
 #include "learn_layout.hpp"
 #include "learn_lit.hpp"
+#include "face_layout.hpp"
 
 #include "etude/learn_colours.hpp"
 #include "etude/look.hpp"

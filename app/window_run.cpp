@@ -4,6 +4,7 @@
 #include "dev_jitter.hpp"
 #include "gfx.hpp"
 #include "touch_device.hpp"
+#include "ui/kit_tip.hpp"
 #include "watchdog.hpp"
 #include "window_icon.hpp"
 #include "window_state.hpp"

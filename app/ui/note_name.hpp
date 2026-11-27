@@ -4,7 +4,8 @@
 // not the font's ♯ and ♭, which at small sizes are blobs that hang below the baseline.
 #pragma once
 
-#include "kit.hpp"
+#include "face_layout.hpp"
+#include "kit_core.hpp"
 
 namespace etude::app::ui {
 

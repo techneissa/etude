@@ -9,6 +9,8 @@
 #pragma once
 
 #include "bar.hpp"
+#include "face_layout.hpp"
+#include "tap.hpp"
 #include "ui_model.hpp"
 
 namespace etude::app::ui {

@@ -2,6 +2,8 @@
 #include "host_fonts.hpp"
 
 #include "../music_font.hpp"
+#include "kit_core.hpp"
+#include "kit_text.hpp"
 
 #include <imgui.h>
 

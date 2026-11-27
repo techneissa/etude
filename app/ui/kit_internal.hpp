@@ -2,17 +2,20 @@
 // What the files of kit.cpp share. Not part of the app's interface.
 #pragma once
 
-#include "kit.hpp"
+#include "kit_core.hpp"
+#include "kit_state.hpp"
+#include "tokens.hpp"
 
 #include "clef_icon.hpp"
+#include "etude/accidental_text.hpp"
+#include "etude/note_style.hpp"
+#include "fit_text.hpp"
 #include "font_ink.hpp"
 #include "icon_audit.hpp"
 #include "icons.hpp"
 #include "pressed_fade.hpp"
 #include "row_layout.hpp"
 #include "sections_port.hpp"
-#include "etude/accidental_text.hpp"
-#include "etude/note_style.hpp"
 #include "transport.hpp"
 
 #include <imgui_internal.h> // ClearActiveID

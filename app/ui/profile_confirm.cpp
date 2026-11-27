@@ -6,7 +6,17 @@
 #include "crash_layout.hpp" // wrap_report
 #include "icon_audit.hpp"
 #include "icons.hpp"
+#include "kit_buttons.hpp"
+#include "kit_card.hpp"
+#include "kit_colour.hpp"
+#include "kit_core.hpp"
+#include "kit_fit.hpp"
+#include "kit_press.hpp"
+#include "kit_state.hpp"
+#include "kit_text.hpp"
 #include "tap.hpp"
+#include "tokens.hpp"
+#include "tokens_popup.hpp"
 
 #include <algorithm>
 #include <string>

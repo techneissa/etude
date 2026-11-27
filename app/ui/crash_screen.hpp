@@ -7,7 +7,7 @@
 
 #include "crash_card.hpp"
 #include "crash_screen_view.hpp"
-#include "kit.hpp"
+#include "kit_core.hpp"
 
 #include <optional>
 #include <string>

@@ -2,7 +2,16 @@
 // Rows with two lines of words: the title over a detail line, with a switch or a chevron at the
 // end, and a paragraph of help text. For the pages whose rows say what they are doing ("Phone /
 // Ready").
-#include "kit.hpp"
+#include "kit_rows.hpp"
+#include "kit_colour.hpp"
+#include "kit_core.hpp"
+#include "kit_detail_rows.hpp"
+#include "kit_fit.hpp"
+#include "kit_icon.hpp"
+#include "kit_label_stack.hpp"
+#include "kit_state.hpp"
+#include "kit_text.hpp"
+#include "tokens.hpp"
 
 #include "kit_internal.hpp"
 

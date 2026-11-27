@@ -3,6 +3,14 @@
 
 #include "icon_audit.hpp"
 #include "icons.hpp"
+#include "kit_card.hpp"
+#include "kit_colour.hpp"
+#include "kit_core.hpp"
+#include "kit_fit.hpp"
+#include "kit_icon.hpp"
+#include "kit_label_stack.hpp"
+#include "kit_text.hpp"
+#include "tokens.hpp"
 
 #include "etude/progress_text.hpp"
 

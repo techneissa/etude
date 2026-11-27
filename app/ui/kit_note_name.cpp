@@ -2,6 +2,9 @@
 #include "note_name.hpp"
 
 #include "font_ink.hpp"
+#include "kit_colour.hpp"
+#include "kit_core.hpp"
+#include "kit_text.hpp"
 
 #include "etude/accidental_glyph.hpp"
 

@@ -13,6 +13,16 @@
 #include "upload_port.hpp"
 
 #include "item_probe.hpp"
+#include "kit_card.hpp"
+#include "kit_chip.hpp"
+#include "kit_colour.hpp"
+#include "kit_core.hpp"
+#include "kit_detail_rows.hpp"
+#include "kit_fit.hpp"
+#include "kit_rows.hpp"
+#include "kit_text.hpp"
+#include "tokens.hpp"
+#include "tokens_phone.hpp"
 
 #include <algorithm>
 #include <cmath>

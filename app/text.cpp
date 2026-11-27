@@ -5,6 +5,7 @@
 #include "frame_picture.hpp"
 #include "gfx.hpp"
 #include "music_font.hpp"
+#include "ui/kit_colour.hpp"
 
 #include <SDL3_ttf/SDL_ttf.h>
 

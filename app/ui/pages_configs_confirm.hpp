@@ -3,7 +3,7 @@
 #pragma once
 
 #include "configs_logic.hpp"
-#include "kit.hpp"
+#include "kit_core.hpp"
 
 #include <cstdint>
 #include <optional>

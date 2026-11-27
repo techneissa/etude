@@ -47,7 +47,8 @@ ROOT = Path(__file__).resolve().parent.parent
 GUARDS = ()
 
 # Headers every screen draws with: a change there is a change everywhere (techneissa, 2026-10-20).
-SHARED_HEADERS = ("app/ui/tokens.hpp", "app/ui/kit.hpp", "app/ui/kit_internal.hpp")
+# The kit and the tokens are split into parts (kit_*.hpp, tokens*.hpp); each part is shared.
+SHARED_HEADERS = re.compile(r"^app/ui/(kit_[a-z_]+|tokens|tokens_[a-z]+)\.hpp$")
 
 # A header that more than this many test files include directly is shared too.
 WIDE = 60
@@ -117,7 +118,7 @@ def plan(changed, tests, repo_files, cmake_lines=None):
             continue
         if BUILD_FILES.search(c):
             return {"mode": "all", "why": {}, "settings": True, "all_reason": f"{c} changed"}
-        if c in SHARED_HEADERS:
+        if SHARED_HEADERS.match(c):
             return {"mode": "all", "why": {}, "settings": True, "all_reason": f"{c} is shared"}
 
     headers_by_name = {}

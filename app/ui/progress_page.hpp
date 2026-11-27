@@ -10,7 +10,7 @@
 // the parts go is progress_layout.hpp.
 #pragma once
 
-#include "kit.hpp"
+#include "kit_core.hpp"
 #include "library_port.hpp"
 #include "medal_wall.hpp"
 #include "progress_ask.hpp"

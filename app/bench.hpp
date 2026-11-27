@@ -10,7 +10,8 @@
 #include "etude/library_browse.hpp"
 #include "etude/look.hpp"
 #include "etude/renderer_path.hpp"
-#include "ui.hpp"
+#include "etude/session_state.hpp"
+#include "panel_tab.hpp"
 
 #include <optional>
 #include <string>

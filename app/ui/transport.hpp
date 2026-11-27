@@ -6,7 +6,8 @@
 #pragma once
 
 #include "bar_metrics.hpp"
-#include "kit.hpp"
+#include "kit_core.hpp"
+#include "kit_icon.hpp"
 #include "song_port.hpp"
 
 #include "etude/top_indicator.hpp"

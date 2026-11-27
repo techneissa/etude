@@ -5,7 +5,7 @@
 #pragma once
 
 #include "face_layout.hpp"
-#include "kit.hpp"
+#include "kit_core.hpp"
 
 #include "etude/medal_eval.hpp"
 #include "etude/medals.hpp"

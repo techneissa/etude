@@ -6,9 +6,13 @@
 #include "colours_layout.hpp"
 #include "icon_audit.hpp"
 #include "icons.hpp"
+#include "kit_core.hpp"
+#include "kit_segmented.hpp"
+#include "kit_text.hpp"
 #include "preview.hpp"
 #include "row_layout.hpp"
 #include "settings_catalogue.hpp"
+#include "tokens.hpp"
 
 #include "etude/accidental_text.hpp"
 #include "etude/palette.hpp"

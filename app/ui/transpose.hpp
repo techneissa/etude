@@ -18,6 +18,7 @@
 #pragma once
 
 #include "bar.hpp"
+#include "tap.hpp"
 
 namespace etude::app::ui {
 

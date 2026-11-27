@@ -7,7 +7,7 @@
 // from the app (`ReplayInfo`), which also acts on the choice that comes back.
 #pragma once
 
-#include "kit.hpp"
+#include "kit_core.hpp"
 #include "replay_bar_layout.hpp"
 #include "replay_port.hpp"
 

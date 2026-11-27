@@ -38,10 +38,30 @@ if(ETUDE_DEP_DOWNLOADS_IN_USE)
   endif()
 endif()
 
+# The libraries that cost the most to compile (SDL3, SDL3_ttf with FreeType, Verovio, lunasvg,
+# libremidi) can be built once into an install prefix, for CI to cache:
+#   -DETUDE_DEPS_INSTALL=ON -DCMAKE_INSTALL_PREFIX=DIR   configure builds only these (this file's
+#                                      first half), then `cmake --build` and `cmake --install` fill DIR
+#   -DETUDE_DEPS_PREFIX=DIR            the app's configure uses DIR instead of building them
+# Both read the pins below, so there is no second list. Without either option every library builds
+# in the app's own build tree. A prefix is used only when it was built from these pins by the same
+# compiler and build type; anything else stops the configure, it never falls back to a build.
+set(ETUDE_PREFIX_DEPS SDL3 SDL3_ttf freetype verovio lunasvg libremidi)
+set(ETUDE_PREFIX_STAMP "${ETUDE_DEPS_PREFIX}/share/etude-deps/stamp.txt")
+set_property(GLOBAL PROPERTY ETUDE_PREFIX_PINS "")
+
 # Every dependency below is declared through this, which adds the download folder. (Wrapping
 # FetchContent_Declare itself does not hold: libremidi's CMake includes FetchContent again, which
-# puts the original back.)
+# puts the original back.) A prefix library's pin is recorded, and with a prefix it is not declared
+# to FetchContent at all.
 function(etude_declare name)
+  if(name IN_LIST ETUDE_PREFIX_DEPS)
+    cmake_parse_arguments(PARSE_ARGV 1 pin "" "URL_HASH" "")
+    set_property(GLOBAL APPEND PROPERTY ETUDE_PREFIX_PINS "${name} ${pin_URL_HASH}")
+    if(ETUDE_DEPS_PREFIX)
+      return()
+    endif()
+  endif()
   if(ETUDE_DEP_DOWNLOADS_IN_USE AND NOT "DOWNLOAD_NO_EXTRACT" IN_LIST ARGN) # a single file stays in its source folder
     FetchContent_Declare(${name} DOWNLOAD_DIR "${ETUDE_DEP_DOWNLOADS}/${name}" ${ARGN})
   else()
@@ -49,22 +69,43 @@ function(etude_declare name)
   endif()
 endfunction()
 
+# What a prefix is built for: the pins and the compiler. The prefix holds it as stamp.txt.
+function(etude_prefix_stamp out)
+  get_property(pins GLOBAL PROPERTY ETUDE_PREFIX_PINS)
+  list(JOIN pins "\n" text)
+  string(APPEND text "\ncompiler ${CMAKE_C_COMPILER_ID} ${CMAKE_C_COMPILER_VERSION} ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}"
+    "\nbuild ${CMAKE_BUILD_TYPE} ${CMAKE_SYSTEM_NAME} ${CMAKE_SYSTEM_PROCESSOR} ${CMAKE_OSX_DEPLOYMENT_TARGET} ${CMAKE_OSX_ARCHITECTURES}\n")
+  set(${out} "${text}" PARENT_SCOPE)
+endfunction()
+
+if(ETUDE_DEPS_INSTALL AND NOT ETUDE_BUILD_APP)
+  message(FATAL_ERROR "ETUDE_DEPS_INSTALL builds the app's libraries: leave ETUDE_BUILD_APP on")
+endif()
+
 if(ETUDE_BUILD_APP)
-  set(SDL_SHARED OFF CACHE BOOL "" FORCE)
-  set(SDL_STATIC ON CACHE BOOL "" FORCE)
-  set(SDL_TEST_LIBRARY OFF CACHE BOOL "" FORCE)
-  set(SDL_EXAMPLES OFF CACHE BOOL "" FORCE)
-  # The app uses video, audio, render and GPU only. Gamepad and HIDAPI exist only for the joystick.
-  foreach(sdl_part CAMERA JOYSTICK HAPTIC HIDAPI DIALOG TRAY)
-    set(SDL_${sdl_part} OFF CACHE BOOL "" FORCE)
-  endforeach()
+  if(NOT ETUDE_DEPS_PREFIX)
+    set(SDL_SHARED OFF CACHE BOOL "" FORCE)
+    set(SDL_STATIC ON CACHE BOOL "" FORCE)
+    set(SDL_TEST_LIBRARY OFF CACHE BOOL "" FORCE)
+    set(SDL_EXAMPLES OFF CACHE BOOL "" FORCE)
+    # The app uses video, audio, render and GPU only. Gamepad and HIDAPI exist only for the joystick.
+    foreach(sdl_part CAMERA JOYSTICK HAPTIC HIDAPI DIALOG TRAY)
+      set(SDL_${sdl_part} OFF CACHE BOOL "" FORCE)
+    endforeach()
+    if(ETUDE_DEPS_INSTALL)
+      set(SDL_INSTALL ON CACHE BOOL "" FORCE)
+      set(SDL_INSTALL_CPACK OFF CACHE BOOL "" FORCE)
+    endif()
+  endif()
   etude_declare(SDL3
     URL https://codeload.github.com/libsdl-org/SDL/tar.gz/refs/tags/release-3.4.16
         https://github.com/libsdl-org/SDL/archive/refs/tags/release-3.4.16.tar.gz
     DOWNLOAD_NAME release-3.4.16.tar.gz
     URL_HASH SHA256=c2ee715e42ec520c4d11fd8d249ef1d2b2baf4ad31148b72b3b000276c0b3633
     SYSTEM)
-  FetchContent_MakeAvailable(SDL3)
+  if(NOT ETUDE_DEPS_PREFIX)
+    FetchContent_MakeAvailable(SDL3)
+  endif()
 
   # Text for the chord name and status lines. SDL3_ttf (zlib) needs FreeType, which its release
   # tarball leaves out, so FreeType's own release tarball is unpacked into SDL3_ttf's external/
@@ -78,26 +119,96 @@ if(ETUDE_BUILD_APP)
     URL_HASH SHA256=63547d58d0185c833213885b635a2c0548201cc8f301e6587c0be1a67e1e045d
     SOURCE_SUBDIR no-add-subdirectory
     SYSTEM)
-  FetchContent_MakeAvailable(SDL3_ttf)
+  if(NOT ETUDE_DEPS_PREFIX)
+    FetchContent_MakeAvailable(SDL3_ttf)
+  endif()
   etude_declare(freetype
     URL https://download.savannah.gnu.org/releases/freetype/freetype-2.14.1.tar.xz
         https://downloads.sourceforge.net/project/freetype/freetype2/2.14.1/freetype-2.14.1.tar.xz
     URL_HASH SHA256=32427e8c471ac095853212a37aef816c60b42052d4d9e48230bab3bdf2936ccc
     SOURCE_DIR ${sdl3_ttf_SOURCE_DIR}/external/freetype
     SOURCE_SUBDIR no-add-subdirectory)
-  FetchContent_MakeAvailable(freetype)
-  set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
-  set(SDLTTF_VENDORED ON CACHE BOOL "" FORCE)
-  set(SDLTTF_HARFBUZZ OFF CACHE BOOL "" FORCE)
-  set(SDLTTF_PLUTOSVG OFF CACHE BOOL "" FORCE)
-  set(SDLTTF_SAMPLES OFF CACHE BOOL "" FORCE)
-  set(SDLTTF_INSTALL OFF CACHE BOOL "" FORCE)
-  add_subdirectory(${sdl3_ttf_SOURCE_DIR} ${sdl3_ttf_BINARY_DIR} EXCLUDE_FROM_ALL SYSTEM)
-  # Third-party warnings are not ours to fix.
-  foreach(target freetype SDL3_ttf-static)
-    set_target_properties(${target} PROPERTIES COMPILE_WARNING_AS_ERROR OFF)
-  endforeach()
+  if(NOT ETUDE_DEPS_PREFIX)
+    FetchContent_MakeAvailable(freetype)
+    set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+    set(SDLTTF_VENDORED ON CACHE BOOL "" FORCE)
+    set(SDLTTF_HARFBUZZ OFF CACHE BOOL "" FORCE)
+    set(SDLTTF_PLUTOSVG OFF CACHE BOOL "" FORCE)
+    set(SDLTTF_SAMPLES OFF CACHE BOOL "" FORCE)
+    # The installed SDL3_ttf has FreeType inside its one static library.
+    if(ETUDE_DEPS_INSTALL)
+      set(SDLTTF_INSTALL ON CACHE BOOL "" FORCE)
+      set(etude_ttf_in_all "")
+    else()
+      set(SDLTTF_INSTALL OFF CACHE BOOL "" FORCE)
+      set(etude_ttf_in_all EXCLUDE_FROM_ALL)
+    endif()
+    add_subdirectory(${sdl3_ttf_SOURCE_DIR} ${sdl3_ttf_BINARY_DIR} ${etude_ttf_in_all} SYSTEM)
+    # Third-party warnings are not ours to fix.
+    foreach(target freetype SDL3_ttf-static)
+      set_target_properties(${target} PROPERTIES COMPILE_WARNING_AS_ERROR OFF)
+    endforeach()
+  endif()
+endif()
 
+# Sheet music: Verovio (LGPL-3.0, RISM Digital Center) engraves MusicXML into SVG, and lunasvg
+# with its plutovg (both MIT; plutovg carries FreeType-derived rasteriser code under the FTL and
+# stb_truetype/stb_image, public domain or MIT) draws the SVG into bitmaps. LGPL-3.0 lets the
+# combined work be conveyed under GPL-3.0, so the linked binary is GPL-3.0; a binary release must
+# ship Verovio's COPYING and COPYING.LESSER, the MIT texts of lunasvg, plutovg, libmei, pugixml
+# and jsonxx, the FTL and the Bravura font's OFL. Verovio's own CMake only builds an executable or
+# a shared library, so both are only downloaded and built as static libraries private to
+# app/ (cmake/SheetLibs.cmake), with every warning off (not ours to fix).
+if(ETUDE_BUILD_APP)
+  etude_declare(verovio
+    URL https://codeload.github.com/rism-digital/verovio/tar.gz/refs/tags/version-6.3.0
+        https://github.com/rism-digital/verovio/archive/refs/tags/version-6.3.0.tar.gz
+    DOWNLOAD_NAME version-6.3.0.tar.gz
+    URL_HASH SHA256=095a561e9bd26c97787ad49e01009576d1ca234feae3995948c5aede97a40598
+    SOURCE_SUBDIR no-add-subdirectory
+    SYSTEM)
+  etude_declare(lunasvg
+    URL https://codeload.github.com/sammycage/lunasvg/tar.gz/refs/tags/v3.5.0
+        https://github.com/sammycage/lunasvg/archive/refs/tags/v3.5.0.tar.gz
+    DOWNLOAD_NAME v3.5.0.tar.gz
+    URL_HASH SHA256=1abf1472ee6c4d19797916e8cc3c2e4b628e0d81178ffac60bdb0d457e32c690
+    SOURCE_SUBDIR no-add-subdirectory
+    SYSTEM)
+  if(NOT ETUDE_DEPS_PREFIX)
+    FetchContent_MakeAvailable(verovio)
+    FetchContent_MakeAvailable(lunasvg)
+    include(${CMAKE_CURRENT_LIST_DIR}/SheetLibs.cmake)
+  endif()
+endif()
+
+# The app reads live MIDI and the tools list ports and play test patterns.
+if(ETUDE_BUILD_APP OR ETUDE_BUILD_TOOLS)
+  etude_declare(libremidi
+    URL https://codeload.github.com/celtera/libremidi/tar.gz/refs/tags/v5.4.3
+        https://github.com/celtera/libremidi/archive/refs/tags/v5.4.3.tar.gz
+    DOWNLOAD_NAME v5.4.3.tar.gz
+    URL_HASH SHA256=a1c369c6aab01c80f1506345d1c099a167b330d1d59159aa7583f7b0b9f966b9
+    SYSTEM)
+  if(NOT ETUDE_DEPS_PREFIX)
+    set(LIBREMIDI_EXAMPLES OFF CACHE BOOL "" FORCE)
+    set(LIBREMIDI_TESTS OFF CACHE BOOL "" FORCE)
+    set(LIBREMIDI_NO_BOOST ON CACHE BOOL "" FORCE)
+    set(LIBREMIDI_NO_JACK ON CACHE BOOL "" FORCE)
+    set(LIBREMIDI_NO_NETWORK ON CACHE BOOL "" FORCE)
+    FetchContent_MakeAvailable(libremidi)
+  endif()
+endif()
+
+if(ETUDE_DEPS_PREFIX)
+  include(${CMAKE_CURRENT_LIST_DIR}/DepsPrefix.cmake)
+elseif(ETUDE_DEPS_INSTALL)
+  etude_prefix_stamp(etude_stamp)
+  file(WRITE "${CMAKE_BINARY_DIR}/etude-deps-stamp.txt" "${etude_stamp}")
+  install(FILES "${CMAKE_BINARY_DIR}/etude-deps-stamp.txt" DESTINATION share/etude-deps RENAME stamp.txt)
+  return() # the rest is built by the app's own configure
+endif()
+
+if(ETUDE_BUILD_APP)
   # The chord-name font: Atkinson Hyperlegible Bold (SIL OFL 1.1, Braille Institute), designed to
   # stay readable at a distance. One file from the google/fonts repository at a fixed commit. It is
   # compiled into the app (app/CMakeLists.txt), so nothing has to be installed next to the binary.
@@ -153,100 +264,6 @@ if(ETUDE_BUILD_APP)
     SOURCE_SUBDIR no-add-subdirectory
     SYSTEM)
   FetchContent_MakeAvailable(imgui)
-
-  # Sheet music: Verovio (LGPL-3.0, RISM Digital Center) engraves MusicXML into SVG, and lunasvg
-  # with its plutovg (both MIT; plutovg carries FreeType-derived rasteriser code under the FTL and
-  # stb_truetype/stb_image, public domain or MIT) draws the SVG into bitmaps. LGPL-3.0 lets the
-  # combined work be conveyed under GPL-3.0, so the linked binary is GPL-3.0; a binary release must
-  # ship Verovio's COPYING and COPYING.LESSER, the MIT texts of lunasvg, plutovg, libmei, pugixml
-  # and jsonxx, the FTL and the Bravura font's OFL. Verovio's own CMake only builds an executable or
-  # a shared library, so both are only downloaded and built here as static libraries private to
-  # app/, with every warning off (not ours to fix).
-  etude_declare(verovio
-    URL https://codeload.github.com/rism-digital/verovio/tar.gz/refs/tags/version-6.3.0
-        https://github.com/rism-digital/verovio/archive/refs/tags/version-6.3.0.tar.gz
-    DOWNLOAD_NAME version-6.3.0.tar.gz
-    URL_HASH SHA256=095a561e9bd26c97787ad49e01009576d1ca234feae3995948c5aede97a40598
-    SOURCE_SUBDIR no-add-subdirectory
-    SYSTEM)
-  FetchContent_MakeAvailable(verovio)
-  etude_declare(lunasvg
-    URL https://codeload.github.com/sammycage/lunasvg/tar.gz/refs/tags/v3.5.0
-        https://github.com/sammycage/lunasvg/archive/refs/tags/v3.5.0.tar.gz
-    DOWNLOAD_NAME v3.5.0.tar.gz
-    URL_HASH SHA256=1abf1472ee6c4d19797916e8cc3c2e4b628e0d81178ffac60bdb0d457e32c690
-    SOURCE_SUBDIR no-add-subdirectory
-    SYSTEM)
-  FetchContent_MakeAvailable(lunasvg)
-
-  # Verovio trimmed to what the app reads: MusicXML (core writes MusicXML for ABC, MuseScore and
-  # MIDI songs itself), so the Humdrum, PAE, DARMS, GABC, ABC and compressed-MusicXML readers are
-  # left out. Its zip reader (filereader.cpp) embeds an older miniz whose global mz_* symbols clash
-  # with core's, so app/sheet/verovio_zip_stub.cpp stands in for it: core unzips and hands Verovio
-  # plain XML. Its bundled pugixml is renamed (pugi=vrv_pugi), since core links its own built with
-  # other options.
-  set(vrv ${verovio_SOURCE_DIR})
-  file(GLOB etude_verovio_sources ${vrv}/src/*.cpp ${vrv}/libmei/dist/*.cpp
-       ${vrv}/libmei/addons/*.cpp ${vrv}/src/midi/*.cpp ${vrv}/src/crc/*.cpp)
-  list(APPEND etude_verovio_sources ${vrv}/src/json/jsonxx.cc ${vrv}/src/pugi/pugixml.cpp
-       ${PROJECT_SOURCE_DIR}/app/sheet/verovio_zip_stub.cpp)
-  list(FILTER etude_verovio_sources EXCLUDE REGEX "/src/filereader\\.cpp$")
-  add_library(etude_verovio STATIC ${etude_verovio_sources})
-  target_include_directories(etude_verovio SYSTEM PUBLIC ${vrv}/include ${vrv}/include/vrv
-    ${vrv}/include/crc ${vrv}/include/midi ${vrv}/include/hum ${vrv}/include/json
-    ${vrv}/include/pugi ${vrv}/include/zip ${vrv}/include/tuning-library ${vrv}/libmei/dist
-    ${vrv}/libmei/addons)
-  target_compile_definitions(etude_verovio PUBLIC pugi=vrv_pugi NO_DARMS_SUPPORT NO_RUNTIME
-    NO_HUMDRUM_SUPPORT NO_PAE_SUPPORT NO_ABC_SUPPORT NO_GABC_SUPPORT NO_MXL_SUPPORT
-    RESOURCE_DIR="")
-  target_compile_features(etude_verovio PUBLIC cxx_std_20)
-  # The fonts Verovio reads at run time: the Bravura glyphs and metrics (its fallback Leipzig too,
-  # which it loads at start) and the text metrics. Copied beside the app, where it looks for them.
-  set(ETUDE_VEROVIO_DATA ${vrv}/data)
-
-  set(luna ${lunasvg_SOURCE_DIR})
-  add_library(etude_plutovg STATIC ${luna}/plutovg/source/plutovg-blend.c
-    ${luna}/plutovg/source/plutovg-canvas.c ${luna}/plutovg/source/plutovg-font.c
-    ${luna}/plutovg/source/plutovg-matrix.c ${luna}/plutovg/source/plutovg-paint.c
-    ${luna}/plutovg/source/plutovg-path.c ${luna}/plutovg/source/plutovg-rasterize.c
-    ${luna}/plutovg/source/plutovg-surface.c ${luna}/plutovg/source/plutovg-ft-math.c
-    ${luna}/plutovg/source/plutovg-ft-raster.c ${luna}/plutovg/source/plutovg-ft-stroker.c)
-  target_include_directories(etude_plutovg SYSTEM PUBLIC ${luna}/plutovg/include)
-  # Fonts come from the app's own memory, never from the system's folders.
-  target_compile_definitions(etude_plutovg PRIVATE PLUTOVG_BUILD PLUTOVG_DISABLE_FONT_FACE_CACHE_LOAD
-    PUBLIC PLUTOVG_BUILD_STATIC)
-  add_library(etude_lunasvg STATIC ${luna}/source/lunasvg.cpp ${luna}/source/graphics.cpp
-    ${luna}/source/svgelement.cpp ${luna}/source/svggeometryelement.cpp
-    ${luna}/source/svglayoutstate.cpp ${luna}/source/svgpaintelement.cpp
-    ${luna}/source/svgparser.cpp ${luna}/source/svgproperty.cpp
-    ${luna}/source/svgrenderstate.cpp ${luna}/source/svgtextelement.cpp)
-  target_include_directories(etude_lunasvg SYSTEM PUBLIC ${luna}/include PRIVATE ${luna}/source)
-  target_compile_definitions(etude_lunasvg PRIVATE LUNASVG_BUILD LUNASVG_DISABLE_LOAD_SYSTEM_FONTS
-    PUBLIC LUNASVG_BUILD_STATIC)
-  target_link_libraries(etude_lunasvg PUBLIC etude_plutovg)
-  if(UNIX AND NOT APPLE)
-    target_link_libraries(etude_plutovg PUBLIC m)
-  endif()
-  foreach(target etude_verovio etude_plutovg etude_lunasvg)
-    target_compile_options(${target} PRIVATE -w)
-    set_target_properties(${target} PROPERTIES COMPILE_WARNING_AS_ERROR OFF)
-  endforeach()
-endif()
-
-# The app reads live MIDI and the tools list ports and play test patterns.
-if(ETUDE_BUILD_APP OR ETUDE_BUILD_TOOLS)
-  set(LIBREMIDI_EXAMPLES OFF CACHE BOOL "" FORCE)
-  set(LIBREMIDI_TESTS OFF CACHE BOOL "" FORCE)
-  set(LIBREMIDI_NO_BOOST ON CACHE BOOL "" FORCE)
-  set(LIBREMIDI_NO_JACK ON CACHE BOOL "" FORCE)
-  set(LIBREMIDI_NO_NETWORK ON CACHE BOOL "" FORCE)
-  etude_declare(libremidi
-    URL https://codeload.github.com/celtera/libremidi/tar.gz/refs/tags/v5.4.3
-        https://github.com/celtera/libremidi/archive/refs/tags/v5.4.3.tar.gz
-    DOWNLOAD_NAME v5.4.3.tar.gz
-    URL_HASH SHA256=a1c369c6aab01c80f1506345d1c099a167b330d1d59159aa7583f7b0b9f966b9
-    SYSTEM)
-  FetchContent_MakeAvailable(libremidi)
 endif()
 
 # TinySoundFont (MIT), the built-in piano's SoundFont player: one header, tsf.h. Upstream has no

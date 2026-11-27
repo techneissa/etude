@@ -2,7 +2,15 @@
 // The rows of a song's details card that read the song's stored facts: its length, level and hands
 // with the practice choices under them, and its best score with the runs (moved out of
 // library_screen_details.cpp as they were).
+#include "kit_colour.hpp"
+#include "kit_core.hpp"
+#include "kit_fit.hpp"
+#include "kit_icon.hpp"
+#include "kit_label_stack.hpp"
+#include "kit_text.hpp"
 #include "library_screen_shared.hpp"
+#include "tokens.hpp"
+#include "tokens_library.hpp"
 
 namespace etude::app::ui::lib_shared {
 

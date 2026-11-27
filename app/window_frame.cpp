@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // The frame, first half: the input and the song move on (the second half, window_draw.cpp, lays
 // the frame out, draws and presents it).
+#include "ui/kit_state.hpp"
+#include "ui/kit_tip.hpp"
 #include "window_state.hpp"
 
 #include "etude/update_handoff.hpp"

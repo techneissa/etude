@@ -3,7 +3,7 @@
 // wears and the dialog that names a section.
 #pragma once
 
-#include "kit.hpp"
+#include "kit_core.hpp"
 #include "sections_port.hpp"
 
 #include <cstddef>

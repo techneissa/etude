@@ -6,7 +6,7 @@
 #pragma once
 
 #include "face_layout.hpp"
-#include "kit.hpp"
+#include "kit_core.hpp"
 
 namespace etude::app::ui {
 

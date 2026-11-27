@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "effects.hpp"
 
+#include "ui/kit_colour.hpp"
+
 #include <algorithm>
 #include <cmath>
 #include <cstring>

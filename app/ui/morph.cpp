@@ -4,7 +4,8 @@
 #include "morph.hpp"
 
 #include "icon_audit.hpp"
-#include "kit.hpp"
+#include "kit_colour.hpp"
+#include "kit_core.hpp"
 
 #include "etude/icon_motion.hpp"
 

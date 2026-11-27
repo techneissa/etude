@@ -2,6 +2,10 @@
 #include "key_ring_demo.hpp"
 
 #include "key_ring_layout.hpp"
+#include "kit_chip.hpp"
+#include "kit_colour.hpp"
+#include "kit_core.hpp"
+#include "tokens.hpp"
 
 #include <algorithm>
 #include <array>

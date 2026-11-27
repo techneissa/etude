@@ -5,7 +5,12 @@
 #include "bar.hpp"
 #include "bar_lineup.hpp"
 #include "bar_metrics.hpp"
+#include "kit_card.hpp"
+#include "kit_colour.hpp"
+#include "kit_core.hpp"
+#include "kit_face.hpp"
 #include "tempo.hpp"
+#include "tokens.hpp"
 
 #include <algorithm>
 

@@ -1,18 +1,23 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "kit.hpp"
+#include "kit_text.hpp"
+#include "kit_colour.hpp"
+#include "kit_core.hpp"
+#include "kit_fit.hpp"
+#include "kit_hands.hpp"
+#include "kit_icon.hpp"
+#include "kit_label_stack.hpp"
 
 #include "kit_internal.hpp"
 
 #include "clef_icon.hpp"
+#include "etude/accidental_text.hpp"
+#include "etude/note_style.hpp"
 #include "exact_shot.hpp"
 #include "font_ink.hpp"
 #include "icon_audit.hpp"
 #include "icons.hpp"
 #include "pressed_fade.hpp"
-#include "row_layout.hpp"
 #include "sections_port.hpp"
-#include "etude/accidental_text.hpp"
-#include "etude/note_style.hpp"
 #include "transport.hpp"
 
 #include <imgui_internal.h> // ClearActiveID

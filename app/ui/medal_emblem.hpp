@@ -8,7 +8,7 @@
 // Household row and the switcher (28 pt, no ribbon) reads as well as the large one.
 #pragma once
 
-#include "kit.hpp"
+#include "kit_core.hpp"
 
 #include <string>
 

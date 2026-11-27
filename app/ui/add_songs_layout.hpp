@@ -20,20 +20,13 @@
 //   unless the code is already at its least.
 #pragma once
 
+#include "rect.hpp"
 #include "tokens.hpp"
+#include "tokens_phone.hpp"
 
 #include <algorithm>
 
 namespace etude::app::ui {
-
-struct Rect {
-    float x = 0.0f;
-    float y = 0.0f;
-    float w = 0.0f;
-    float h = 0.0f;
-    float right() const { return x + w; }
-    float bottom() const { return y + h; }
-};
 
 // The Phone row: an icon, the title over the state, the switch, left to right.
 struct ToggleRowGeometry {

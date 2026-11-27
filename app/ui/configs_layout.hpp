@@ -4,9 +4,9 @@
 // the row of the other profiles, a pill for each that wraps onto a new row when the row is full.
 #pragma once
 
-#include "crash_layout.hpp"   // wrap_report
 #include "face_layout.hpp"
 #include "tokens.hpp"
+#include "tokens_popup.hpp"
 
 #include "etude/look.hpp"
 
@@ -196,7 +196,7 @@ inline float configs_reset_row_h(int lines, float u) {
 // --- The copy's confirm card ------------------------------------------------------------------
 // "Copy Dani's config?" over the page: the profile's avatar, the question, one line on what it
 // does, and Cancel and Copy side by side. It is a popup, so its sizes come from the popup rule
-// (tokens.hpp: popup_type, popup_grow, popup_width) and it is centred in the window.
+// (tokens_popup.hpp: popup_type, popup_grow, popup_width) and it is centred in the window.
 
 namespace configs_tok {
 inline constexpr float kConfirmBaseW = 344.0f; // the card's width at step 0, design points

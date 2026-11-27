@@ -15,6 +15,7 @@
 #pragma once
 
 #include "bar.hpp"
+#include "tap.hpp"
 #include "tempo.hpp"
 
 namespace etude::app::ui {

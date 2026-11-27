@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // The names the --panel option takes, and the panel each opens.
-#include "../ui.hpp"
+#include "../panel_tab.hpp"
 
 #include "page_ids.hpp"
 

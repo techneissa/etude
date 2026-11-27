@@ -1,6 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "library_screen_shared.hpp"
 
+#include "kit_chip.hpp"
+#include "kit_colour.hpp"
+#include "kit_core.hpp"
+#include "kit_fit.hpp"
+#include "kit_icon.hpp"
+#include "kit_state.hpp"
+#include "kit_text.hpp"
+#include "tokens.hpp"
+#include "tokens_library.hpp"
+
 #include <algorithm>
 #include <cmath>
 

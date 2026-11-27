@@ -7,6 +7,13 @@
 #include "icon_audit.hpp"
 #include "icons.hpp"
 #include "item_probe.hpp"
+#include "kit_chip.hpp"
+#include "kit_colour.hpp"
+#include "kit_core.hpp"
+#include "kit_icon.hpp"
+#include "kit_text.hpp"
+#include "tokens.hpp"
+#include "tokens_popup.hpp"
 
 #include <imgui_internal.h>
 

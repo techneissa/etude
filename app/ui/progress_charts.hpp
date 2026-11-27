@@ -4,8 +4,9 @@
 // box from progress_layout.hpp) and the numbers (core ProgressView); none presses anything.
 #pragma once
 
-#include "kit.hpp"
+#include "kit_core.hpp"
 #include "progress_layout.hpp"
+#include "face_layout.hpp"
 
 #include "etude/progress_view.hpp"
 

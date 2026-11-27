@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "qr_draw.hpp"
 
+#include "kit_colour.hpp"
+#include "kit_core.hpp"
+#include "tokens.hpp"
+#include "tokens_phone.hpp"
+
 #include <algorithm>
 #include <cmath>
 

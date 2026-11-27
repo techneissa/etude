@@ -14,6 +14,8 @@
 
 #include "learn_card_layout.hpp"
 #include "tokens.hpp"
+#include "tokens_learn.hpp"
+#include "tokens_melody.hpp"
 
 #include "etude/melody_manifest.hpp"
 

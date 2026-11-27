@@ -15,10 +15,13 @@
 // leaves without committing.
 #pragma once
 
-#include "kit.hpp"
+#include "kit_colour.hpp"
+#include "kit_core.hpp"
 #include "osk_focus.hpp"
 #include "osk_layout.hpp"
 #include "osk_text.hpp"
+#include "tokens.hpp"
+#include "tokens_osk.hpp"
 
 #include <span>
 #include <string>

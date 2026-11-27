@@ -18,6 +18,7 @@
 #include "key_ring_layout.hpp"
 #include "learn_drill_layout.hpp"
 #include "tokens.hpp"
+#include "tokens_learn.hpp"
 
 #include <algorithm>
 #include <array>

@@ -5,8 +5,15 @@
 #include "configs_layout.hpp"
 #include "crash_layout.hpp" // wrap_report
 #include "icons.hpp"
+#include "kit_buttons.hpp"
+#include "kit_card.hpp"
+#include "kit_colour.hpp"
+#include "kit_core.hpp"
+#include "kit_text.hpp"
 #include "profile_ui.hpp"
 #include "tap.hpp"
+#include "tokens.hpp"
+#include "tokens_popup.hpp"
 
 #include <imgui_internal.h> // BringWindowToDisplayFront
 

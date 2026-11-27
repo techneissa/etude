@@ -2,7 +2,8 @@
 #include "clef_icon.hpp"
 
 #include "../gfx.hpp"
-#include "kit.hpp"
+#include "kit_colour.hpp"
+#include "kit_core.hpp"
 
 #include "../sheet/sheet_job.hpp"
 

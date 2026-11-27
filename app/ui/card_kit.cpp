@@ -5,7 +5,16 @@
 
 #include "icon_audit.hpp"
 #include "icons.hpp"
+#include "kit_colour.hpp"
+#include "kit_core.hpp"
+#include "kit_fit.hpp"
+#include "kit_icon.hpp"
+#include "kit_icon_toggle.hpp"
+#include "kit_state.hpp"
+#include "kit_text.hpp"
 #include "replay_port.hpp"
+#include "tap.hpp"
+#include "tokens.hpp"
 
 #include <imgui_internal.h> // ShadeVertsLinearColorGradientKeepAlpha
 

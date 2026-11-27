@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Where the library screen's parts go, in ImGui points (its sizes are `lib_tok` in tokens.hpp).
+// Where the library screen's parts go, in ImGui points (its sizes are `lib_tok` in tokens_library.hpp).
 // No ImGui here.
 //
 // The screen covers everything under the top row. Top to bottom: the search row (the search field
@@ -14,6 +14,7 @@
 #include "face_layout.hpp"
 #include "osk_layout.hpp"
 #include "tokens.hpp"
+#include "tokens_library.hpp"
 
 #include "etude/library_browse.hpp"
 

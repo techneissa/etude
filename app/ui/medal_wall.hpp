@@ -6,7 +6,7 @@
 // builds a string. The view is the player's, kept in the profile's settings.
 #pragma once
 
-#include "kit.hpp"
+#include "kit_core.hpp"
 #include "medal_wall_layout.hpp"
 
 #include "etude/medal_eval.hpp"

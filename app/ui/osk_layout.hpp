@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // The on-screen keyboard: its keys, where they go, and where the name card sits above it, in ImGui
-// points (the sizes are `osk_tok` in tokens.hpp). No ImGui here. One keyboard serves every text field in the app:
+// points (the sizes are `osk_tok` in tokens_osk.hpp). No ImGui here. One keyboard serves every text field in the app:
 // the library's search and names, a section's name, a look's name, the typed tempo.
 #pragma once
 
 #include "face_layout.hpp"
 #include "tokens.hpp"
+#include "tokens_osk.hpp"
 
 #include <algorithm>
 #include <array>

@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "display_panel.hpp"
+#include "display_scale.hpp"
 #include "log_ring.hpp"
 
 #include "panel_probe.hpp"
-#include "ui.hpp"
 
 #include "etude/screen_layout.hpp"
 

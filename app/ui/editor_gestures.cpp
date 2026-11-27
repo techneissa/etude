@@ -7,6 +7,7 @@
 #include "../gfx.hpp"
 #include "../touch_device.hpp"
 #include "icons.hpp"
+#include "kit_core.hpp"
 #include "sections_ui.hpp"
 
 #include "etude/section_editing.hpp"

@@ -5,8 +5,8 @@
 
 #include "audio_out.hpp"
 #include "dev_script.hpp"
+#include "panel_tab.hpp"
 #include "song_sound.hpp"
-#include "ui.hpp"
 #include "ui/icon_audit.hpp"
 
 #include "etude/look.hpp"

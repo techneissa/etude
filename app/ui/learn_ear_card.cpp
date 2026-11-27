@@ -6,9 +6,21 @@
 
 #include "icon_audit.hpp"
 #include "icons.hpp"
+#include "kit_buttons.hpp"
+#include "kit_card.hpp"
+#include "kit_chip.hpp"
+#include "kit_colour.hpp"
+#include "kit_core.hpp"
+#include "kit_icon.hpp"
+#include "kit_press.hpp"
+#include "kit_state.hpp"
+#include "kit_text.hpp"
 #include "learn_draw.hpp"
 #include "learn_types.hpp"
 #include "note_name.hpp"
+#include "tap.hpp"
+#include "tokens.hpp"
+#include "tokens_learn.hpp"
 
 #include <algorithm>
 #include <array>

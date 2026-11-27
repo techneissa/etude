@@ -9,7 +9,7 @@
 // a tap comes back as a choice the app acts on.
 #pragma once
 
-#include "kit.hpp"
+#include "kit_core.hpp"
 #include "replay_port.hpp"
 #include "summary_board.hpp"
 #include "summary_chart.hpp"

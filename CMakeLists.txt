@@ -14,6 +14,12 @@ option(ETUDE_BUILD_TESTS "Build unit tests" ON)
 option(ETUDE_BUILD_UPDATE_HELPER "Build etude-update-helper" ON)
 option(ETUDE_UPDATE_HELPER_ONLY "Skip core: only the update helper (pass the BUILD_APP, TOOLS and TESTS switches OFF too)" OFF)
 
+# Prebuilt third-party libraries (SDL3, SDL3_ttf, Verovio, lunasvg, libremidi), for CI: see
+# cmake/Dependencies.cmake. ETUDE_DEPS_INSTALL configures only those, to be installed into
+# CMAKE_INSTALL_PREFIX; ETUDE_DEPS_PREFIX makes a normal configure use such a prefix.
+option(ETUDE_DEPS_INSTALL "Configure only the libraries that go into a prefix (for ETUDE_DEPS_PREFIX)" OFF)
+set(ETUDE_DEPS_PREFIX "" CACHE PATH "Use the libraries installed in this prefix instead of building them")
+
 # ccache, when it is installed (`brew install ccache`; `sudo apt install ccache`): every checkout and
 # checkout of this machine shares the compiled objects of the dependencies and of unchanged code, so
 # a new checkout's first build takes a fraction of the time. Off with -DETUDE_CCACHE=OFF. The
@@ -53,6 +59,9 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
 endif()
 
 include(cmake/Dependencies.cmake)
+if(ETUDE_DEPS_INSTALL)
+  return()
+endif()
 
 if(NOT ETUDE_UPDATE_HELPER_ONLY)
   add_subdirectory(core)

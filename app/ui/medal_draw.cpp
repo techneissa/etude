@@ -1,9 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "medal_draw.hpp"
 
+#include "kit_colour.hpp"
+#include "kit_core.hpp"
+#include "kit_fit.hpp"
+#include "kit_icon.hpp"
+#include "kit_text.hpp"
 #include "medal_atlas.hpp"
 #include "medal_emblem.hpp"
 #include "progress_layout.hpp"
+#include "tokens.hpp"
 
 #include <algorithm>
 #include <cmath>

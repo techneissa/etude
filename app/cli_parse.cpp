@@ -10,7 +10,7 @@
 #include "etude/session_state.hpp"
 #include "etude/sheet_view.hpp"
 #include "etude/version.hpp"
-#include "ui.hpp"
+#include "panel_tab.hpp"
 
 #include <algorithm>
 #include <cstdio>

@@ -3,7 +3,7 @@
 // emblems and the Learn gallery's Melodies picture use it.
 #pragma once
 
-#include "kit.hpp"
+#include "kit_core.hpp"
 
 namespace etude::app::ui {
 

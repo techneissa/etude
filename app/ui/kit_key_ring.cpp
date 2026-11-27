@@ -5,12 +5,19 @@
 #include "key_ring.hpp"
 
 #include "icon_audit.hpp"
+#include "kit_colour.hpp"
+#include "kit_core.hpp"
+#include "kit_fit.hpp"
+#include "kit_motion.hpp"
+#include "kit_state.hpp"
+#include "kit_text.hpp"
 #include "note_name.hpp"
 #include "tap.hpp"
+#include "tokens.hpp"
 
 #include <cctype>
-#include <cstdlib>
 #include <cstdio>
+#include <cstdlib>
 
 namespace etude::app::ui {
 

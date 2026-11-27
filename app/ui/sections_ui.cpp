@@ -4,6 +4,8 @@
 #include "sections_ui.hpp"
 
 #include "icons.hpp"
+#include "kit_colour.hpp"
+#include "kit_core.hpp"
 #include "osk.hpp"
 
 #include <algorithm>

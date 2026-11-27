@@ -5,7 +5,15 @@
 #include "icon_audit.hpp"
 #include "icons.hpp"
 #include "item_probe.hpp"
+#include "kit_card.hpp"
+#include "kit_core.hpp"
+#include "kit_icon_toggle.hpp"
+#include "kit_motion.hpp"
+#include "kit_rows.hpp"
+#include "kit_scroll.hpp"
+#include "kit_sliders.hpp"
 #include "settings_catalogue.hpp"
+#include "tokens.hpp"
 
 #include <imgui_internal.h> // ClearActiveID
 

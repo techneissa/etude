@@ -29,7 +29,7 @@
 
 #include "bar.hpp"
 #include "fit_text.hpp"
-#include "kit.hpp"
+#include "kit_core.hpp"
 #include "library_layout.hpp"
 #include "library_port.hpp"
 #include "osk.hpp"
@@ -40,8 +40,8 @@
 #include "etude/library_browse.hpp"
 #include "etude/melody_added.hpp"
 #include "etude/progress.hpp"
-#include "etude/sections.hpp"
 #include "etude/scroll_drag.hpp"
+#include "etude/sections.hpp"
 
 #include <cstddef>
 #include <cstdint>

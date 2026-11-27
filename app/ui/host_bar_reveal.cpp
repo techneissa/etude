@@ -5,14 +5,16 @@
 #include "host_impl.hpp"
 
 #include "bar_metrics.hpp"
-#include "kit.hpp"
-#include "replay_bar_layout.hpp"
-#include "tap.hpp"
-#include "toast_regions.hpp"
 #include "etude/bar_reveal.hpp"
 #include "etude/screen_layout.hpp"
 #include "etude/toast.hpp"
 #include "etude/touch_gesture.hpp"
+#include "kit_core.hpp"
+#include "kit_motion.hpp"
+#include "replay_bar_layout.hpp"
+#include "tap.hpp"
+#include "toast_regions.hpp"
+#include "tokens.hpp"
 
 #include <algorithm>
 #include <cfloat>

@@ -2,6 +2,9 @@
 // The notice after a crash, over every other screen: its card in the note area, and the sheet that
 // "Send report" opens over the whole window.
 #include "host_impl.hpp"
+#include "kit_core.hpp"
+#include "kit_tip.hpp"
+#include "tokens.hpp"
 
 namespace etude::app {
 

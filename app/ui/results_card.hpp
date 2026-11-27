@@ -7,7 +7,7 @@
 // draws a card the app made when the run finished and says what was tapped.
 #pragma once
 
-#include "kit.hpp"
+#include "kit_core.hpp"
 #include "replay_port.hpp"
 #include "results_card_layout.hpp"
 #include "summary_page.hpp"

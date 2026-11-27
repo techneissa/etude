@@ -4,6 +4,14 @@
 #include "bar.hpp" // begin_layer
 #include "card_kit.hpp"
 #include "icons.hpp"
+#include "kit_chip.hpp"
+#include "kit_colour.hpp"
+#include "kit_core.hpp"
+#include "kit_icon.hpp"
+#include "kit_icon_toggle.hpp"
+#include "kit_press.hpp"
+#include "kit_text.hpp"
+#include "tokens.hpp"
 
 #include "etude/grade_palette.hpp"
 #include "etude/unit_format.hpp"

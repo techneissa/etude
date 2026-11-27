@@ -12,10 +12,9 @@
 #pragma once
 
 #include "device_check_choice.hpp"
-#include "kit.hpp"
+#include "kit_core.hpp"
 
 #include "etude/device_check.hpp"
-
 
 namespace etude::app::ui {
 

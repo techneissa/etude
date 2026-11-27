@@ -24,7 +24,7 @@
 #pragma once
 
 #include "bar.hpp"
-#include "kit.hpp"
+#include "kit_core.hpp"
 #include "sections_port.hpp"
 
 #include "etude/editor_layout.hpp"

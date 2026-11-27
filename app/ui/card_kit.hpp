@@ -4,7 +4,8 @@
 // gradient.
 #pragma once
 
-#include "kit.hpp"
+#include "fit_text.hpp"
+#include "kit_core.hpp"
 #include "replay_port.hpp"
 
 #include "etude/color.hpp"

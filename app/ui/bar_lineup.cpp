@@ -2,6 +2,10 @@
 #include "bar_lineup.hpp"
 
 #include "icons.hpp"
+#include "kit_core.hpp"
+#include "kit_icon.hpp"
+#include "kit_icon_toggle.hpp"
+#include "tokens.hpp"
 #include "transport.hpp"
 
 #include <array>

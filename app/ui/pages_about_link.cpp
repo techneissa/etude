@@ -10,6 +10,12 @@
 #include "qr_draw.hpp"
 
 #include "../update_status.hpp"
+#include "kit_chip.hpp"
+#include "kit_colour.hpp"
+#include "kit_core.hpp"
+#include "kit_fit.hpp"
+#include "kit_text.hpp"
+#include "tokens.hpp"
 
 #include <string>
 

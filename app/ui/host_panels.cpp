@@ -5,17 +5,19 @@
 #include "host_impl.hpp"
 
 #include "editor.hpp"
+#include "etude/results_card.hpp"
 #include "icons.hpp"
-#include "kit.hpp"
+#include "kit_core.hpp"
+#include "kit_icon_toggle.hpp"
 #include "learn_screen.hpp"
 #include "library_screen.hpp"
 #include "results_card.hpp"
 #include "run_card.hpp"
 #include "settings_catalogue.hpp"
 #include "sheet.hpp"
+#include "tokens.hpp"
 #include "transpose.hpp"
 #include "view_choice.hpp"
-#include "etude/results_card.hpp"
 
 #include <cmath>
 

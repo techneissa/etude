@@ -4,6 +4,11 @@
 #include "card_kit.hpp"
 #include "fit_text.hpp"
 #include "icon_audit.hpp"
+#include "kit_colour.hpp"
+#include "kit_core.hpp"
+#include "kit_fit.hpp"
+#include "kit_text.hpp"
+#include "tokens.hpp"
 
 #include <algorithm>
 #include <array>

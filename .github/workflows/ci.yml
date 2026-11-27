@@ -149,12 +149,51 @@ jobs:
             echo "CCACHE_COMPILERCHECK=content"
           } >> "$GITHUB_ENV"
 
+      # SDL3, SDL3_ttf, Verovio, lunasvg and libremidi take about half of a cold build and most of
+      # the configure, and change only when their pins do. They are built once into a prefix that
+      # the cache keeps under a key of the files that decide them (the pins are in
+      # cmake/Dependencies.cmake), the runner image and the compiler; every other run configures
+      # and compiles only our own code. The configure stops when the prefix does not match its
+      # pins or compiler, it never builds them from source instead. A pull request builds only
+      # the tests, which need none of them.
+      - name: Find compiler
+        id: compiler
+        if: ${{ !matrix.tests_only }}
+        run: echo "id=$(c++ --version | head -n 1 | tr -c 'A-Za-z0-9._\n' '-')" >> "$GITHUB_OUTPUT"
+
+      - name: Restore dependency prefix
+        id: prefix
+        if: ${{ !matrix.tests_only }}
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/etude-deps
+          key: prefix-${{ matrix.os }}-${{ steps.compiler.outputs.id }}-${{ hashFiles('CMakeLists.txt', 'cmake/Dependencies.cmake', 'cmake/SheetLibs.cmake', 'app/sheet/verovio_zip_stub.cpp') }}
+
+      - name: Build dependency prefix
+        id: prefix_build
+        if: ${{ !matrix.tests_only && steps.prefix.outputs.cache-hit != 'true' }}
+        # No ccache: the prefix is its own cache, and these objects would only fill ccache's 1 GB.
+        run: |
+          cmake -S . -B deps-build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_COMPILE_WARNING_AS_ERROR=ON -DETUDE_CCACHE=OFF \
+            -DETUDE_DEPS_INSTALL=ON -DCMAKE_INSTALL_PREFIX="$HOME/etude-deps"
+          cmake --build deps-build
+          cmake --install deps-build
+
+      - name: Save dependency prefix
+        if: steps.prefix_build.outcome == 'success'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/etude-deps
+          key: prefix-${{ matrix.os }}-${{ steps.compiler.outputs.id }}-${{ hashFiles('CMakeLists.txt', 'cmake/Dependencies.cmake', 'cmake/SheetLibs.cmake', 'app/sheet/verovio_zip_stub.cpp') }}
+
       - name: Configure
         env:
           TESTS_ONLY: ${{ matrix.tests_only }}
         run: |
           args=()
           [ "$TESTS_ONLY" = true ] && args=(-DETUDE_BUILD_APP=OFF -DETUDE_BUILD_TOOLS=OFF)
+          [ "$TESTS_ONLY" != true ] && args=(-DETUDE_DEPS_PREFIX="$HOME/etude-deps")
           cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_COMPILE_WARNING_AS_ERROR=ON -DETUDE_PIANO_FROM_SOURCE=OFF "${args[@]}"
 

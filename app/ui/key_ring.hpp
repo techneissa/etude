@@ -5,7 +5,8 @@
 #pragma once
 
 #include "key_ring_layout.hpp"
-#include "kit.hpp"
+#include "kit_core.hpp"
+#include "tokens.hpp"
 
 #include "etude/scales.hpp"
 

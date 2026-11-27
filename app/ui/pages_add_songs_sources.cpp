@@ -3,6 +3,15 @@
 
 #include "add_songs_layout.hpp"
 #include "icons.hpp"
+#include "kit_card.hpp"
+#include "kit_chip.hpp"
+#include "kit_colour.hpp"
+#include "kit_core.hpp"
+#include "kit_fit.hpp"
+#include "kit_icon.hpp"
+#include "kit_scroll.hpp"
+#include "kit_text.hpp"
+#include "tokens.hpp"
 
 #include "etude/network_share.hpp"
 

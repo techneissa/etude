@@ -8,7 +8,7 @@
 // colours) is core's palette.hpp.
 #pragma once
 
-#include "kit.hpp"
+#include "kit_core.hpp"
 
 namespace etude::app::ui {
 

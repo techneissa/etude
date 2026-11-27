@@ -2,8 +2,9 @@
 // The two-column layout the settings pages share.
 #pragma once
 
-#include "kit.hpp"
+#include "kit_core.hpp"
 #include "settings_catalogue.hpp"
+#include "tokens.hpp"
 
 #include <cmath>
 

@@ -4,7 +4,7 @@
 // alone for the title medals' notes and clef.
 #pragma once
 
-#include "kit.hpp"
+#include "kit_core.hpp"
 
 namespace etude::app::ui {
 

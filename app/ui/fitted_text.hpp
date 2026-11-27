@@ -3,7 +3,8 @@
 // page's frame costs a few comparisons and not a measuring of its text.
 #pragma once
 
-#include "kit.hpp"
+#include "kit_fit.hpp"
+#include "kit_text.hpp"
 
 #include <string>
 

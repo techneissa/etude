@@ -4,9 +4,12 @@
 #include "host_impl.hpp"
 
 #include "bar.hpp"
-#include "kit.hpp"
+#include "kit_core.hpp"
+#include "kit_text.hpp"
 #include "tempo.hpp"
 #include "toast_regions.hpp"
+#include "tokens.hpp"
+#include "tokens_popup.hpp"
 #include "transport.hpp"
 
 #include <algorithm>

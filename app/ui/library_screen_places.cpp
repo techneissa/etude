@@ -3,11 +3,16 @@
 
 #include "library_screen_shared.hpp"
 
+#include "../sheet/sheet_preview.hpp"
 #include "icon_audit.hpp"
 #include "icons.hpp"
+#include "kit_chip.hpp"
+#include "kit_core.hpp"
+#include "kit_tip.hpp"
 #include "preview.hpp"
-#include "../sheet/sheet_preview.hpp"
 #include "settings_catalogue.hpp"
+#include "tokens.hpp"
+#include "tokens_library.hpp"
 
 #include "etude/level_stars.hpp"
 #include "etude/tap_rule.hpp"

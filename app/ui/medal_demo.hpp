@@ -6,6 +6,7 @@
 #pragma once
 
 #include "bar.hpp"
+#include "face_layout.hpp"
 
 namespace etude::app::ui {
 

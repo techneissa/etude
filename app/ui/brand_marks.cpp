@@ -4,7 +4,8 @@
 #include "../gfx.hpp"
 #include "../icon_assets.hpp"
 #include "icon_audit.hpp"
-#include "kit.hpp"
+#include "kit_colour.hpp"
+#include "kit_core.hpp"
 
 #include <SDL3/SDL.h>
 #include <lunasvg.h>

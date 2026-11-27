@@ -6,7 +6,8 @@
 // action and the app applies it to the run.
 #pragma once
 
-#include "kit.hpp"
+#include "kit_core.hpp"
+#include "kit_state.hpp"
 #include "run_card_layout.hpp"
 
 #include "etude/trouble_run.hpp"

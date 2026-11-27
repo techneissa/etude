@@ -2,7 +2,7 @@
 #include "font_ink.hpp"
 
 #include "ink_measure.hpp"
-#include "kit.hpp"
+#include "kit_text.hpp"
 
 #include <cmath>
 #include <cstdint>

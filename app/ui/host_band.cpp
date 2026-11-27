@@ -4,8 +4,9 @@
 #include "host_impl.hpp"
 
 #include "editor.hpp"
-#include "kit.hpp"
+#include "kit_core.hpp"
 #include "section_band.hpp"
+#include "tokens.hpp"
 
 namespace etude::app {
 

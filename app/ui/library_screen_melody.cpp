@@ -9,6 +9,15 @@
 #include "../library_row.hpp"
 
 #include "icons.hpp"
+#include "kit_buttons.hpp"
+#include "kit_card.hpp"
+#include "kit_chip.hpp"
+#include "kit_colour.hpp"
+#include "kit_core.hpp"
+#include "kit_fit.hpp"
+#include "kit_text.hpp"
+#include "tokens.hpp"
+#include "tokens_library.hpp"
 
 #include "etude/melody_steps.hpp"
 

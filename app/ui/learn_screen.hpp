@@ -18,11 +18,11 @@
 #pragma once
 
 #include "bar.hpp"
+#include "chip_strip.hpp"
 #include "ear_layout.hpp"
 #include "ear_session.hpp"
-#include "chip_strip.hpp"
-#include "kit.hpp"
 #include "key_ring.hpp"
+#include "kit_core.hpp"
 #include "learn_draw.hpp"
 #include "learn_layout.hpp"
 #include "learn_melodies.hpp"

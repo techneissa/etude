@@ -4,6 +4,15 @@
 #include "colour_widgets_internal.hpp"
 
 #include "bar.hpp" // begin_layer
+#include "kit_card.hpp"
+#include "kit_colour.hpp"
+#include "kit_core.hpp"
+#include "kit_fit.hpp"
+#include "kit_icon.hpp"
+#include "kit_press.hpp"
+#include "kit_state.hpp"
+#include "kit_text.hpp"
+#include "tokens.hpp"
 #include "top_menu_layout.hpp"
 
 #include <imgui_internal.h> // BringWindowToDisplayFront

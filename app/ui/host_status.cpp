@@ -4,9 +4,13 @@
 #include "host_impl.hpp"
 
 #include "bar_metrics.hpp"
-#include "kit.hpp"
-#include "status_fit.hpp"
 #include "etude/top_indicator.hpp"
+#include "kit_colour.hpp"
+#include "kit_core.hpp"
+#include "kit_fit.hpp"
+#include "kit_text.hpp"
+#include "status_fit.hpp"
+#include "tokens.hpp"
 
 #include <algorithm>
 #include <array>

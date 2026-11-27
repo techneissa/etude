@@ -9,10 +9,15 @@
 
 #include "icon_audit.hpp"
 #include "icons.hpp"
+#include "kit_chip.hpp"
+#include "kit_colour.hpp"
+#include "kit_core.hpp"
+#include "kit_text.hpp"
 #include "learn_draw.hpp"
 #include "learn_lit.hpp"
 #include "learn_types.hpp"
 #include "note_name.hpp"
+#include "tokens.hpp"
 
 #include <algorithm>
 #include <array>

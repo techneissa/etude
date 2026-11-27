@@ -9,9 +9,8 @@
 // wider to match.
 #pragma once
 
-#include "about_layout.hpp"
-#include "add_songs_layout.hpp"
 #include "tokens.hpp"
+#include "tokens_popup.hpp"
 
 #include <algorithm>
 #include <array>

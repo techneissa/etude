@@ -20,7 +20,7 @@
 
 #include "chip_strip.hpp"
 #include "fit_text.hpp"
-#include "kit.hpp"
+#include "kit_core.hpp"
 #include "learn_melodies_layout.hpp"
 
 #include "../melody_book.hpp"

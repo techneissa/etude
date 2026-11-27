@@ -12,8 +12,8 @@
 //   to fit.
 #pragma once
 
-#include "add_songs_layout.hpp"
 #include "tokens.hpp"
+#include "rect.hpp"
 
 #include "etude/learn_palette.hpp"
 

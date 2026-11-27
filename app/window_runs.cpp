@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // The toast, the practice history, the results card and the trouble-bar run's check-in.
+#include "ui/kit_state.hpp"
 #include "window_state.hpp"
 
 #include <algorithm>

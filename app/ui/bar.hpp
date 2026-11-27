@@ -11,9 +11,10 @@
 //   Dock    a dock centred in the window, play the one filled button.
 #pragma once
 
-#include "kit.hpp"
+#include "kit_core.hpp"
 #include "pages.hpp"
 #include "song_port.hpp"
+#include "tap.hpp"
 
 #include "etude/screen_layout.hpp"
 #include "etude/session_state.hpp"

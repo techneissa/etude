@@ -5,9 +5,22 @@
 #include "fit_text.hpp"
 #include "icon_audit.hpp"
 #include "icons.hpp"
+#include "kit_buttons.hpp"
+#include "kit_colour.hpp"
+#include "kit_core.hpp"
+#include "kit_fit.hpp"
+#include "kit_icon.hpp"
+#include "kit_label_stack.hpp"
+#include "kit_press.hpp"
+#include "kit_scroll.hpp"
+#include "kit_segmented.hpp"
+#include "kit_state.hpp"
+#include "kit_text.hpp"
 #include "profile_ui.hpp"
 #include "segment_layout.hpp"
 #include "summary_chart.hpp"
+#include "tap.hpp"
+#include "tokens.hpp"
 
 #include <algorithm>
 #include <array>

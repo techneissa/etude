@@ -6,6 +6,8 @@
 
 #include "icons.hpp"
 #include "item_probe.hpp"
+#include "kit_core.hpp"
+#include "kit_rows.hpp"
 #include "port_lists.hpp"
 
 #include <string>

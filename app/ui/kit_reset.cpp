@@ -1,6 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // The reset button of a settings slider or stepper row, and the toast that says what it did.
+#include "kit_colour.hpp"
+#include "kit_core.hpp"
+#include "kit_icon.hpp"
 #include "kit_internal.hpp"
+#include "kit_state.hpp"
+#include "tap.hpp"
+#include "tokens.hpp"
 
 namespace etude::app::ui {
 

@@ -4,7 +4,10 @@
 #include "bar.hpp"
 #include "bar_lineup.hpp"
 #include "bar_metrics.hpp"
+#include "kit_colour.hpp"
+#include "kit_core.hpp"
 #include "tempo.hpp"
+#include "tokens.hpp"
 
 namespace etude::app::ui {
 

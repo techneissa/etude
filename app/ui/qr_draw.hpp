@@ -4,7 +4,7 @@
 // pixels, black on a white tile with its quiet zone inside the tile.
 #pragma once
 
-#include "kit.hpp"
+#include "kit_core.hpp"
 
 #include "../qr_code.hpp"
 

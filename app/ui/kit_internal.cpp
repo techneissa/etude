@@ -2,6 +2,14 @@
 #include "kit_internal.hpp"
 
 #include "info_toggle.hpp"
+#include "kit_colour.hpp"
+#include "kit_core.hpp"
+#include "kit_fit.hpp"
+#include "kit_icon.hpp"
+#include "kit_label_stack.hpp"
+#include "kit_state.hpp"
+#include "kit_text.hpp"
+#include "tokens.hpp"
 #include "touch_rules.hpp"
 
 #include <string>

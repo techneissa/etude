@@ -9,6 +9,7 @@
 
 #include "bar.hpp"
 #include "profile_port.hpp"
+#include "tap.hpp"
 #include "top_menu_layout.hpp"
 
 #include <optional>

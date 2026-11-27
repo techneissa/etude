@@ -5,7 +5,7 @@
 #include "../frame_log.hpp"
 #include "card_kit.hpp"
 #include "exact_shot.hpp"
-#include "kit.hpp"
+#include "kit_core.hpp"
 #include "results_card.hpp"
 #include "results_card_layout.hpp"
 #include "tokens.hpp"

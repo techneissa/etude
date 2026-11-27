@@ -7,8 +7,10 @@
 #include "colours_layout.hpp"
 #include "icon_audit.hpp"
 #include "icons.hpp"
+#include "kit_colour.hpp"
+#include "kit_state.hpp"
+#include "kit_text.hpp"
 #include "preview.hpp"
-#include "row_layout.hpp"
 #include "settings_catalogue.hpp"
 #include "tap.hpp"
 

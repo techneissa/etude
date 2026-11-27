@@ -5,7 +5,7 @@
 // is touched here. Laid out by add_songs_layout.hpp.
 #pragma once
 
-#include "kit.hpp"
+#include "kit_core.hpp"
 #include "sources_port.hpp"
 
 #include <string>

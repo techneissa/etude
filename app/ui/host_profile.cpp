@@ -4,6 +4,8 @@
 #include "host_impl.hpp"
 
 #include "bar.hpp"
+#include "kit_core.hpp"
+#include "tokens.hpp"
 
 #include <imgui_internal.h> // BringWindowToDisplayFront
 

@@ -5,12 +5,16 @@
 
 #include "library_screen.hpp"
 
+#include "../sheet/sheet_preview.hpp"
 #include "icon_audit.hpp"
 #include "icons.hpp"
+#include "kit_chip.hpp"
+#include "kit_icon.hpp"
+#include "kit_state.hpp"
 #include "preview.hpp"
-#include "tap.hpp"
-#include "../sheet/sheet_preview.hpp"
 #include "settings_catalogue.hpp"
+#include "tap.hpp"
+#include "tokens_library.hpp"
 
 #include "etude/level_stars.hpp"
 #include "etude/tap_rule.hpp"

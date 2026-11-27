@@ -13,9 +13,10 @@
 //   the body is cut where it must be.
 #pragma once
 
-#include "about_layout.hpp"
 #include "add_songs_layout.hpp"
 #include "tokens.hpp"
+#include "tokens_phone.hpp"
+#include "tokens_popup.hpp"
 
 #include <algorithm>
 #include <string>

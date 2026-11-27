@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Where the Learn screen's parts go, in ImGui points (its sizes are `learn_tok` in tokens.hpp). No ImGui here.
+// Where the Learn screen's parts go, in ImGui points (its sizes are `learn_tok` in tokens_learn.hpp). No ImGui here.
 //
 // The screen covers everything under the top row. Its two pages, both with a header row (back, the
 // page's name, and on the cards the four tabs):
@@ -19,8 +19,8 @@
 
 #include "face_layout.hpp"
 #include "learn_card_layout.hpp"
-#include "key_ring_layout.hpp"
 #include "tokens.hpp"
+#include "tokens_learn.hpp"
 
 #include "etude/scale_diagram.hpp"
 #include "etude/scales.hpp"

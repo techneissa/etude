@@ -6,7 +6,7 @@
 // `ReviewInfo::board`.
 #pragma once
 
-#include "kit.hpp"
+#include "kit_core.hpp"
 #include "replay_port.hpp"
 #include "summary_board_text.hpp"
 #include "summary_chart.hpp"

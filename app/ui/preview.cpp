@@ -5,10 +5,15 @@
 #include "icon_audit.hpp"
 
 #include "../frame_log.hpp"
-#include "../song_controller.hpp" // kGradeShowNs
-#include "../ui.hpp"              // display_px_per_mm
+#include "../scene.hpp"
+#include "../song_controller_types.hpp" // kGradeShowNs
+#include "../ui.hpp"                    // display_px_per_mm
+#include "etude/hit_line.hpp"
 #include "etude/midi_event.hpp"
 #include "etude/screen_layout.hpp"
+#include "kit_colour.hpp"
+#include "kit_core.hpp"
+#include "tokens.hpp"
 
 #include <imgui.h>
 

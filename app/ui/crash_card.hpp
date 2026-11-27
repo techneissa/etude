@@ -6,13 +6,16 @@
 // does it. Laid out by crash_layout.hpp.
 #pragma once
 
-#include "kit.hpp"
+#include "kit_core.hpp"
+#include "rect.hpp"
 
 #include <string>
 #include <string_view>
 #include <vector>
 
 namespace etude::app::ui {
+
+struct ChipOpts;
 
 // What the card shows (the app owns the strings).
 struct CrashView {

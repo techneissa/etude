@@ -12,9 +12,9 @@
 //   for the library's details; it loops after a short rest.
 #pragma once
 
-#include "kit.hpp"
+#include "kit_core.hpp"
 
-#include "../scene.hpp"
+#include "../scene_types.hpp"
 #include "etude/key_state.hpp"
 #include "etude/keyboard.hpp"
 #include "etude/keyboard_view.hpp"
@@ -28,6 +28,10 @@
 #include <memory>
 #include <span>
 #include <vector>
+
+namespace etude::app {
+class Scene;
+}
 
 namespace etude::app::ui {
 

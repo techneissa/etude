@@ -23,7 +23,8 @@
 #pragma once
 
 #include "band_layout.hpp"
-#include "kit.hpp"
+#include "fit_text.hpp"
+#include "kit_core.hpp"
 #include "sections_port.hpp"
 #include "song_port.hpp"
 

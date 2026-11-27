@@ -16,6 +16,7 @@
 
 #include "ear_session.hpp"
 #include "learn_card_layout.hpp"
+#include "tokens_learn.hpp"
 
 #include <algorithm>
 #include <array>

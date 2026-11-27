@@ -2,7 +2,12 @@
 #include "learn_melodies_art.hpp"
 
 #include "icons.hpp"
+#include "kit_colour.hpp"
+#include "kit_core.hpp"
+#include "kit_icon.hpp"
 #include "music_glyph.hpp"
+#include "tokens.hpp"
+#include "tokens_learn.hpp"
 
 #include "etude/learn_colours.hpp"
 

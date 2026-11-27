@@ -3,13 +3,25 @@
 
 #include "confirm_arm.hpp"
 
+#include "colours_layout.hpp"
 #include "icon_audit.hpp"
 #include "icons.hpp"
 #include "item_probe.hpp"
+#include "kit_buttons.hpp"
+#include "kit_card.hpp"
+#include "kit_colour.hpp"
+#include "kit_core.hpp"
+#include "kit_fit.hpp"
+#include "kit_icon.hpp"
+#include "kit_motion.hpp"
+#include "kit_scroll.hpp"
+#include "kit_state.hpp"
+#include "kit_text.hpp"
 #include "row_layout.hpp"
 #include "settings_catalogue.hpp"
-#include "colours_layout.hpp"
 #include "sheet_layout.hpp"
+#include "tap.hpp"
+#include "tokens.hpp"
 
 #include <imgui_internal.h> // a window's content height
 

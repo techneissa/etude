@@ -2,6 +2,7 @@
 // The frame, second half: lays the frame out, draws the scene and the UI, and presents it.
 #include "window_state.hpp"
 
+#include "ui/tokens.hpp"
 #include "update_start.hpp"
 
 #include <SDL3/SDL.h>

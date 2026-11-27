@@ -5,9 +5,21 @@
 
 #include "icon_audit.hpp"
 #include "icons.hpp"
+#include "key_ring.hpp"
+#include "kit_colour.hpp"
+#include "kit_core.hpp"
+#include "kit_icon.hpp"
+#include "kit_icon_toggle.hpp"
+#include "kit_label_stack.hpp"
+#include "kit_motion.hpp"
+#include "kit_press.hpp"
+#include "kit_state.hpp"
+#include "kit_text.hpp"
 #include "learn_draw.hpp"
 #include "learn_types.hpp"
-#include "key_ring.hpp"
+#include "tap.hpp"
+#include "tokens.hpp"
+#include "tokens_learn.hpp"
 
 #include <algorithm>
 #include <array>

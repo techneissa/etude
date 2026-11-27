@@ -4,10 +4,9 @@
 // column or two. Each setting is drawn on one page only (settings_catalogue.hpp).
 #pragma once
 
-#include "kit.hpp"
+#include "kit_core.hpp"
 #include "page_ids.hpp"
 #include "settings_catalogue.hpp"
-#include "sheet_layout.hpp"
 
 #include <array>
 #include <cstdint>

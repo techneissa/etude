@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
-#include "etude/evaluator.hpp"
+#include "etude/evaluator_results.hpp"
 #include "etude/note_window.hpp"
 
 #include <cstddef>

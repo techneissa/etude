@@ -17,6 +17,7 @@
 #include "bar.hpp"
 #include "osk.hpp"
 #include "pages.hpp"
+#include "tap.hpp"
 #include "transpose.hpp"
 
 #include "etude/count_band.hpp"

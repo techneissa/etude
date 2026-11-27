@@ -6,10 +6,11 @@
 // is profile_layout.hpp; what the app is told is profile_port.hpp.
 #pragma once
 
-#include "kit.hpp"
+#include "kit_core.hpp"
 #include "osk.hpp"
 #include "profile_layout.hpp"
 #include "profile_port.hpp"
+#include "tap.hpp"
 
 #include <cstdint>
 #include <string>

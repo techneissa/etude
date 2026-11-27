@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // The pin at the end of the bar and the grab handle that shows the bar is there while it is hidden.
 #include "bar.hpp"
+#include "kit_colour.hpp"
+#include "kit_core.hpp"
+#include "kit_icon_toggle.hpp"
 
 namespace etude::app::ui {
 

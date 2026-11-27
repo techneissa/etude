@@ -3,9 +3,20 @@
 
 #include "icon_audit.hpp"
 #include "icons.hpp"
+#include "kit_buttons.hpp"
+#include "kit_colour.hpp"
+#include "kit_core.hpp"
+#include "kit_fit.hpp"
+#include "kit_icon.hpp"
+#include "kit_label_stack.hpp"
+#include "kit_press.hpp"
+#include "kit_segmented.hpp"
+#include "kit_state.hpp"
+#include "kit_text.hpp"
 #include "medal_draw.hpp"
 #include "progress_charts.hpp"
 #include "tap.hpp"
+#include "tokens.hpp"
 
 #include <algorithm>
 #include <cstdio>

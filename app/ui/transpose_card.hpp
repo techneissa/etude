@@ -7,6 +7,7 @@
 #pragma once
 
 #include "tokens.hpp"
+#include "tokens_popup.hpp"
 
 #include <algorithm>
 

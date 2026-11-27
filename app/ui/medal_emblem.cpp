@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "medal_emblem.hpp"
 
+#include "kit_colour.hpp"
+#include "kit_core.hpp"
 #include "medal_atlas.hpp"
 #include "music_glyph.hpp"
 

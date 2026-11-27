@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "music_glyph.hpp"
 
+#include "kit_core.hpp"
+
 namespace etude::app::ui {
 
 void draw_music_glyph(const Kit& k, ImDrawList* dl, ImVec2 centre, ImWchar cp, float ink_h, ImU32 ink) {

@@ -5,7 +5,7 @@
 // wrong (take_wrong_presses); this is the rule that turns those into what is drawn.
 #pragma once
 
-#include "etude/evaluator.hpp"
+#include "etude/evaluator_results.hpp"
 
 #include <array>
 #include <cstdint>

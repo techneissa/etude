@@ -4,6 +4,9 @@
 #include "host_impl.hpp"
 
 #include "icons.hpp"
+#include "kit_core.hpp"
+#include "kit_icon_toggle.hpp"
+#include "tokens.hpp"
 
 namespace etude::app {
 
