@@ -12,6 +12,7 @@ target_compile_features(etude_upload_page PRIVATE cxx_std_20)
 find_package(Threads REQUIRED)
 add_library(etude_app_core STATIC
   catalogue_service.cpp
+  catalogue_service_net.cpp
   catalogue_service_search.cpp
   crash_handler.cpp
   crash_notice.cpp
@@ -23,6 +24,8 @@ add_library(etude_app_core STATIC
   frame_log.cpp
   hand_split_job.cpp
   history_journal.cpp
+  history_journal_decode.cpp
+  history_journal_encode.cpp
   history_schema.cpp
   history_store.cpp
   history_store_journal.cpp
@@ -39,6 +42,7 @@ add_library(etude_app_core STATIC
   library_binding_progress.cpp
   library_catalogue.cpp
   library_catalogue_shelves.cpp
+  library_catalogue_versions.cpp
   library_files.cpp
   library_row.cpp
   log_ring.cpp
@@ -52,6 +56,8 @@ add_library(etude_app_core STATIC
   run_program.cpp
   runs_file.cpp
   sections_controller.cpp
+  sections_controller_advice.cpp
+  sections_controller_plan.cpp
   settings_store.cpp
   share_probe.cpp
   song_controller.cpp
@@ -162,6 +168,7 @@ add_executable(etude
   alloc_probe.cpp
   audio_out.cpp
   bench.cpp
+  bench_schedule.cpp
   chord_label_view.cpp
   cli_parse.cpp
   cli_parse_dev.cpp
@@ -249,6 +256,7 @@ add_executable(etude
   ui/host_bar_reveal.cpp
   ui/host_crash.cpp
   ui/host_fonts.cpp
+  ui/host_frame.cpp
   ui/host_learn.cpp
   ui/host_menu.cpp
   ui/host_open_panel.cpp

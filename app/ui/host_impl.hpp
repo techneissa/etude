@@ -51,6 +51,9 @@ namespace etude::app {
 // Renders the frame's draw data (and hashes it for the idle gate); host.cpp.
 void render_draw_data(SDL_Renderer* renderer);
 
+// The bar of a style; host.cpp.
+std::unique_ptr<ui::BarLook> make_bar(BarStyle style);
+
 // Whether the point is inside the box (its right and bottom edges outside).
 inline bool box_has(const ui::Box& b, ImVec2 p) {
     return p.x >= b.x0 && p.x < b.x1 && p.y >= b.y0 && p.y < b.y1;

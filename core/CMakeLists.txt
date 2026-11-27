@@ -162,6 +162,8 @@ add_library(etude_core
   src/screen_layout.cpp
   src/scroll_drag.cpp
   src/section_editing.cpp
+  src/section_library.cpp
+  src/section_names.cpp
   src/section_overview.cpp
   src/section_suggestions.cpp
   src/sections.cpp
