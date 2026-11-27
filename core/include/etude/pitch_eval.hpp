@@ -103,6 +103,10 @@ struct SynthEvalOptions {
     // learned the tuning from them, so a melody can come out a little differently. Open chords:
     // the same, the earlier chords drawn but not scored.
     int melody_first = 0;
+    // Open chords: the registers whose chords are rendered and scored (bit n is register n, see
+    // register_of). The others are drawn but skipped, as with melody_first, so a chord that is
+    // kept is the one a run over every register plays.
+    unsigned chord_registers = ~0u;
 };
 
 // Open detection over the synthetic set. The detector is calibrated once on room noise alone.

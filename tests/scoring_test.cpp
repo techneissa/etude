@@ -632,9 +632,11 @@ TEST_CASE("wait: a press still queued when a seek lands is not marked wrong") {
     CHECK(rig.eval.waiting_for_s() == 8.0);
 }
 
-TEST_CASE("wait: a press still queued at a loop wrap belongs to the lap it was played in") {
-    // Chords at 0 and 1 s, loop 0..2 s. A wrong key is pressed in the last frame before the wrap:
-    // lap one's, not the next lap's, so lap two can still be clean.
+// A wrong key stamped in the last frame before a loop wrap and applied with it belongs to the lap it
+// was played in: lap one's, not the next lap's, so lap two can still be clean. Each mode plays it and
+// returns the passes it finished.
+std::vector<PassResult> wait_wrap_passes() {
+    // Chords at 0 and 1 s, loop 0..2 s. The wrong key is pressed in the last frame before the wrap.
     const auto make = [](WaitRig& rig) {
         REQUIRE(rig.transport.set_loop(0, 0.0, 2.0));
         rig.transport.set_loop_enabled(0, true);
@@ -670,17 +672,13 @@ TEST_CASE("wait: a press still queued at a loop wrap belongs to the lap it was p
     }
     std::vector<PassResult> passes;
     rig.eval.take_passes(passes);
-    REQUIRE(!passes.empty());
-    CHECK(passes[0].wrong == 1);
-    CHECK_FALSE(passes[0].clean);
     CHECK(rig.summary().wrong == 1);
     CHECK(rig.eval.waiting_for_s() == 0.0); // lap two waits from the loop start again
+    return passes;
 }
 
-TEST_CASE("flow: a press still queued at a loop wrap belongs to the lap it was played in") {
-    // Notes at 0.5 and 1.5 s, loop 0..2 s, play from wall 1 s: the wrap is at wall 3 s. A wrong key
-    // is stamped in the last frame before it and applied with the wrap: lap one's, so lap two is
-    // clean.
+std::vector<PassResult> flow_wrap_passes() {
+    // Notes at 0.5 and 1.5 s, loop 0..2 s, play from wall 1 s: the wrap is at wall 3 s.
     FlowRig rig(song_of({{0.5, 60}, {1.5, 62}}));
     REQUIRE(rig.transport.set_loop(0, 0.0, 2.0));
     rig.transport.set_loop_enabled(0, true);
@@ -696,11 +694,26 @@ TEST_CASE("flow: a press still queued at a loop wrap belongs to the lap it was p
     REQUIRE(rig.transport.loop_count() >= 1);
     std::vector<PassResult> passes;
     rig.eval.take_passes(passes);
-    REQUIRE(passes.size() >= 2);
-    CHECK(passes[0].wrong == 1);
-    CHECK_FALSE(passes[0].clean);
-    CHECK(passes[1].wrong == 0);
-    CHECK(passes[1].clean);
+    return passes;
+}
+
+TEST_CASE("a press still queued at a loop wrap belongs to the lap it was played in") {
+    const struct {
+        const char* mode;
+        std::vector<PassResult> (*play)();
+        bool second_lap; // Flow plays lap two right; Wait checks its position instead
+    } modes[] = {{"wait", wait_wrap_passes, false}, {"flow", flow_wrap_passes, true}};
+    for (const auto& m : modes) {
+        CAPTURE(m.mode);
+        const std::vector<PassResult> passes = m.play();
+        REQUIRE(passes.size() >= (m.second_lap ? 2u : 1u));
+        CHECK(passes[0].wrong == 1);
+        CHECK_FALSE(passes[0].clean);
+        if (m.second_lap) {
+            CHECK(passes[1].wrong == 0);
+            CHECK(passes[1].clean);
+        }
+    }
 }
 
 TEST_CASE("wait: a press still queued when the song switches is not judged against the new song") {
@@ -802,30 +815,41 @@ TEST_CASE("wait: a press while paused or before play never plays a chord") {
     CHECK(early.summary().counts.played == 0);
 }
 
-TEST_CASE("flow and wait agree on one key struck for two notes 21 ms apart") {
-    const Song close = song_of({{1.000, 60, Hand::Right}, {1.021, 60, Hand::Left}, {3.0, 72}});
-    const EvaluationSummary s = flow(close, {press(2.0105, 60), press(4.0, 72)});
-    CHECK(hits(s) == 3);
-    CHECK(s.counts.missed == 0);
-    WaitRig rig(close);
-    rig.begin(2.5);
-    rig.send(press(2.5, 60));
-    rig.run_until(3.0);
-    CHECK(rig.summary().counts.played == 2);
-    CHECK(rig.eval.waiting_for_s() == 3.0);
-}
-
-TEST_CASE("flow and wait agree that one key 40 ms apart needs two strikes") {
-    const Song apart = song_of({{1.000, 60}, {1.040, 60}, {3.0, 72}});
-    const EvaluationSummary s = flow(apart, {press(2.02, 60)});
-    CHECK(hits(s) == 1);
-    CHECK(s.counts.missed == 2);
-    WaitRig rig(apart);
-    rig.begin(2.5);
-    rig.send(press(2.5, 60));
-    rig.run_until(3.0);
-    CHECK(rig.summary().counts.played == 1);
-    CHECK(rig.eval.waiting_for_s() == doctest::Approx(1.040));
+TEST_CASE("flow and wait agree on one key struck for two notes 21 ms and 40 ms apart") {
+    struct Case {
+        const char* gap;
+        Song song;
+        double flow_press_s;   // the key struck once, at this wall time
+        bool plays_last_note;  // and the note at 3 s played too
+        int flow_hits;
+        int flow_missed;
+        int wait_played;
+        double wait_waiting_for_s;
+    };
+    const Case cases[] = {
+        {"21 ms: one strike plays both",
+         song_of({{1.000, 60, Hand::Right}, {1.021, 60, Hand::Left}, {3.0, 72}}),
+         2.0105,
+         true,
+         3,
+         0,
+         2,
+         3.0},
+        {"40 ms: two strikes are needed", song_of({{1.000, 60}, {1.040, 60}, {3.0, 72}}), 2.02, false, 1, 2, 1, 1.040},
+    };
+    for (const Case& c : cases) {
+        CAPTURE(c.gap);
+        const EvaluationSummary s = c.plays_last_note ? flow(c.song, {press(c.flow_press_s, 60), press(4.0, 72)})
+                                                      : flow(c.song, {press(c.flow_press_s, 60)});
+        CHECK(hits(s) == c.flow_hits);
+        CHECK(s.counts.missed == c.flow_missed);
+        WaitRig rig(c.song);
+        rig.begin(2.5);
+        rig.send(press(2.5, 60));
+        rig.run_until(3.0);
+        CHECK(rig.summary().counts.played == c.wait_played);
+        CHECK(rig.eval.waiting_for_s() == doctest::Approx(c.wait_waiting_for_s));
+    }
 }
 
 TEST_CASE("wait: a key of a later chord pressed early is not wrong") {
@@ -1103,8 +1127,8 @@ TEST_CASE("run record: sanitized forces every field into its documented range") 
     r.all.graded = -1;
     r.counts.perfect = 2'000'000'000;
     const RunRecord s = sanitized(r);
-    CHECK(s.speed_percent == 200);
-    CHECK(s.transpose_semitones == -12);
+    CHECK(s.speed_percent == kMaxSpeedPercent);
+    CHECK(s.transpose_semitones == -kMaxTransposeSemitones);
     CHECK(s.duration_ms == 0);
     CHECK(s.local_day == kMaxRunDay);
     CHECK(s.wrong == 0);

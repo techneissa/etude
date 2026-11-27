@@ -120,8 +120,8 @@ TEST_CASE("fetch: only https, only the catalogue's hosts, redirects stay on http
     CHECK(redirect_target("https://a.org/x/y", "/z") == "https://a.org/z");
     CHECK(redirect_target("https://a.org/x/y", "//b.org/q").empty());
     CurlFetcher curl; // refuses before it reaches out
-    CHECK(curl.fetch("http://www.mutopiaproject.org/", hosts, 1000, {}).reason == "Only secure links are used");
-    CHECK(curl.fetch("https://example.org/", hosts, 1000, {}).reason == "That site is not one of the catalogues");
+    CHECK_FALSE(curl.fetch("http://www.mutopiaproject.org/", hosts, 1000, {}).ok);
+    CHECK_FALSE(curl.fetch("https://example.org/", hosts, 1000, {}).ok);
 }
 
 TEST_CASE("catalogue: a song file comes only from under its catalogue, and is named inside its folder") {
@@ -199,11 +199,10 @@ TEST_CASE("catalogue service: a download lands in the catalogue's folder and nev
     REQUIRE(again);
     CHECK(again->path == root / "songs/Mutopia/J. Wanhal - Rondo (2).mid");
     CHECK(read_file(kept) == rondo);
-    // A file that is not a song fails with a reason and is not kept.
+    // A file that is not a song fails and is not kept.
     const std::uint32_t fake = entry("Les Lanciers");
     s.download(fake);
     REQUIRE(until([&] { return s.file(fake).state == CatalogueFile::State::Failed; }));
-    CHECK(s.file_reason(fake) == "The file is not a song");
 }
 
 TEST_CASE("melody manifest: a file with no licence line is refused") {

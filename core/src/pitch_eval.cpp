@@ -547,7 +547,7 @@ OpenChordReport evaluate_open_chord_synthetic(const SynthEvalOptions& options, i
                    options.melody_note_velocities ? pick_velocity() : velocity, length,
                    base + static_cast<std::uint64_t>(i));
         }
-        if (c < options.melody_first) {
+        if (c < options.melody_first || ((options.chord_registers >> reg) & 1u) == 0) {
             continue;
         }
         std::vector<float> audio(static_cast<size_t>(length), 0.0f);

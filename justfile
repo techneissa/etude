@@ -58,7 +58,7 @@ test *args: build
 # The full unit suite and the settings check (the same as `just test --all`)
 test-all: (test "--all")
 
-# Export the committed tree the way a public publish would and fail on any leak-guard hit (internal wording, personal paths, secrets, CRLF) after the guard's own self-test; pushes nothing. About 15 s, so it runs in the batch gate, not in `just test` (arg: a git ref, default HEAD)
+# Export the committed tree the way a public publish would and fail on any leak-guard hit (internal wording, personal paths, secrets, CRLF) after the guard's own self-test, then runs actionlint on the exported workflows; pushes nothing. About 15 s, so it runs in the batch gate, not in `just test` (arg: a git ref, default HEAD)
 publish-check ref="HEAD":
     #!/usr/bin/env bash
     set -euo pipefail
@@ -66,6 +66,12 @@ publish-check ref="HEAD":
     out="$(mktemp -d "${TMPDIR:-/tmp}/etude-publish-check.XXXXXX")"
     trap 'rm -rf "$out"' EXIT
     .publish/publish.sh --dry-run --ref {{ref}} --out "$out" >/dev/null
+    command -v actionlint >/dev/null || { echo "install actionlint (brew install actionlint)" >&2; exit 1; }
+    actionlint "$out"/.github/workflows/*.yml
+
+# Start release <version>: refuses unless it is the version on origin/main, the public main is its export with green CI and build/release-notes.md is clean; shows the notes, asks for the version to be typed, then pushes the tag v<version> on the public main (release.yml does the rest). DRY_RUN=1 runs every check and pushes nothing
+release version:
+    .publish/release.sh {{version}}
 
 # Render every note style and `--shot-pattern all` headless twice and fail when two runs give different PNG bytes (about 2.5 min, so it runs in the batch gate only with `just gate --shots`, not in `just test`)
 shots-check: build

@@ -44,7 +44,10 @@ jobs:
     runs-on: ubuntu-24.04-arm
     container:
       image: debian:trixie@sha256:913f6706df59a68922d1dd08f78c2476560a8d367897200a6005b00e5f67c2d5
-    timeout-minutes: 90
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      actions: read
     steps:
       - name: Check the tag
         # First, so a tag that is not a release version stops the run before any work.
@@ -53,6 +56,18 @@ jobs:
           TAG: ${{ github.ref_name }}
         run: |
           [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::the tag $TAG is not v<major>.<minor>.<patch>"; exit 1; }
+
+      - name: Check that CI passed on this commit
+        # A tag on a commit that never passed CI is not built. The run may be the one on staging.
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends curl ca-certificates
+          url="$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$GITHUB_SHA&status=success&per_page=1"
+          count="$(curl -fsS -H "Authorization: Bearer $GH_TOKEN" "$url" | grep -o '"total_count": *[0-9]*' | grep -o '[0-9]*$')"
+          [ "${count:-0}" -gt 0 ] || { echo "::error::no successful CI run for commit $GITHUB_SHA"; exit 1; }
 
       - name: Install packages
         # setup.sh's build packages, plus git for the checkout and python3 for the piano samples.
@@ -92,7 +107,7 @@ jobs:
     if: github.repository == 'techneissa/etude'
     # macos-15 is arm64 (Apple silicon), the one Mac architecture released.
     runs-on: macos-15
-    timeout-minutes: 90
+    timeout-minutes: 45
     steps:
       - name: Check the tag
         shell: bash
@@ -129,6 +144,7 @@ jobs:
     if: github.repository == 'techneissa/etude'
     needs: [build, build-mac]
     runs-on: ubuntu-24.04-arm
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -183,6 +199,7 @@ jobs:
     if: github.repository == 'techneissa/etude'
     needs: sign
     runs-on: ubuntu-24.04-arm
+    timeout-minutes: 15
     permissions:
       contents: write
     steps:
@@ -196,5 +213,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
         run: |
-          gh release create "$TAG" release/* --repo "$GITHUB_REPOSITORY" --title "etude ${TAG#v}" \
-            --generate-notes
+          # The notes are the message of an annotated tag (`just release` makes one); any other
+          # tag gets generated notes.
+          notes=(--generate-notes)
+          sha="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG" --jq 'select(.object.type == "tag") | .object.sha')"
+          if [ -n "$sha" ]; then
+            gh api "repos/$GITHUB_REPOSITORY/git/tags/$sha" --jq .message > "$RUNNER_TEMP/notes.md"
+            notes=(--notes-file "$RUNNER_TEMP/notes.md")
+          fi
+          gh release create "$TAG" release/* --repo "$GITHUB_REPOSITORY" --title "etude ${TAG#v}" "${notes[@]}"

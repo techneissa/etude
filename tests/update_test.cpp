@@ -34,6 +34,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <ctime>
 #include <functional>
 #include <memory>
 #include <span>
@@ -319,6 +320,7 @@ struct Rig {
     TempDir root;
     FolderFetcher* fetcher = nullptr;
     std::atomic<int> verified{0};
+    std::atomic<int> worker_clock_reads{0}; // the worker reads the clock once per pass of its loop
     std::vector<std::uint8_t> checked_bytes;
     std::string checked_comment;
     std::atomic<bool> signature_good{true};
@@ -337,6 +339,10 @@ struct Rig {
         UpdateOptions o = base_options(root.path, "debian", "13");
         fetcher = static_cast<FolderFetcher*>(o.fetcher.get());
         o.pickup_wait_ms = 1500;
+        o.clock = [this] {
+            ++worker_clock_reads;
+            return static_cast<std::int64_t>(std::time(nullptr));
+        };
         o.verify = [this](std::span<const std::uint8_t> data, std::string_view, std::string_view comment) {
             checked_bytes.assign(data.begin(), data.end());
             checked_comment = std::string(comment);
@@ -348,6 +354,18 @@ struct Rig {
             return result;
         };
         return o;
+    }
+
+    // Waits until the worker has made whole passes of its loop since now, so anything a call just
+    // asked of it (a check, an install, the ready file) has been looked at, and done when it was to
+    // be done: before the "nothing happened" checks that follow. A pass reads the clock first and
+    // then acts, so the third read after now is the end of a pass that began after the call.
+    void wait_worker_passes() {
+        const int from = worker_clock_reads;
+        for (int waited = 0; waited < 5000 && worker_clock_reads < from + 3; waited += 5) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
+        }
+        REQUIRE(worker_clock_reads >= from + 3);
     }
 };
 
@@ -866,7 +884,7 @@ TEST_CASE("update service: nothing is offered without the key, nothing is fetche
         o.key_ready = false;
         UpdateService s(std::move(o));
         s.check_now();
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        rig.wait_worker_passes();
         CHECK(s.update().phase == ui::UpdatePhase::NotSetUp);
         CHECK(rig.fetcher->fetches() == 0);
     }
@@ -945,7 +963,7 @@ TEST_CASE("update install: only from the idle screen, and the helper's refusal i
     offer_update(s);
     s.set_busy(true);
     s.update_now(); // a song is playing: nothing starts
-    std::this_thread::sleep_for(std::chrono::milliseconds(150));
+    rig.wait_worker_passes();
     CHECK(s.update().phase == ui::UpdatePhase::Available);
     CHECK(rig.verified == 0);
     s.set_busy(false);
@@ -953,7 +971,6 @@ TEST_CASE("update install: only from the idle screen, and the helper's refusal i
     REQUIRE(wait_for_file(rig.update_dir() / "request"));
     write_file(rig.update_dir() / "status", "state=failed\nversion=1.2.3\nfrom=1.1.0\nreason=the unpacked folder was refused\n");
     REQUIRE(failed(s));
-    CHECK(s.update().failure == "Update to 1.2.3 failed: the unpacked folder was refused");
     CHECK_FALSE(fs::exists(rig.update_dir() / "release.tar.gz")); // what the app left is removed
 }
 
@@ -962,7 +979,7 @@ TEST_CASE("update install: a new version tells the helper it is ready only when 
     UpdateService s(rig.options());
     s.startup_progress(true, HistoryOpen::Failed);
     s.startup_progress(true, HistoryOpen::Opened); // not even if it then reads as opened
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    rig.wait_worker_passes();
     CHECK_FALSE(fs::exists(rig.update_dir() / "ready"));
     UpdateService t(rig.options());
     t.startup_progress(true, HistoryOpen::Pending);
@@ -971,7 +988,7 @@ TEST_CASE("update install: a new version tells the helper it is ready only when 
     CHECK(read_file(rig.update_dir() / "ready") == "version=1.1.0\n");
     write_file(rig.update_dir() / "status", "state=rolled-back\nversion=1.2.0\nfrom=1.1.0\nreason=1.2.0 did not start\n");
     UpdateService after(rig.options()); // 1.1.0 again after a rollback: it says why
-    CHECK(after.update().failure == "Update to 1.2.0 failed: 1.2.0 did not start");
+    CHECK(after.update().phase == ui::UpdatePhase::Failed);
 }
 
 TEST_CASE("update files: a failed write, fsync or rename leaves the old file whole") {

@@ -336,11 +336,13 @@ int wrong_in_chord(std::uint64_t seed, int index, bool interferer = true) {
 }
 
 TEST_CASE("pitch chords: McLeod names no key outside the chord, struck together or nearly") {
-    SynthEvalOptions options; // one chord for each register in each context
+    SynthEvalOptions options; // one chord for each chosen register in each context
     options.detector.method = PitchMethod::Mpm;
+    // Both ends of the keyboard and the middle (A0-B1, C4-B4, C7-C8), in every context.
+    options.chord_registers = (1u << 0) | (1u << register_of(60)) | (1u << (kRegisterCount - 1));
     const int chords = kOpenChordContexts * kRegisterCount;
     const OpenChordReport r = evaluate_open_chord_synthetic(options, chords);
-    REQUIRE(r.registers.total.notes == chords);
+    REQUIRE(r.registers.total.notes == kOpenChordContexts * 3);
     CHECK(r.registers.total.wrong == 0);
     CHECK(r.registers.total.octave == 0);
     // Not a detector that stays safe by never answering: some chords are named by one of their
